@@ -155,7 +155,7 @@ export class AcpClient {
             });
 
             this._process.stderr?.on('data', (chunk: Buffer) => {
-                console.log('[hermes acp]', chunk.toString());
+                this._onMessage('tool', `⚠️ ${chunk.toString().trim()}`);
             });
 
             this._app = client({ name: 'hermes-vscode' });
@@ -194,6 +194,7 @@ export class AcpClient {
 
             this._app.onRequest(methods.client.fs.writeTextFile as any, async ({ params }: any) => {
                 await this._onFileSystem.writeTextFile(params.path, params.content);
+                return {};
             });
 
             // Register terminal capability handlers

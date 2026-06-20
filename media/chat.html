@@ -727,7 +727,14 @@ body {
                 '<button class="delete-btn" data-id="' + s.id + '" title="Delete session">✕</button>' +
                 '</div>';
         }).join('');
-        // Click to view is disabled for now — future: session switching
+        // Click session to load it
+        list.querySelectorAll('.session-item').forEach(function(item) {
+            item.addEventListener('click', function(e) {
+                if ((e.target as HTMLElement).classList.contains('delete-btn')) return;
+                vscode.postMessage({ type: 'switchSession', sessionId: this.dataset.id });
+            });
+        });
+        // Delete buttons
         list.querySelectorAll('.delete-btn').forEach(function(btn) {
             btn.addEventListener('click', function(e) {
                 e.stopPropagation();

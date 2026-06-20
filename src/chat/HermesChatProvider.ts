@@ -21,7 +21,7 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
     private _view?: vscode.WebviewView;
     private _acp?: AcpClient;
     private _output: vscode.OutputChannel;
-    private _historyPath: string;
+    private _historyDir: string;
     private _sessionsPath: string;
     private _sessionMessages: ChatMessage[] = [];
     private _sessionId: string = '';
@@ -35,11 +35,15 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
         this._output = vscode.window.createOutputChannel('Hermes Chat', 'hermes-chat');
         const storagePath = context.globalStorageUri.fsPath;
         fs.mkdirSync(storagePath, { recursive: true });
-        this._historyPath = path.join(storagePath, 'chat-history.json');
+        this._historyDir = storagePath;
         this._sessionsPath = path.join(storagePath, 'sessions.json');
         this._sessionId = Date.now().toString(36);
         this._loadSessions();
         this._loadHistory();
+    }
+
+    private _msgPath(sid: string): string {
+        return path.join(this._historyDir, `msgs_${sid}.json`);
     }
 
     public resolveWebviewView(
@@ -89,6 +93,9 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
                 case 'switchAgent':
                     this._handleSwitchAgent(message.agentName);
                     break;
+                case 'switchSession':
+                    this._handleSwitchSession(message.sessionId);
+                    break;
             }
         });
 
@@ -116,7 +123,7 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
         this._sessionMessages.push({ role, text, timestamp: Date.now() });
         try {
             const keep = this._sessionMessages.slice(-100);
-            fs.writeFileSync(this._historyPath, JSON.stringify(keep, null, 2));
+            fs.writeFileSync(this._msgPath(this._sessionId), JSON.stringify(keep, null, 2));
             this._saveCurrentSession();
         } catch {
             // non-critical
@@ -125,8 +132,9 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
 
     private _loadHistory(): void {
         try {
-            if (fs.existsSync(this._historyPath)) {
-                const data = fs.readFileSync(this._historyPath, 'utf-8');
+            const p = this._msgPath(this._sessionId);
+            if (fs.existsSync(p)) {
+                const data = fs.readFileSync(p, 'utf-8');
                 this._sessionMessages = JSON.parse(data);
                 this._log(`Loaded ${this._sessionMessages.length} messages from history`);
             }
@@ -290,7 +298,7 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
         this._saveCurrentSession();
         this._sessionMessages = [];
         this._sessionId = Date.now().toString(36);
-        try { fs.unlinkSync(this._historyPath); } catch { /* ignore */ }
+        try { fs.unlinkSync(this._msgPath(this._sessionId)); } catch { /* ignore */ }
 
         const config = vscode.workspace.getConfiguration('hermes');
         const configCwd = config.get<string>('cwd') || undefined;
@@ -305,11 +313,24 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
         this._postMessage({ type: 'sessionList', sessions: this._sessions });
     }
 
+    private async _handleSwitchSession(sessionId: string): Promise<void> {
+        this._log(`Switch to session: ${sessionId}`);
+        this._saveCurrentSession();
+        this._acp?.newSession(process.cwd()); // new ACP session for the loaded context
+        this._sessionId = sessionId;
+        this._sessionMessages = [];
+        this._loadHistory();
+        this._postMessage({ type: 'newChat' });
+        this._postMessage({ type: 'sessionList', sessions: this._sessions });
+        this._restoreMessages();
+    }
+
     private async _handleDeleteSession(sessionId: string): Promise<void> {
         this._log(`Delete session: ${sessionId}`);
         this._sessions = this._sessions.filter(s => s.id !== sessionId);
         try {
             fs.writeFileSync(this._sessionsPath, JSON.stringify(this._sessions, null, 2));
+            fs.unlinkSync(this._msgPath(sessionId)); // also delete messages
         } catch { /* ignore */ }
         this._postMessage({ type: 'sessionList', sessions: this._sessions });
     }
@@ -321,7 +342,7 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
         this._acp = undefined;
         this._sessionMessages = [];
         this._sessionId = Date.now().toString(36);
-        try { fs.unlinkSync(this._historyPath); } catch { /* ignore */ }
+        try { fs.unlinkSync(this._msgPath(this._sessionId)); } catch { /* ignore */ }
         this._postMessage({ type: 'newChat' });
         this._postMessage({ type: 'agentList', agents: this._getAgentNames() });
         await this._connect(agentName);
