@@ -3,7 +3,9 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { AcpClient, AcpStatus, ModelListState, TokenUsage } from '../acp/AcpClient';
 import { buildFallbackModelListState, isRuntimeModelSource } from '../acp/modelConfig';
-import { getWebviewLocale, localizeStatusMessage, t } from '../i18n';
+import { getLocale, getWebviewLocale, initI18n, localizeStatusMessage, t } from '../i18n';
+import { SupportedLocale } from '../i18n/types';
+import { WEBVIEW_LOCALE_HELPER } from '../i18n/format';
 
 interface ChatMessage {
     role: string;
@@ -41,6 +43,7 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
     private _activeAgentName: string = '';
     private _modelSwitchInFlight: Promise<void> | undefined;
     private _tokenUsage: TokenUsage | null = null;
+    private _webviewLocale?: SupportedLocale;
 
     constructor(
         private readonly _extensionUri: vscode.Uri,
@@ -98,6 +101,13 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
         };
 
         webviewView.webview.html = this._getHtml();
+        this._webviewLocale = getLocale();
+
+        webviewView.onDidChangeVisibility(() => {
+            if (webviewView.visible) {
+                this._syncWebviewLocale();
+            }
+        });
 
         webviewView.webview.onDidReceiveMessage((message) => {
             switch (message.type) {
@@ -105,6 +115,7 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
                     this._handleUserMessage(message.text);
                     break;
                 case 'cancel':
+                    this._lastAssistantText = '';
                     this._acp?.cancel();
                     break;
                 case 'openFile':
@@ -124,6 +135,7 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
                     break;
                 case 'ready':
                     this._log('WebView ready');
+                    this._syncWebviewLocale();
                     this._postPluginInfo();
                     this._postSessionList();
                     this._postProfileList();
@@ -185,7 +197,11 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
     private _restoreMessages(): void {
         if (this._sessionMessages.length === 0) return;
         this._log(`Restoring ${this._sessionMessages.length} messages`);
-        this._postMessage({ type: 'restoreHistory', messages: this._sessionMessages });
+        this._postMessage({
+            type: 'restoreHistory',
+            messages: this._sessionMessages,
+            localHistoryOnly: true,
+        });
     }
 
     private _saveMessage(role: string, text: string): void {
@@ -473,6 +489,9 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
         }
         const known = agentState.models.some(m => m.valueId === session.modelId);
         if (!known) {
+            const label = session.modelLabel || session.modelId;
+            this._log(`Saved model not available: ${label}`);
+            vscode.window.showWarningMessage(t('savedModelUnavailable', label));
             return;
         }
         try {
@@ -806,6 +825,22 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
         this._postMessage({ type: 'insertInput', text });
     }
 
+    /** Push updated locale strings when VS Code display language changes. */
+    public updateLocale(): void {
+        this._webviewLocale = undefined;
+        this._syncWebviewLocale();
+    }
+
+    private _syncWebviewLocale(): void {
+        const current = initI18n();
+        if (current === this._webviewLocale) {
+            return;
+        }
+        this._webviewLocale = current;
+        this._postMessage({ type: 'setLocale', locale: getWebviewLocale() });
+        this._postSessionList();
+    }
+
     public async sendText(text: string): Promise<void> {
         if (this._modelSwitchInFlight) {
             await this._modelSwitchInFlight;
@@ -814,9 +849,13 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
             vscode.window.showWarningMessage(t('hermesNotConnectedConnecting'));
             await this._connect();
         }
+        if (!this._acp) {
+            vscode.window.showWarningMessage(t('hermesNotConnected'));
+            return;
+        }
         this._postMessage({ type: 'addMessage', role: 'user', text });
         this._saveMessage('user', text);
-        this._acp?.sendMessage(text);
+        this._acp.sendMessage(text);
     }
 
     public dispose(): void {
@@ -916,9 +955,13 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
                 .replace('{{MARKED_URI}}', vendorUri('marked.min.js'))
                 .replace('{{HIGHLIGHT_URI}}', vendorUri('highlight.min.js'))
                 .replace('{{HIGHLIGHT_CSS_URI}}', vendorUri('github-dark.min.css'))
-                .replace('{{LOCALE_JSON}}', JSON.stringify(getWebviewLocale()).replace(/</g, '\\u003c'));
+                .replace('{{PURIFY_URI}}', vendorUri('purify.min.js'))
+                .replace('{{LOCALE_JSON}}', JSON.stringify(getWebviewLocale()).replace(/</g, '\\u003c'))
+                .replace('{{LOCALE_HELPER}}', WEBVIEW_LOCALE_HELPER);
         } else {
-            html = html.replace('{{LOCALE_JSON}}', '{}');
+            html = html
+                .replace('{{LOCALE_JSON}}', '{}')
+                .replace('{{LOCALE_HELPER}}', WEBVIEW_LOCALE_HELPER);
         }
 
         return html;

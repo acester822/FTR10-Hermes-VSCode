@@ -1,6 +1,6 @@
-import * as vscode from 'vscode';
 import { en } from './locales/en';
 import { zhCn } from './locales/zh-cn';
+import { formatLocaleString } from './format';
 import { LocaleKey, LocaleStrings, SupportedLocale } from './types';
 
 const LOCALES: Record<SupportedLocale, LocaleStrings> = {
@@ -11,12 +11,23 @@ const LOCALES: Record<SupportedLocale, LocaleStrings> = {
 let currentLocale: SupportedLocale = 'en';
 let strings: LocaleStrings = en;
 
-export function resolveLocale(language?: string): SupportedLocale {
-    const lang = (language ?? vscode.env.language).toLowerCase();
+/** Pure locale resolution — safe for standalone unit tests without vscode. */
+export function resolveLocaleFromLanguage(language: string): SupportedLocale {
+    const lang = language.toLowerCase();
     if (lang === 'zh-cn' || lang === 'zh-hans' || lang.startsWith('zh-cn')) {
         return 'zh-cn';
     }
     return 'en';
+}
+
+export function resolveLocale(language?: string): SupportedLocale {
+    if (language !== undefined) {
+        return resolveLocaleFromLanguage(language);
+    }
+    // Lazy require so standalone mocha tests can import this module without vscode.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const vscode = require('vscode') as typeof import('vscode');
+    return resolveLocaleFromLanguage(vscode.env.language);
 }
 
 export function initI18n(language?: string): SupportedLocale {
@@ -34,11 +45,8 @@ export function getWebviewLocale(): LocaleStrings {
 }
 
 export function t(key: LocaleKey, ...args: (string | number)[]): string {
-    let text = strings[key] ?? en[key] ?? key;
-    args.forEach((arg, index) => {
-        text = text.replace(`{${index}}`, String(arg));
-    });
-    return text;
+    const text = strings[key] ?? en[key] ?? key;
+    return formatLocaleString(text, ...args);
 }
 
 /** Map ACP status messages (English from AcpClient) to localized strings. */

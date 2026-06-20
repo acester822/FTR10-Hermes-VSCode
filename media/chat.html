@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="stylesheet" href="{{HIGHLIGHT_CSS_URI}}">
 <script src="{{MARKED_URI}}"></script>
+<script src="{{PURIFY_URI}}"></script>
 <script src="{{HIGHLIGHT_URI}}"></script>
 <style>
 :root {
@@ -423,6 +424,32 @@ body {
 .session-tab .tab-close:hover {
     opacity: 1;
     color: var(--error);
+}
+.session-tab .tab-local-badge {
+    flex-shrink: 0;
+    font-size: 9px;
+    line-height: 1.2;
+    padding: 1px 4px;
+    border-radius: 3px;
+    background: color-mix(in srgb, var(--primary) 18%, var(--text-block));
+    color: var(--dim);
+    border: 1px solid color-mix(in srgb, var(--primary) 30%, var(--border));
+}
+.local-history-divider {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 16px 12px;
+    font-size: 11px;
+    color: var(--dim);
+    line-height: 1.4;
+}
+.local-history-divider::before,
+.local-history-divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
 }
 #logBadge {
     display: none;
@@ -1300,7 +1327,7 @@ mark.search-mark-active {
                 <div class="dropdown-item" data-menu="settings" id="menuSettingsItem"></div>
                 <div class="dropdown-item" data-menu="help" id="menuHelpItem"></div>
                 <div class="dropdown-divider"></div>
-                <div class="dropdown-item" data-menu="logs" id="menuLogsItem">日志<span class="item-badge" id="logMenuBadge" style="display:none"></span></div>
+                <div class="dropdown-item" data-menu="logs" id="menuLogsItem"><span class="item-badge" id="logMenuBadge" style="display:none"></span></div>
             </div>
         </div>
     </div>
@@ -1401,7 +1428,8 @@ mark.search-mark-active {
 
 <script>
 (function() {
-    const locale = {{LOCALE_JSON}};
+    let locale = {{LOCALE_JSON}};
+    {{LOCALE_HELPER}}
     const vscode = acquireVsCodeApi();
     const messagesEl = document.getElementById('messages');
     const inputEl = document.getElementById('input');
@@ -1426,6 +1454,26 @@ mark.search-mark-active {
     const statusDot = document.getElementById('statusDot');
     const statusText = document.getElementById('statusText');
     let placeholder = document.getElementById('placeholder');
+    let lastSessions = [];
+    let lastActiveSessionId = '';
+
+    const LOCAL_HISTORY_DIVIDER_ID = 'localHistoryDivider';
+
+    function removeLocalHistoryDivider() {
+        const divider = document.getElementById(LOCAL_HISTORY_DIVIDER_ID);
+        if (divider) divider.remove();
+    }
+
+    function insertLocalHistoryDivider() {
+        removeLocalHistoryDivider();
+        const divider = document.createElement('div');
+        divider.id = LOCAL_HISTORY_DIVIDER_ID;
+        divider.className = 'local-history-divider';
+        divider.title = locale.localHistoryDividerTitle || '';
+        divider.textContent = locale.localHistoryDivider || '';
+        placeholder.style.display = 'none';
+        messagesEl.appendChild(divider);
+    }
 
     function setConnectingPlaceholder() {
         if (!placeholder) return;
@@ -1472,12 +1520,9 @@ mark.search-mark-active {
         if (menuHelpItem) menuHelpItem.textContent = locale.menuHelp;
         const menuLogsItem = document.getElementById('menuLogsItem');
         if (menuLogsItem) {
+            const badge = menuLogsItem.querySelector('#logMenuBadge');
             menuLogsItem.textContent = locale.menuLogs;
-            const badge = document.createElement('span');
-            badge.className = 'item-badge';
-            badge.id = 'logMenuBadge';
-            badge.style.display = 'none';
-            menuLogsItem.appendChild(badge);
+            if (badge) menuLogsItem.appendChild(badge);
         }
         setConnectingPlaceholder();
         if (inputResizeHandle) {
@@ -1651,7 +1696,7 @@ mark.search-mark-active {
         tokenUsageArc.style.strokeDasharray = filled + ' ' + TOKEN_RING_CIRCUMFERENCE;
         const level = pct >= 90 ? 'high' : pct >= 70 ? 'medium' : 'low';
         tokenUsageRing.dataset.level = level;
-        const label = '输入 TOKEN: ' + formatTokenCount(usedTokens) + ' / ' + formatTokenCount(totalTokens) + ' (' + pct + '%)';
+        const label = localeText('tokenUsageLabel', formatTokenCount(usedTokens), formatTokenCount(totalTokens), pct);
         tokenUsageRing.title = label;
         tokenUsageRing.setAttribute('aria-label', label);
         tokenUsageRing.hidden = false;
@@ -2035,7 +2080,7 @@ mark.search-mark-active {
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.className = 'copy-btn';
-        btn.title = '复制';
+        btn.title = locale.copy;
         btn.innerHTML = COPY_ICON_SVG;
         btn.addEventListener('click', function(e) {
             e.stopPropagation();
@@ -2043,10 +2088,10 @@ mark.search-mark-active {
             if (!text) return;
             copyToClipboard(text).then(function() {
                 btn.classList.add('copied');
-                btn.title = '已复制';
+                btn.title = locale.copied;
                 setTimeout(function() {
                     btn.classList.remove('copied');
-                    btn.title = '复制';
+                    btn.title = locale.copy;
                 }, 1500);
             });
         });
@@ -2136,9 +2181,14 @@ mark.search-mark-active {
 
     function renderMarkdown(text) {
         const html = marked.parse(text);
+        if (typeof DOMPurify !== 'undefined') {
+            return DOMPurify.sanitize(html, {
+                USE_PROFILES: { html: true },
+                ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto|file):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i,
+            });
+        }
         const div = document.createElement('div');
         div.innerHTML = html;
-        // Sanitize: remove event handlers and javascript: links
         div.querySelectorAll('*').forEach(function(n) {
             if (!n.attributes) return;
             for (let i = n.attributes.length - 1; i >= 0; i--) {
@@ -2197,7 +2247,7 @@ mark.search-mark-active {
         if (!pre || pre.dataset.insertReady) return;
         pre.dataset.insertReady = '1';
         hljs.highlightElement(codeBlock);
-        pre.title = '点击插入到输入框';
+        pre.title = locale.clickToInsert;
         pre.addEventListener('click', function (e) {
             if (e.target.closest('.code-actions')) return;
             e.preventDefault();
@@ -2215,7 +2265,7 @@ mark.search-mark-active {
         actions.className = 'code-actions';
         const btn = document.createElement('button');
         btn.textContent = locale.insert + (lang ? ' (' + lang + ')' : '');
-        btn.title = '插入到输入框';
+        btn.title = locale.insertToInput;
         btn.addEventListener('click', function (e) {
             e.stopPropagation();
             insertCodeFromBlock(codeBlock);
@@ -2309,7 +2359,7 @@ mark.search-mark-active {
                 link.href = '#';
                 link.className = 'file-ref';
                 link.textContent = match[0];
-                link.title = '点击打开 · 悬停预览';
+                link.title = locale.fileLinkTitle;
                 link.dataset.path = match[1];
                 link.addEventListener('click', function (e) {
                     e.preventDefault();
@@ -2416,6 +2466,7 @@ mark.search-mark-active {
 
     function resetChatView() {
         clearChatSearch();
+        removeLocalHistoryDivider();
         messagesEl.innerHTML = '<div class="placeholder" id="placeholder">' + escapeHtml(locale.readyPlaceholder) + '</div>';
         placeholder = document.getElementById('placeholder');
         streamingMessageId = null;
@@ -2435,18 +2486,24 @@ mark.search-mark-active {
         resetChatView();
     }
 
-    function restoreHistory(messages) {
+    function restoreHistory(messages, localHistoryOnly) {
         streamingMessageId = null;
         thoughtMsgId = null;
         toolCallMap = {};
         window._hermesRendered = false;
         if (!messages || messages.length === 0) {
+            removeLocalHistoryDivider();
             return;
         }
         for (const m of messages) {
             addMessage(m.role, m.text, { restore: true });
         }
         updateQuickActionBtns();
+        if (localHistoryOnly) {
+            insertLocalHistoryDivider();
+        } else {
+            removeLocalHistoryDivider();
+        }
     }
 
     function sendMessage() {
@@ -2820,6 +2877,8 @@ mark.search-mark-active {
 
     function renderSessionTabs(sessions, activeId) {
         activeSessionId = activeId || activeSessionId;
+        lastSessions = sessions || [];
+        lastActiveSessionId = activeSessionId;
         if (editingSessionId) {
             return;
         }
@@ -2830,10 +2889,14 @@ mark.search-mark-active {
         tabBar.innerHTML = sessions.map(function(s) {
             const active = s.id === activeSessionId ? ' active' : '';
             const title = escapeHtml(s.title || locale.newChat);
+            const localBadge = s.messageCount > 0
+                ? '<span class="tab-local-badge" title="' + escapeHtml(locale.localHistoryBadge) + '">' + escapeHtml(locale.localHistoryBadge) + '</span>'
+                : '';
             return '<div class="session-tab' + active + '" data-id="' + escapeHtml(s.id) + '" title="' + title + '">' +
                 '<span class="tab-title">' + title + '</span>' +
-                '<span class="tab-edit" data-id="' + escapeHtml(s.id) + '" title="Rename">' + TAB_EDIT_SVG + '</span>' +
-                '<span class="tab-close" data-id="' + escapeHtml(s.id) + '" title="Close">×</span>' +
+                localBadge +
+                '<span class="tab-edit" data-id="' + escapeHtml(s.id) + '" title="' + escapeHtml(locale.tabRename) + '">' + TAB_EDIT_SVG + '</span>' +
+                '<span class="tab-close" data-id="' + escapeHtml(s.id) + '" title="' + escapeHtml(locale.tabClose) + '">×</span>' +
                 '</div>';
         }).join('');
 
@@ -2982,7 +3045,22 @@ mark.search-mark-active {
                 break;
 
             case 'restoreHistory':
-                restoreHistory(msg.messages);
+                restoreHistory(msg.messages, msg.localHistoryOnly);
+                break;
+
+            case 'setLocale':
+                if (msg.locale) {
+                    locale = msg.locale;
+                    applyLocale();
+                    if (lastSessions.length > 0) {
+                        renderSessionTabs(lastSessions, lastActiveSessionId);
+                    }
+                    const divider = document.getElementById(LOCAL_HISTORY_DIVIDER_ID);
+                    if (divider) {
+                        divider.textContent = locale.localHistoryDivider || '';
+                        divider.title = locale.localHistoryDividerTitle || '';
+                    }
+                }
                 break;
 
             case 'sessionList':

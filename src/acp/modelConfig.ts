@@ -187,3 +187,19 @@ export function isRuntimeModelSource(configId: string): boolean {
 export function isHermesModelValueId(valueId: string): boolean {
     return /^[\w.-]+:[\w./-]+$/i.test(valueId.trim());
 }
+
+/** Choose Hermes native session/set_model vs standard set_config_option. */
+export function shouldUseHermesSetModel(
+    configId: string,
+    modelListState: ModelListState | null,
+    hermesModelsRaw: unknown,
+    valueId: string
+): boolean {
+    const effectiveConfigId = configId || modelListState?.configId || '';
+    return (
+        effectiveConfigId === HERMES_MODEL_CONFIG_ID ||
+        modelListState?.configId === HERMES_MODEL_CONFIG_ID ||
+        hermesModelsRaw != null ||
+        isHermesModelValueId(valueId)
+    );
+}

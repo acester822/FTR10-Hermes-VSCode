@@ -8,6 +8,7 @@ export interface LocaleStrings {
     deny: string;
     waitForResponse: string;
     failedSwitchModel: string;
+    savedModelUnavailable: string;
     modelPreferenceSaved: string;
     hermesNotConnected: string;
     couldNotOpenFile: string;
@@ -103,6 +104,16 @@ export interface LocaleStrings {
     noModels: string;
     modelFromAgent: string;
     modelLocalPreference: string;
+    tokenUsageLabel: string;
+    copied: string;
+    clickToInsert: string;
+    insertToInput: string;
+    fileLinkTitle: string;
+    tabRename: string;
+    tabClose: string;
+    localHistoryDivider: string;
+    localHistoryDividerTitle: string;
+    localHistoryBadge: string;
 }
 
 export type LocaleKey = keyof LocaleStrings;

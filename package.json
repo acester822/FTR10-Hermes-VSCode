@@ -2,8 +2,8 @@
   "name": "hermes-agent-chat",
   "displayName": "%extension.displayName%",
   "description": "%extension.description%",
-  "version": "0.2.0-beta.1",
-  "publisher": "jove-rina",
+  "version": "0.2.0",
+  "publisher": "JoveRina",
   "icon": "media/icon.png",
   "license": "MIT",
   "engines": {
@@ -23,7 +23,7 @@
         {
           "id": "hermes-sidebar",
           "title": "%viewsContainers.activitybar.title%",
-          "icon": "$(comment-discussion)"
+          "icon": "media/activitybar.svg"
         }
       ]
     },

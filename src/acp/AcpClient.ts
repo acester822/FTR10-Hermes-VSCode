@@ -18,7 +18,7 @@ import {
     buildModelListStateFromHermesModels,
     buildModelListStateFromSessionResponse,
     HERMES_MODEL_CONFIG_ID,
-    isHermesModelValueId,
+    shouldUseHermesSetModel,
     type ModelListState
 } from './modelConfig';
 
@@ -322,11 +322,12 @@ export class AcpClient {
         }
 
         const effectiveConfigId = configId || this._modelListState?.configId || '';
-        const useHermesSetModel =
-            effectiveConfigId === HERMES_MODEL_CONFIG_ID ||
-            this._modelListState?.configId === HERMES_MODEL_CONFIG_ID ||
-            this._hermesModelsRaw != null ||
-            isHermesModelValueId(valueId);
+        const useHermesSetModel = shouldUseHermesSetModel(
+            configId,
+            this._modelListState,
+            this._hermesModelsRaw,
+            valueId
+        );
 
         if (useHermesSetModel) {
             this._onLog(`session/set_model → ${valueId}`);

@@ -10,6 +10,7 @@ import {
     HERMES_MODEL_CONFIG_ID,
     SETTINGS_MODEL_CONFIG_ID,
     isHermesModelValueId,
+    shouldUseHermesSetModel,
 } from '../../acp/modelConfig';
 
 describe('modelConfig', () => {
@@ -119,5 +120,28 @@ describe('modelConfig', () => {
     it('isHermesModelValueId detects provider-prefixed ids', () => {
         assert.strictEqual(isHermesModelValueId('deepseek:deepseek-v4-pro'), true);
         assert.strictEqual(isHermesModelValueId('gpt-4'), false);
+    });
+
+    it('shouldUseHermesSetModel routes Hermes native models', () => {
+        assert.strictEqual(
+            shouldUseHermesSetModel(HERMES_MODEL_CONFIG_ID, null, null, 'deepseek:model'),
+            true
+        );
+        assert.strictEqual(
+            shouldUseHermesSetModel('', { configId: HERMES_MODEL_CONFIG_ID, currentValueId: '', currentLabel: '', models: [], fromAgent: true }, null, 'x'),
+            true
+        );
+        assert.strictEqual(
+            shouldUseHermesSetModel('', null, [{ id: 'a', name: 'A' }], 'gpt-4'),
+            true
+        );
+        assert.strictEqual(
+            shouldUseHermesSetModel('', null, null, 'deepseek:model'),
+            true
+        );
+        assert.strictEqual(
+            shouldUseHermesSetModel('model-config', { configId: 'model-config', currentValueId: 'gpt-4', currentLabel: 'GPT-4', models: [], fromAgent: true }, null, 'gpt-4'),
+            false
+        );
     });
 });
