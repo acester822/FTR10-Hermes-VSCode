@@ -1,0 +1,9 @@
+{
+    "extends": "../../tsconfig.json",
+    "compilerOptions": {
+        "outDir": "../out/tests",
+        "types": ["mocha", "node"],
+        "lib": ["ES2022"]
+    },
+    "include": ["./**/*.test.ts", "./**/*.ts"]
+}

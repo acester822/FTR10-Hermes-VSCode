@@ -93,8 +93,14 @@ export class AcpClient {
             });
 
             const childInput = new WritableStream<Uint8Array>({
-                write: (chunk) => {
-                    this._process?.stdin?.write(Buffer.from(chunk));
+                write: async (chunk) => {
+                    const canContinue = this._process?.stdin?.write(Buffer.from(chunk));
+                    if (canContinue === false) {
+                        // Backpressure: wait for drain before writing more
+                        await new Promise<void>((resolve) => {
+                            this._process?.stdin?.once('drain', () => resolve());
+                        });
+                    }
                 },
                 close: () => {
                     this._process?.stdin?.end();
