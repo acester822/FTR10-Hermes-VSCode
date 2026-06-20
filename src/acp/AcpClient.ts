@@ -208,7 +208,7 @@ export class AcpClient {
         } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
             this._transitionTo('error', `Connection failed: ${msg}`);
-            await this.stop();
+            this.stop();
             throw err;
         }
     }
@@ -266,10 +266,15 @@ export class AcpClient {
         }
     }
 
-    async stop(): Promise<void> {
+    stop(): void {
         try {
             this._session?.dispose();
         } catch { /* ignore */ }
+        // Kill all terminal child processes
+        for (const [, term] of this._terminals) {
+            try { term.process.kill(); } catch { /* ignore */ }
+        }
+        this._terminals.clear();
         this._session = null;
         this._conn = null;
         this._app = null;

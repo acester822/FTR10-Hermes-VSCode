@@ -150,9 +150,8 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
 
         try {
             await this._acp.start(cwd, configPath);
-        } catch (err) {
-            const msg = err instanceof Error ? err.message : String(err);
-            this._postMessage({ type: 'status', status: 'error', message: msg });
+        } catch {
+            // start() already set error status and cleaned up — just null the ref
             this._acp = undefined;
         }
     }
