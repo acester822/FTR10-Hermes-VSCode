@@ -5,21 +5,37 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.6] - 2026-06-21
+
+### Added
+
+- Auto-discover Hermes profiles via `hermes profile list` when `hermes.agents` is not configured
+- Profile-isolated local session history and model preference storage (`profileStorage`)
+- Hermes profile CLI arguments, ACP model catalog parsing, and grouped display (`acpModelCatalog`, `hermesProfile`, `profileDiscovery`)
+
+### Fixed
+
+- When selecting the **Default** profile, explicitly pass `--profile default` instead of launching `hermes acp` without a profile argument (which previously followed Hermes' globally active profile and caused incorrect default model display)
+- Model list is now fetched **only via ACP**: prefer Hermes `model.options`, fall back to session `models.availableModels`; no longer reads `config.yaml`
+- Model dropdown displays models grouped by provider; the selected model aligns with the profile default model returned by ACP
+- On reconnect and retry, preserve the current profile in the chat UI instead of relying solely on workspace settings
+
 ## [0.2.5] - 2026-06-21
 
 ### Added
 
-- **聊天内权限审批**：在 WebView 中展示权限请求卡片（替代 `showWarningMessage`），支持批准/拒绝及会话级/永久选项；详情默认折叠，超出三行可展开
-- **审批历史持久化**：权限卡片写入会话消息记录，刷新或切换会话后可只读恢复
-- **MCP 配置转发**：从 `~/.cursor/mcp.json` 及工作区 `.cursor` / `.vscode` 的 `mcp.json` 读取 MCP 服务器，并在 `session/new` 时传给 Hermes
-- **流式推送智能滚动**：默认跟随到底部；用户手动滚动后暂停，5 秒无操作且仍在推送时恢复
-- **TOKEN 圆环占比**：圆环中心显示当前 token 使用百分比
-- 权限选项 i18n（`permissionOptions.ts`）及 `mcpConfig` / `permissionOptions` 单元测试
-- 集成测试脚本 `scripts/test-session-new.mjs`
+- **In-chat permission approval**: Show permission request cards in the WebView (replacing `showWarningMessage`), with approve/deny and session-level/permanent options; details collapsed by default, expandable when exceeding three lines
+- **Approval history persistence**: Permission cards are written to session message history for read-only recovery after refresh or session switch
+- **MCP config forwarding**: Read MCP servers from `~/.cursor/mcp.json` and workspace `.cursor` / `.vscode` `mcp.json`, passed to Hermes on `session/new`
+- **Smart scroll during streaming**: Follow to bottom by default; pause when the user scrolls manually, resume after 5 seconds of inactivity while still streaming
+- **TOKEN ring percentage**: Display current token usage percentage in the center of the ring
+- Permission options i18n (`permissionOptions.ts`) and unit tests for `mcpConfig` / `permissionOptions`
+- Integration test script `scripts/test-session-new.mjs`
 
 ### Fixed
 
-- 审批或工具调用后，后续助手回复不再错误追加到旧气泡，而是开启新消息段
-- `allow_session` 选项不再误显示为「始终允许」（`optionId` 优先于 `kind` 映射）
+- After approval or tool calls, subsequent assistant replies no longer incorrectly append to old bubbles but start a new message segment
+- `allow_session` option no longer incorrectly displays as "Always allow" (`optionId` takes priority over `kind` mapping)
 
+[0.2.6]: https://github.com/jove-rina/rina-hermes-acp/compare/v0.2.5...v0.2.6
 [0.2.5]: https://github.com/jove-rina/rina-hermes-acp/compare/v0.2.2...v0.2.5

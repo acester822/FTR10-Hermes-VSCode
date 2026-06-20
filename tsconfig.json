@@ -3,6 +3,7 @@
     "module": "commonjs",
     "target": "ES2022",
     "lib": ["ES2022"],
+    "types": ["node"],
     "outDir": "out",
     "rootDir": "src",
     "sourceMap": true,
@@ -14,5 +15,5 @@
     "declaration": true
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "out", ".vscode-test"]
+  "exclude": ["node_modules", "out", "src/out", ".vscode-test"]
 }

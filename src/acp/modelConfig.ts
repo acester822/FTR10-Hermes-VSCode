@@ -12,12 +12,33 @@ export interface ModelListItem {
     name: string;
 }
 
+export interface ModelProviderGroup {
+    slug: string;
+    name: string;
+    isPrimary?: boolean;
+    models: ModelListItem[];
+}
+
+export interface ProfileDefaultModel {
+    modelName: string;
+    valueId: string;
+    groupSlug?: string;
+}
+
+export interface ProfileModelCatalog {
+    groups: ModelProviderGroup[];
+    flatModels: ModelListItem[];
+    /** Profile ``model.default`` resolved against the fetched provider catalog. */
+    profileDefault?: ProfileDefaultModel;
+}
+
 export interface ModelListState {
     /** ACP config option id (session/set_config_option) */
     configId: string;
     currentValueId: string;
     currentLabel: string;
     models: ModelListItem[];
+    groups?: ModelProviderGroup[];
     /** true when options come from agent configOptions; false for settings fallback */
     fromAgent: boolean;
 }
@@ -186,6 +207,214 @@ export function isRuntimeModelSource(configId: string): boolean {
 /** Hermes encodes choices as ``provider:model-id``. */
 export function isHermesModelValueId(valueId: string): boolean {
     return /^[\w.-]+:[\w./-]+$/i.test(valueId.trim());
+}
+
+/** Build a Hermes ``session/set_model`` id from config provider + model name. */
+export function encodeHermesModelValueId(provider: string | undefined, modelName: string): string {
+    const model = modelName.trim();
+    const rawProvider = (provider ?? '').trim().toLowerCase();
+    if (!rawProvider || rawProvider === 'custom' || rawProvider.startsWith('custom:')) {
+        return `custom:${model}`;
+    }
+    return `${rawProvider}:${model}`;
+}
+
+/** Merge supplemental models; dedupe by valueId only. */
+export function mergeModelListItems(
+    primary: ModelListItem[],
+    supplemental: ModelListItem[]
+): ModelListItem[] {
+    if (supplemental.length === 0) {
+        return primary;
+    }
+    const merged = [...primary];
+    const seenIds = new Set(primary.map(m => m.valueId));
+
+    for (const item of supplemental) {
+        if (seenIds.has(item.valueId)) {
+            continue;
+        }
+        merged.push(item);
+        seenIds.add(item.valueId);
+    }
+    return merged;
+}
+
+function findModelInGroups(
+    groups: ModelProviderGroup[],
+    valueId: string
+): ModelListItem | undefined {
+    for (const group of groups) {
+        const found = group.models.find(m => m.valueId === valueId);
+        if (found) {
+            return found;
+        }
+    }
+    return undefined;
+}
+
+function upsertModelInGroups(
+    groups: ModelProviderGroup[],
+    groupName: string,
+    item: ModelListItem
+): ModelProviderGroup[] {
+    const next = groups.map(g => ({ ...g, models: [...g.models] }));
+    for (const group of next) {
+        if (group.models.some(m => m.valueId === item.valueId)) {
+            return next;
+        }
+    }
+    let target = next.find(g => g.name === groupName);
+    if (!target) {
+        target = { slug: 'other', name: groupName, models: [] };
+        next.push(target);
+    }
+    target.models.push(item);
+    return next;
+}
+
+/** Build grouped picker state: full provider catalog first, then align current model. */
+export function buildModelListStateFromCatalog(
+    catalog: ProfileModelCatalog,
+    agentState: ModelListState | null,
+    options: {
+        modelId?: string;
+        modelLabel?: string;
+        settingsModels?: Array<{ id: string; name: string }>;
+    } = {}
+): ModelListState | null {
+    let groups = catalog.groups.map(g => ({
+        ...g,
+        models: g.models.map(m => ({ ...m })),
+    }));
+
+    for (const setting of options.settingsModels ?? []) {
+        groups = upsertModelInGroups(groups, 'Other', {
+            valueId: setting.id,
+            name: setting.name,
+        });
+    }
+
+    const savedId = options.modelId?.trim() || '';
+    if (savedId && !findModelInGroups(groups, savedId)) {
+        groups = upsertModelInGroups(groups, 'Other', {
+            valueId: savedId,
+            name: options.modelLabel || savedId,
+        });
+    }
+
+    const flatModels = flattenGroupedModels(groups);
+    if (!flatModels.length) {
+        return agentState;
+    }
+
+    const current = resolveCurrentModelSelection(flatModels, groups, {
+        savedModelId: savedId,
+        profileDefault: catalog.profileDefault,
+        agentCurrentId: agentState?.currentValueId,
+    });
+
+    return {
+        configId: agentState?.configId || HERMES_MODEL_CONFIG_ID,
+        currentValueId: current.valueId,
+        currentLabel: current.label,
+        models: flatModels,
+        groups,
+        fromAgent: agentState?.fromAgent ?? true,
+    };
+}
+
+function resolveCurrentModelSelection(
+    flatModels: ModelListItem[],
+    groups: ModelProviderGroup[],
+    options: {
+        savedModelId?: string;
+        profileDefault?: ProfileDefaultModel;
+        agentCurrentId?: string;
+    }
+): { valueId: string; label: string } {
+    const inList = (id: string) => Boolean(id) && flatModels.some(m => m.valueId === id);
+    const labelFor = (id: string) =>
+        findModelInGroups(groups, id)?.name ||
+        flatModels.find(m => m.valueId === id)?.name ||
+        id;
+
+    if (options.savedModelId && inList(options.savedModelId)) {
+        return { valueId: options.savedModelId, label: labelFor(options.savedModelId) };
+    }
+
+    const profileDefault = options.profileDefault;
+    if (profileDefault) {
+        if (inList(profileDefault.valueId)) {
+            return { valueId: profileDefault.valueId, label: labelFor(profileDefault.valueId) };
+        }
+        const byName = flatModels.find(m => m.name === profileDefault.modelName);
+        if (byName) {
+            return { valueId: byName.valueId, label: byName.name };
+        }
+    }
+
+    if (options.agentCurrentId && inList(options.agentCurrentId)) {
+        return { valueId: options.agentCurrentId, label: labelFor(options.agentCurrentId) };
+    }
+
+    const primaryGroup = groups.find(g => g.isPrimary);
+    const fallback = primaryGroup?.models[0] || flatModels[0];
+    return { valueId: fallback.valueId, label: fallback.name };
+}
+
+function flattenGroupedModels(groups: ModelProviderGroup[]): ModelListItem[] {
+    const flat: ModelListItem[] = [];
+    const seen = new Set<string>();
+    for (const group of groups) {
+        for (const model of group.models) {
+            if (seen.has(model.valueId)) {
+                continue;
+            }
+            seen.add(model.valueId);
+            flat.push(model);
+        }
+    }
+    return flat;
+}
+
+/** Enrich agent model state with profile-configured models when the agent list is sparse. */
+export function enrichModelListState(
+    state: ModelListState | null,
+    supplemental: ModelListItem[]
+): ModelListState | null {
+    if (!supplemental.length) {
+        return state;
+    }
+    if (!state) {
+        const models = mergeModelListItems([], supplemental);
+        if (!models.length) {
+            return null;
+        }
+        const current = models[0];
+        return {
+            configId: HERMES_MODEL_CONFIG_ID,
+            currentValueId: current.valueId,
+            currentLabel: current.name,
+            models,
+            fromAgent: true,
+        };
+    }
+    const models = mergeModelListItems(state.models, supplemental);
+    if (models.length === state.models.length) {
+        return state;
+    }
+    const currentStillValid = models.some(m => m.valueId === state.currentValueId);
+    const currentValueId = currentStillValid ? state.currentValueId : state.currentValueId;
+    const currentLabel =
+        models.find(m => m.valueId === currentValueId)?.name ?? state.currentLabel;
+    return {
+        ...state,
+        configId: state.configId || HERMES_MODEL_CONFIG_ID,
+        models,
+        currentValueId,
+        currentLabel,
+    };
 }
 
 /** Choose Hermes native session/set_model vs standard set_config_option. */

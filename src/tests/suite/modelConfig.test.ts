@@ -5,6 +5,9 @@ import {
     buildModelListState,
     buildModelListStateFromHermesModels,
     buildModelListStateFromSessionResponse,
+    buildModelListStateFromCatalog,
+    enrichModelListState,
+    encodeHermesModelValueId,
     flattenSelectOptions,
     findModelConfigOption,
     HERMES_MODEL_CONFIG_ID,
@@ -143,5 +146,86 @@ describe('modelConfig', () => {
             shouldUseHermesSetModel('model-config', { configId: 'model-config', currentValueId: 'gpt-4', currentLabel: 'GPT-4', models: [], fromAgent: true }, null, 'gpt-4'),
             false
         );
+    });
+
+    it('encodeHermesModelValueId builds custom provider ids', () => {
+        assert.strictEqual(encodeHermesModelValueId('custom', 'agnes-2.0-flash'), 'custom:agnes-2.0-flash');
+        assert.strictEqual(encodeHermesModelValueId('custom:deepseek', 'deepseek-v4-flash'), 'custom:deepseek-v4-flash');
+    });
+
+    it('enrichModelListState merges profile-configured models', () => {
+        const state = buildModelListStateFromHermesModels({
+            currentModelId: 'custom:agnes-2.0-flash',
+            availableModels: [{ modelId: 'custom:agnes-2.0-flash', name: 'agnes-2.0-flash' }],
+        });
+        const enriched = enrichModelListState(state, [
+            { valueId: 'custom:deepseek-v4-flash', name: 'deepseek-v4-flash' },
+        ]);
+        assert.strictEqual(enriched!.models.length, 2);
+        assert.strictEqual(enriched!.currentLabel, 'agnes-2.0-flash');
+    });
+
+    it('buildModelListStateFromCatalog builds grouped picker state', () => {
+        const built = buildModelListStateFromCatalog(
+            {
+                groups: [
+                    {
+                        slug: 'custom:deepseek',
+                        name: 'DeepSeek',
+                        isPrimary: true,
+                        models: [
+                            { valueId: 'custom:deepseek-v4-flash', name: 'deepseek-v4-flash' },
+                            { valueId: 'custom:deepseek-v4-pro', name: 'deepseek-v4-pro' },
+                        ],
+                    },
+                    {
+                        slug: 'custom:agnes',
+                        name: 'Agnes',
+                        models: [{ valueId: 'custom:agnes-2.0-flash', name: 'agnes-2.0-flash' }],
+                    },
+                ],
+                flatModels: [],
+                profileDefault: {
+                    modelName: 'deepseek-v4-flash',
+                    valueId: 'custom:deepseek-v4-flash',
+                    groupSlug: 'custom:deepseek',
+                },
+            },
+            buildModelListStateFromHermesModels({
+                currentModelId: 'custom:agnes-2.0-flash',
+                availableModels: [{ modelId: 'custom:agnes-2.0-flash', name: 'agnes-2.0-flash' }],
+            })
+        );
+        assert.ok(built);
+        assert.strictEqual(built!.groups!.length, 2);
+        assert.strictEqual(built!.models.length, 3);
+        assert.strictEqual(built!.currentLabel, 'deepseek-v4-flash');
+    });
+
+    it('buildModelListStateFromCatalog prefers saved model over profile default', () => {
+        const built = buildModelListStateFromCatalog(
+            {
+                groups: [
+                    {
+                        slug: 'custom:deepseek',
+                        name: 'DeepSeek',
+                        isPrimary: true,
+                        models: [
+                            { valueId: 'custom:deepseek-v4-flash', name: 'deepseek-v4-flash' },
+                            { valueId: 'custom:deepseek-v4-pro', name: 'deepseek-v4-pro' },
+                        ],
+                    },
+                ],
+                flatModels: [],
+                profileDefault: {
+                    modelName: 'deepseek-v4-flash',
+                    valueId: 'custom:deepseek-v4-flash',
+                    groupSlug: 'custom:deepseek',
+                },
+            },
+            null,
+            { modelId: 'custom:deepseek-v4-pro', modelLabel: 'deepseek-v4-pro' }
+        );
+        assert.strictEqual(built!.currentValueId, 'custom:deepseek-v4-pro');
     });
 });
