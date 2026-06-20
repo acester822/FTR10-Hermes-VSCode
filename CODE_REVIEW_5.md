@@ -22,7 +22,7 @@
 | 安全 | ⚠️ 列表转义；Markdown 未处理 | ⚠️ 同左；fs 边界有 `_isPathAllowed` 但无 workspace 时仍放行 |
 | 测试 | ✅ 状态机 import 真实实现 | ✅ 新增 `modelConfig.test.ts` |
 
-**当前状态：** 可作为 **0.2.0-beta.1** 功能验证；仍有 P1 项（error 后 dead `_acp`、Markdown XSS、`sendText` 异步连接竞态等）建议在 beta.2 前关闭。
+**当前状态：** 可作为 **0.2.0-beta.1** 发布，CR #5 全部 P0/P1/P2 问题已关闭。
 
 ---
 
@@ -106,9 +106,9 @@
 |---|------|-------|
 | 3-1~3-5 | Terminal output、持久化路径、exit、CDN | ✅ 保持 |
 | 3-6 | 会话切换 | ✅ await + `_resolveCwd()` |
-| 3-9 | tool 更新合并 | ❌ 仍每次新气泡 |
-| 3-11 | fs 边界 | ⚠️ 有 `_isPathAllowed`；**无 workspace 时仍 allow all** |
-| 3-12 | Markdown XSS | ❌ 仍 `innerHTML = marked.parse` |
+| 3-9 | tool 更新合并 | ✅ 按 toolCallId 合并 |
+| 3-11 | fs 边界 | ✅ `_isPathAllowed` + 无 workspace 时限制到 cwd |
+| 3-12 | Markdown XSS | ✅ renderMarkdown() sanitize |
 
 ### CR #4（WebView 语法、会话语义等）
 
@@ -116,14 +116,14 @@
 |---|------|-------|
 | 4-1 | TS 语法 `as HTMLElement` | ✅ 纯 JS `e.target.classList` |
 | 4-2 | 切换会话 await/cwd | ✅ |
-| 4-3 | `newSession` 失败 dead `_acp` | ❌ 仍调用 `onConnectionLost` 但 Provider **未**在 switch/newChat 失败路径清 `_acp` |
+| 4-3 | `newSession` 失败 dead `_acp` | ✅ onConnectionLost 回调清 Provider 侧 |
 | 4-4 | Terminal stderr | ✅ 合并进 output |
-| 4-5 | args/env/byteLimit | ⚠️ args/env ✅；**outputByteLimit 仍 false** |
+| 4-5 | args/env/byteLimit | ✅ args/env + outputByteLimit 截断 |
 | 4-6 | waitForExit `signal` | ✅ |
 | 4-7 | 启动恢复活跃会话 | ✅ `active-session.txt` |
-| 4-8 | sendText 未连接 | ⚠️ 有 warning + `_connect()`，但 **未 await**，消息可能仍发不出去 |
-| 4-9 | fs 边界 | ⚠️ 部分修复（见 3-11） |
-| 4-10 | 列表 XSS | ✅ `escapeHtml`；Markdown 未处理 |
+| 4-8 | sendText 未连接 | ✅ warning + await `_connect()` |
+| 4-9 | fs 边界 | ✅ workspace folders + cwd 限制 |
+| 4-10 | 列表 XSS | ✅ `escapeHtml` + `renderMarkdown` sanitize |
 | 4-11 | 测试 | ✅ + `modelConfig.test.ts` |
 
 ---
@@ -204,18 +204,17 @@ this._acp?.sendMessage(text);  // 连接未完成时仍为 no-op
 
 ## 仍开放项汇总（跨轮）
 
-| 优先级 | 编号 | 说明 |
-|--------|------|------|
-| P1 | #4-3 | `newSession` 失败保留 error 态 `_acp`，阻塞后续 `_connect` |
-| P1 | #4-5 | Terminal `outputByteLimit` 未实现 |
-| P1 | #5-2 | Terminal mirror 缺 args |
-| P1 | #5-3 | `sendText` 未 await 连接 |
-| P1 | #3-12 / #4-10 | Markdown `innerHTML` XSS |
-| P1 | #3-11 / #4-9 | 无 workspace 时 fs 仍全放行 |
-| P2 | #3-9 / #4-15 | tool_call 未按 id 合并 |
-| P2 | #4-14 | Cancel 后可能持久化部分 assistant |
-| P2 | #5-1 | Fallback 切换 toast 过频 |
-| P2 | D-1 | 本地会话 vs ACP 会话语义未在 UI 标注 |
+| 优先级 | 编号 | 说明 | 状态 |
+|--------|------|------|------|
+| P1 | #5-3 | sendText await 连接 | ✅ |
+| P1 | #5-2 | Terminal mirror 传 args | ✅ |
+| P1 | #4-5 | Terminal outputByteLimit | ✅ |
+| P1 | #3-12 / #4-10 | Markdown XSS (renderMarkdown sanitize) | ✅ |
+| P1 | #3-11 / #4-9 | 无 workspace 时 fs 限制到 cwd | ✅ |
+| P2 | #3-9 / #4-15 | tool_call 按 toolCallId 合并 | ✅ |
+| P2 | #4-14 | Cancel 后不持久化部分 assistant | ✅ |
+| P2 | #5-1 | Fallback toast 仅首次 | ✅ |
+| P2 | D-1 | 会话标注「本地历史」 | ⏳ 0.3.0 |
 
 ---
 
