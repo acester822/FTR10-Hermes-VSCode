@@ -592,6 +592,9 @@ body {
         }
 
         messagesEl.appendChild(div);
+        // Apply visibility filter for thought/tool messages
+        if (role === 'thought' && !window._showThoughts) div.style.display = 'none';
+        if (role === 'tool' && !window._showToolCalls) div.style.display = 'none';
         messagesEl.scrollTop = messagesEl.scrollHeight;
         return id;
     }
@@ -906,6 +909,18 @@ body {
                 if (logs.length > 500) logs = logs.slice(-500);
                 logBadge.textContent = logs.length;
                 logBadge.style.display = '';
+                break;
+
+            case 'config':
+                window._showThoughts = msg.showThoughts;
+                window._showToolCalls = msg.showToolCalls;
+                // Apply to existing messages
+                document.querySelectorAll('.message.thought').forEach(function(el) {
+                    el.style.display = msg.showThoughts ? '' : 'none';
+                });
+                document.querySelectorAll('.message.tool').forEach(function(el) {
+                    el.style.display = msg.showToolCalls ? '' : 'none';
+                });
                 break;
         }
     });

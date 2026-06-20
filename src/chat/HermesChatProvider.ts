@@ -101,6 +101,7 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
                     this._log('WebView ready');
                     this._postMessage({ type: 'sessionList', sessions: this._sessions });
                     this._postMessage({ type: 'agentList', agents: this._getAgentNames() });
+                    this._postConfig();
                     this._restoreMessages();
                     this._connect();
                     break;
@@ -413,6 +414,15 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
 
     private _postMessage(msg: any): void {
         this._view?.webview.postMessage(msg);
+    }
+
+    private _postConfig(): void {
+        const config = vscode.workspace.getConfiguration('hermes');
+        this._postMessage({
+            type: 'config',
+            showThoughts: config.get<boolean>('showThoughts', false),
+            showToolCalls: config.get<boolean>('showToolCalls', false),
+        });
     }
 
     private _getHtml(): string {

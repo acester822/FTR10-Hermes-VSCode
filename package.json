@@ -75,6 +75,16 @@
           "default": "",
           "description": "Hermes profile name (maps to hermes --profile <name>). Leave empty for default."
         },
+        "hermes.showThoughts": {
+          "type": "boolean",
+          "default": false,
+          "description": "Show agent thinking process in the chat."
+        },
+        "hermes.showToolCalls": {
+          "type": "boolean",
+          "default": false,
+          "description": "Show tool call notifications in the chat."
+        },
         "hermes.agents": {
           "type": "array",
           "default": [],
