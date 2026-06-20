@@ -703,7 +703,7 @@ body {
             return;
         }
         list.innerHTML = agents.map(name =>
-            '<div class="agent-item" data-agent="' + name + '">' + name + '</div>'
+            '<div class="agent-item" data-agent="' + escapeHtml(name) + '">' + escapeHtml(name) + '</div>'
         ).join('');
         list.querySelectorAll('.agent-item').forEach(function(item) {
             item.addEventListener('click', function() {
@@ -711,6 +711,10 @@ body {
                 agentDropdown.style.display = 'none';
             });
         });
+    }
+
+    function escapeHtml(s) {
+        return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     }
 
     function renderSessionList(sessions) {
@@ -721,16 +725,16 @@ body {
         }
         list.innerHTML = sessions.map(s => {
             const time = new Date(s.updatedAt || s.createdAt).toLocaleDateString();
-            return '<div class="session-item" data-id="' + s.id + '">' +
-                '<span class="title" title="' + s.title.replace(/"/g,'&quot;') + '">' + s.title + '</span>' +
+            return '<div class="session-item" data-id="' + escapeHtml(s.id) + '">' +
+                '<span class="title" title="' + escapeHtml(s.title) + '">' + escapeHtml(s.title) + '</span>' +
                 '<span class="meta">' + s.messageCount + ' msgs · ' + time + '</span>' +
-                '<button class="delete-btn" data-id="' + s.id + '" title="Delete session">✕</button>' +
+                '<button class="delete-btn" data-id="' + escapeHtml(s.id) + '" title="Delete session">✕</button>' +
                 '</div>';
         }).join('');
         // Click session to load it
         list.querySelectorAll('.session-item').forEach(function(item) {
             item.addEventListener('click', function(e) {
-                if ((e.target as HTMLElement).classList.contains('delete-btn')) return;
+                if (e.target && e.target.classList && e.target.classList.contains('delete-btn')) return;
                 vscode.postMessage({ type: 'switchSession', sessionId: this.dataset.id });
             });
         });

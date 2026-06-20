@@ -28,6 +28,8 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
     private _sessions: SessionInfo[] = [];
     private _lastAssistantText: string = '';
 
+    private _activeIdPath: string;
+
     constructor(
         private readonly _extensionUri: vscode.Uri,
         context: vscode.ExtensionContext
@@ -37,9 +39,25 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
         fs.mkdirSync(storagePath, { recursive: true });
         this._historyDir = storagePath;
         this._sessionsPath = path.join(storagePath, 'sessions.json');
-        this._sessionId = Date.now().toString(36);
+        this._activeIdPath = path.join(storagePath, 'active-session.txt');
         this._loadSessions();
+        this._sessionId = this._restoreActiveSession();
         this._loadHistory();
+    }
+
+    private _restoreActiveSession(): string {
+        // Try restoring last active session
+        try {
+            if (fs.existsSync(this._activeIdPath)) {
+                const id = fs.readFileSync(this._activeIdPath, 'utf-8').trim();
+                if (this._sessions.some(s => s.id === id)) return id;
+            }
+        } catch { /* ignore */ }
+        return Date.now().toString(36);
+    }
+
+    private _saveActiveSession(): void {
+        try { fs.writeFileSync(this._activeIdPath, this._sessionId); } catch { /* ignore */ }
     }
 
     private _msgPath(sid: string): string {
@@ -159,6 +177,7 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
         }
         try {
             fs.writeFileSync(this._sessionsPath, JSON.stringify(this._sessions.slice(0, 50), null, 2));
+            this._saveActiveSession();
         } catch { /* non-critical */ }
     }
 
@@ -208,6 +227,9 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
                 if (status === 'ready' && this._lastAssistantText) {
                     this._saveMessage('assistant', this._lastAssistantText);
                     this._lastAssistantText = '';
+                }
+                if (status === 'prompting') {
+                    this._lastAssistantText = ''; // clear any stale text from previous send
                 }
             },
             async (prompt) => {
@@ -316,10 +338,12 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
     private async _handleSwitchSession(sessionId: string): Promise<void> {
         this._log(`Switch to session: ${sessionId}`);
         this._saveCurrentSession();
-        this._acp?.newSession(process.cwd()); // new ACP session for the loaded context
         this._sessionId = sessionId;
         this._sessionMessages = [];
         this._loadHistory();
+        // Start a new ACP session; note: agent context won't match history
+        const cwd = this._resolveCwd();
+        await this._acp?.newSession(cwd);
         this._postMessage({ type: 'newChat' });
         this._postMessage({ type: 'sessionList', sessions: this._sessions });
         this._restoreMessages();
@@ -359,6 +383,10 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
     }
 
     public sendText(text: string): void {
+        if (!this._acp) {
+            vscode.window.showWarningMessage('Hermes is not connected. Opening chat...');
+            this._connect();
+        }
         this._postMessage({ type: 'addMessage', role: 'user', text });
         this._saveMessage('user', text);
         this._acp?.sendMessage(text);

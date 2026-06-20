@@ -61,6 +61,10 @@ export class AcpClient {
         error:       ['connecting', 'idle'],
     };
 
+    static canTransitionTo(from: AcpStatus, to: AcpStatus): boolean {
+        return AcpClient.VALID[from]?.includes(to) ?? false;
+    }
+
     constructor(
         onMessage: MessageHandler,
         onStatus: StatusHandler,
@@ -155,7 +159,10 @@ export class AcpClient {
             });
 
             this._process.stderr?.on('data', (chunk: Buffer) => {
-                this._onMessage('tool', `⚠️ ${chunk.toString().trim()}`);
+                const line = chunk.toString().trim();
+                if (line) {
+                    this._onMessage('tool', `⚠️ ${line}`);
+                }
             });
 
             this._app = client({ name: 'hermes-vscode' });
@@ -265,10 +272,10 @@ export class AcpClient {
             });
             this._responseBuffer = '';
             this._thoughtBuffer = '';
+            this._transitionTo('ready');
         } catch {
             // best-effort
         }
-        this._transitionTo('ready');
     }
 
     async newSession(cwd: string): Promise<void> {
@@ -362,7 +369,7 @@ export class AcpClient {
         const term = this._terminals.get(params.terminalId);
         if (!term) return { output: '', truncated: false, exitStatus: {} };
         return {
-            output: term.stdout,
+            output: (term.stdout + '\n' + term.stderr).replace(/^\n/, ''),
             truncated: false,
             exitStatus: term.exitCode !== null ? { exitCode: term.exitCode } : undefined,
         };
@@ -370,9 +377,9 @@ export class AcpClient {
 
     private async _handleTerminalWaitForExit(params: any): Promise<any> {
         const term = this._terminals.get(params.terminalId);
-        if (!term) return { exitCode: null, exitSignal: null };
+        if (!term) return { signal: undefined, exitCode: undefined };
         await term.exited;
-        return { exitCode: term.exitCode, exitSignal: term.exitSignal };
+        return { exitCode: term.exitCode, signal: term.exitSignal };
     }
 
     private _handleTerminalRelease(params: any): any {
