@@ -413,6 +413,54 @@ body {
     color: #fff;
     border-color: var(--error);
 }
+
+/* Model selector in input area */
+#modelSelector {
+    position: relative;
+    flex-shrink: 0;
+}
+#modelBtn {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--dim);
+    cursor: pointer;
+    font-size: 11px;
+    padding: 6px 8px;
+    border-radius: 4px;
+    white-space: nowrap;
+}
+#modelBtn:hover {
+    color: var(--fg);
+    border-color: var(--primary);
+}
+.model-dropdown {
+    position: absolute;
+    bottom: 100%;
+    left: 0;
+    z-index: 100;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    min-width: 160px;
+    max-height: 250px;
+    overflow-y: auto;
+    box-shadow: 0 -4px 12px rgba(0,0,0,0.3);
+    margin-bottom: 4px;
+}
+.model-dropdown .dropdown-header {
+    padding: 6px 10px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--dim);
+    border-bottom: 1px solid var(--border);
+}
+.model-item {
+    padding: 6px 10px;
+    cursor: pointer;
+    font-size: 12px;
+    border-bottom: 1px solid var(--border);
+}
+.model-item:hover { background: var(--text-block); }
 </style>
 </head>
 <body>
@@ -451,6 +499,13 @@ body {
 <div id="input-area">
     <textarea id="input" rows="1" placeholder="Message Hermes..." disabled></textarea>
     <button id="cancelBtn" style="display:none" title="Cancel response">⏹</button>
+    <div class="model-selector" id="modelSelector" title="Switch Model">
+        <button id="modelBtn">default ▾</button>
+        <div class="model-dropdown" id="modelDropdown" style="display:none">
+            <div class="dropdown-header">Models</div>
+            <div id="modelList"></div>
+        </div>
+    </div>
     <button id="sendBtn" disabled>Send</button>
 </div>
 
@@ -745,6 +800,7 @@ body {
     document.addEventListener('click', function() {
         sessionDropdown.style.display = 'none';
         agentDropdown.style.display = 'none';
+        modelDropdown.style.display = 'none';
     });
     sessionDropdown.addEventListener('click', function(e) {
         e.stopPropagation();
@@ -774,6 +830,33 @@ body {
             item.addEventListener('click', function() {
                 vscode.postMessage({ type: 'switchAgent', agentName: this.dataset.agent });
                 agentDropdown.style.display = 'none';
+            });
+        });
+    }
+
+    // Model selector near send button
+    const modelBtn = document.getElementById('modelBtn');
+    const modelDropdown = document.getElementById('modelDropdown');
+    modelBtn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        modelDropdown.style.display = modelDropdown.style.display === 'none' ? 'block' : 'none';
+    });
+    modelDropdown.addEventListener('click', function(e) {
+        e.stopPropagation();
+    });
+    function renderModelList(agents) {
+        const list = document.getElementById('modelList');
+        if (!agents || agents.length === 0) {
+            list.innerHTML = '<div class="model-item" style="color:var(--dim);cursor:default;font-style:italic">Configure agents in Settings</div>';
+            return;
+        }
+        list.innerHTML = agents.map(name =>
+            '<div class="model-item" data-agent="' + escapeHtml(name) + '">' + escapeHtml(name) + '</div>'
+        ).join('');
+        list.querySelectorAll('.model-item').forEach(function(item) {
+            item.addEventListener('click', function() {
+                vscode.postMessage({ type: 'switchAgent', agentName: this.dataset.agent });
+                modelDropdown.style.display = 'none';
             });
         });
     }
@@ -902,6 +985,7 @@ body {
 
             case 'agentList':
                 renderAgentList(msg.agents);
+                renderModelList(msg.agents);
                 break;
 
             case 'log':
@@ -921,6 +1005,10 @@ body {
                 document.querySelectorAll('.message.tool').forEach(function(el) {
                     el.style.display = msg.showToolCalls ? '' : 'none';
                 });
+                break;
+
+            case 'activeAgent':
+                modelBtn.textContent = (msg.name || 'default') + ' ▾';
                 break;
         }
     });

@@ -196,6 +196,8 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
         if (this._acp) return;
         this._log(`Connecting${agentName ? ' as ' + agentName : ''}...`);
 
+        this._postMessage({ type: 'activeAgent', name: agentName || '' });
+
         const config = vscode.workspace.getConfiguration('hermes');
         let configPath = config.get<string>('path') || undefined;
         let configCwd = config.get<string>('cwd') || undefined;
@@ -382,6 +384,7 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
         try { fs.unlinkSync(this._msgPath(this._sessionId)); } catch { /* ignore */ }
         this._postMessage({ type: 'newChat' });
         this._postMessage({ type: 'agentList', agents: this._getAgentNames() });
+        this._postMessage({ type: 'activeAgent', name: agentName || '' });
         await this._connect(agentName);
     }
 
