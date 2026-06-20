@@ -1,5 +1,5 @@
 {
-  "extension.displayName": "Hermes Agent Chat",
+  "extension.displayName": "Hermes AI Chat",
   "extension.description": "Chat with Hermes Agent directly inside VS Code",
   "viewsContainers.activitybar.title": "Hermes Agent",
   "views.hermesChat.name": "Chat",

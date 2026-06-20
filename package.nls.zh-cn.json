@@ -1,5 +1,5 @@
 {
-  "extension.displayName": "Hermes Agent Chat",
+  "extension.displayName": "Hermes AI Chat",
   "extension.description": "在 VS Code 中直接与 Hermes Agent 对话",
   "viewsContainers.activitybar.title": "Hermes Agent",
   "views.hermesChat.name": "聊天",
