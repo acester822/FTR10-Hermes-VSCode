@@ -22,6 +22,7 @@ import type { SessionMcpServer } from './mcpConfig';
 import { normalizeHermesCliProfile } from './hermesProfile';
 import { findHermesExecutableOrThrow } from './profileDiscovery';
 import type { AcpModelOptionsResponse } from './acpModelCatalog';
+import { extractTextFromContentBlock } from './contentText';
 import {
     ToolCallTracker,
     formatToolCallDisplay,
@@ -434,8 +435,10 @@ export class AcpClient {
         this._thoughtBuffer = '';
         this._toolCallTracker.clear();
         this._transitionTo('prompting', 'Hermes is thinking...');
+        this._acceptStreamOutput = true;
 
         if (promptId !== this._activePromptId) {
+            this._acceptStreamOutput = false;
             this._restoreReadyAfterAbortedPrompt();
             return;
         }
@@ -453,13 +456,13 @@ export class AcpClient {
         }
 
         if (promptId !== this._activePromptId) {
+            this._acceptStreamOutput = false;
             void this._abandonOrphanPrompt(promptPromise);
             this._restoreReadyAfterAbortedPrompt();
             return;
         }
 
         this._promptPromise = promptPromise;
-        this._acceptStreamOutput = true;
 
         try {
             await promptPromise;
@@ -772,6 +775,10 @@ export class AcpClient {
     // ---- ACP session update handler ----
 
     private _handleSessionUpdate(notification: any): void {
+        const sessionId = notification?.sessionId;
+        if (sessionId && this._session && sessionId !== this._session.sessionId) {
+            return;
+        }
         const update = notification.update;
         const kind = update.sessionUpdate;
 
@@ -784,8 +791,7 @@ export class AcpClient {
                 // Assumption: ACP sends INCREMENTAL text per chunk (spec-compliant).
                 // If an agent sends the FULL text each time instead, this will
                 // double-append. The SDK's readText() uses the same += pattern.
-                const content = update.content;
-                const text = content?.text || content?.content?.text || '';
+                const text = extractTextFromContentBlock(update.content);
                 if (text) {
                     this._responseBuffer += text;
                     this._onMessage('assistant', this._responseBuffer);
@@ -797,8 +803,7 @@ export class AcpClient {
                 if (!this._acceptStreamOutput) {
                     break;
                 }
-                const thought = update.content;
-                const thoughtText = thought?.text || thought?.content?.text || '';
+                const thoughtText = extractTextFromContentBlock(update.content);
                 if (thoughtText) {
                     this._thoughtBuffer += thoughtText;
                     this._onMessage('thought', this._thoughtBuffer);

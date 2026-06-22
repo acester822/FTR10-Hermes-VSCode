@@ -145,6 +145,8 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
     private _deferReadyUntilSessionSetup = false;
     /** Bumped on cancel to abort a pending send before it reaches Hermes. */
     private _sendEpoch = 0;
+    /** Fires when a prompt produces no output for a while (Hermes plugin init). */
+    private _promptStallTimer: ReturnType<typeof setTimeout> | undefined;
     /** Chat session that owns the in-flight ACP prompt (may differ from `_sessionId` after tab switch). */
     private _promptSessionId: string | undefined;
     /** Chat session currently bound to the single ACP agent runtime context. */
@@ -471,6 +473,33 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
             return;
         }
         this._postMessage({ ...msg, sessionId: this._sessionId });
+    }
+
+    private _clearPromptStallTimer(): void {
+        if (this._promptStallTimer) {
+            clearTimeout(this._promptStallTimer);
+            this._promptStallTimer = undefined;
+        }
+    }
+
+    private _schedulePromptStallHint(): void {
+        this._clearPromptStallTimer();
+        this._promptStallTimer = setTimeout(() => {
+            this._promptStallTimer = undefined;
+            if (this._acp?.status !== 'prompting' || !this._isViewingPromptSession()) {
+                return;
+            }
+            if (this._lastAssistantText || this._lastThoughtText) {
+                return;
+            }
+            this._log('Prompt stall hint: Hermes still initializing');
+            this._postMessage({
+                type: 'status',
+                status: 'prompting',
+                message: localizeStatusMessage('Hermes is initializing...'),
+                sessionId: this._sessionId,
+            });
+        }, 25000);
     }
 
     private async _detachActivePrompt(fromSessionId: string, options?: { savePartial?: boolean }): Promise<void> {
@@ -1048,6 +1077,9 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
 
         this._acp = new AcpClient(
             (role, text, toolCallId) => {
+                if (role === 'assistant' || role === 'thought' || role === 'tool') {
+                    this._clearPromptStallTimer();
+                }
                 this._postPromptScopedMessage({ type: 'addMessage', role, text, toolCallId });
                 if (!this._promptSessionId) {
                     return;
@@ -1083,6 +1115,7 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
                     });
                 }
                 if (status === 'ready') {
+                    this._clearPromptStallTimer();
                     if (this._promptSessionId) {
                         this._withPromptSessionContext(() => {
                             this._flushThoughtToHistory();
@@ -1101,6 +1134,7 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
                 if (status === 'prompting') {
                     this._lastAssistantText = '';
                     this._lastThoughtText = '';
+                    this._schedulePromptStallHint();
                 }
             },
             async (request) => this._requestPermissionInChat(request),
@@ -1892,6 +1926,7 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
 
     private async _handleCancel(): Promise<void> {
         this._sendEpoch++;
+        this._clearPromptStallTimer();
         this._contextAttachAwaitingReply = false;
         await this._awaitSessionReady();
         this._flushThoughtToHistory();
@@ -2550,6 +2585,7 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
     }
 
     public dispose(): void {
+        this._clearPromptStallTimer();
         this._saveCurrentSession();
         this._cancelPendingPermissions();
         this._clearViewDetectProgress();

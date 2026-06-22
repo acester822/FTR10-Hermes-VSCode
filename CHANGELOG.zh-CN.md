@@ -6,6 +6,18 @@
 
 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.3.2] - 2026-06-22
+
+### 新增
+
+- **Hermes 初始化提示**：若发送后 25 秒内仍无输出，状态栏会提示 Hermes 仍在初始化（首次对话可能需 1–3 分钟）
+
+### 修复
+
+- **连接卡在「连接中…」/ 连接错误**：流式输出在 prompting 开始时即接受；被替换或取消的 prompt 不再导致客户端阻塞
+- **跨会话流式串扰**：`sessionId` 与当前会话不一致的 session update 会被忽略
+- **内容解析**：助手与思考块改用 `extractTextFromContentBlock`，更稳健地从 ACP 内容块提取文本
+
 ## [0.3.1] - 2026-06-22
 
 ### 新增
@@ -100,6 +112,7 @@
 - 面向市场的图标、README 与 VSIX 打包（bundle 中排除 icon.svg）。
 - 显示名称定为 **Rina Hermes ACP**（此前受 Marketplace 命名限制经历 **Hermes AI Chat** 等调整）。
 
+[0.3.2]: https://github.com/jove-rina/rina-hermes-acp/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/jove-rina/rina-hermes-acp/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/jove-rina/rina-hermes-acp/compare/v0.2.6...v0.3.0
 [0.2.6]: https://github.com/jove-rina/rina-hermes-acp/compare/v0.2.5...v0.2.6

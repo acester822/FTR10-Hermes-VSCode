@@ -203,6 +203,7 @@ Changes to connection-related settings trigger an automatic reconnect.
 | Stuck on **Connecting…** | Open **Environment → Environment detection** from the wrench menu; ensure `hermes` is on PATH or set `hermes.path` |
 | **ACP dependencies missing** | Detection tries `pip install agent-client-protocol==0.9.0` automatically; if it still fails, run `hermes acp --check` and `hermes acp` in a terminal |
 | **Connection error** | Click **Retry** in the toolbar; check Hermes logs via **More options → Logs** |
+| **Hermes is initializing…** (no reply yet) | Normal on first message after connect — Hermes may load plugins for 1–3 minutes; wait or check logs |
 | Model not listed | Add entries under `hermes.models` in Settings |
 | **Settings** not opening in Cursor | Use **More options → Settings** in the chat view title bar |
 | UI not in expected language | Set VS Code display language; switch away from and back to the Hermes sidebar |
@@ -219,7 +220,7 @@ We welcome issues, feature requests, and pull requests.
 2. Click **New issue**
 3. Include:
    - VS Code version
-   - Extension version (`0.3.1` or later)
+   - Extension version (`0.3.2` or later)
    - Hermes Agent version (`hermes --version`)
    - Steps to reproduce
    - Expected vs. actual behavior

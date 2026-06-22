@@ -19,6 +19,7 @@ export interface LocaleStrings {
     defaultAgent: string;
     statusStartingAcp: string;
     statusHermesThinking: string;
+    statusHermesInitializing: string;
     statusProcessError: string;
     statusProcessExited: string;
     statusConnectionFailed: string;

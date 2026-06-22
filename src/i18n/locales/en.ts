@@ -18,6 +18,7 @@ export const en: LocaleStrings = {
     defaultAgent: 'Default',
     statusStartingAcp: 'Starting Hermes ACP...',
     statusHermesThinking: 'Hermes is thinking...',
+    statusHermesInitializing: 'Hermes is initializing (first reply may take 1–3 min)...',
     statusProcessError: 'Process error: {0}',
     statusProcessExited: 'Process exited (code: {0}, signal: {1})',
     statusConnectionFailed: 'Connection failed: {0}',

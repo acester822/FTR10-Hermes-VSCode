@@ -2,7 +2,7 @@
   "name": "rina-hermes-acp",
   "displayName": "%extension.displayName%",
   "description": "%extension.description%",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "publisher": "JoveRina",
   "icon": "media/icon.png",
   "license": "MIT",

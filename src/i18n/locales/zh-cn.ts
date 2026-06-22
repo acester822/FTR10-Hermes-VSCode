@@ -18,6 +18,7 @@ export const zhCn: LocaleStrings = {
     defaultAgent: '默认',
     statusStartingAcp: '正在启动 Hermes ACP…',
     statusHermesThinking: 'Hermes 正在思考…',
+    statusHermesInitializing: 'Hermes 正在初始化（首次对话可能需 1–3 分钟）…',
     statusProcessError: '进程错误：{0}',
     statusProcessExited: '进程已退出（code: {0}, signal: {1}）',
     statusConnectionFailed: '连接失败：{0}',

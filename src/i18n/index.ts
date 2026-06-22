@@ -57,6 +57,9 @@ export function localizeStatusMessage(msg: string): string {
     if (msg === 'Hermes is thinking...') {
         return t('statusHermesThinking');
     }
+    if (msg === 'Hermes is initializing...') {
+        return t('statusHermesInitializing');
+    }
 
     let match = msg.match(/^Process error: (.+)$/);
     if (match) {
