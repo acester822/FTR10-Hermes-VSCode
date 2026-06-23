@@ -46,7 +46,7 @@ describe('hermesEnvironmentDetect', () => {
         assert.strictEqual(buildRecommendation(executables).action, 'reinstall');
     });
 
-    it('buildRecommendation suggests configure_system when verified but not on PATH', () => {
+    it('buildRecommendation suggests configure_plugin when verified but not on PATH', () => {
         const dir = process.platform === 'win32' ? 'C:\\missing\\hermes\\bin' : '/missing/hermes/bin';
         const executable = process.platform === 'win32'
             ? `${dir}\\hermes.exe`
@@ -57,7 +57,7 @@ describe('hermesEnvironmentDetect', () => {
             verified: true,
         }];
         const recommendation = buildRecommendation(executables, '');
-        assert.strictEqual(recommendation.action, 'configure_system');
+        assert.strictEqual(recommendation.action, 'configure_plugin');
         assert.strictEqual(recommendation.pluginPath, executable);
     });
 

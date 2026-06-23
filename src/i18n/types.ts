@@ -35,6 +35,11 @@ export interface LocaleStrings {
     detectEnvironmentConfigurePluginDesc: string;
     detectEnvironmentConfigureSystem: string;
     detectEnvironmentConfigureSystemDesc: string;
+    detectEnvironmentSystemVarTargetWindows: string;
+    detectEnvironmentSystemVarTargetUnix: string;
+    detectEnvironmentConfigureSystemConfirm: string;
+    detectEnvironmentConfigureSystemConfirmYes: string;
+    detectEnvironmentConfigureSystemConfirmNo: string;
     detectEnvironmentPluginConfigured: string;
     detectEnvironmentSystemConfigured: string;
     detectEnvironmentSystemAlreadyConfigured: string;
@@ -81,6 +86,23 @@ export interface LocaleStrings {
     detectEnvironmentAlreadyConfigured: string;
     detectEnvironmentRunFirst: string;
     detectEnvironmentClose: string;
+
+    configureEnvironmentTitle: string;
+    configureEnvironmentPathLabel: string;
+    configureEnvironmentPathPlaceholder: string;
+    configureEnvironmentBrowse: string;
+    configureEnvironmentDetect: string;
+    configureEnvironmentDetecting: string;
+    configureEnvironmentCandidatesTitle: string;
+    configureEnvironmentNoCandidates: string;
+    configureEnvironmentSave: string;
+    configureEnvironmentCancel: string;
+    configureEnvironmentBrowseTitle: string;
+    configureEnvironmentInvalidPath: string;
+    configureEnvironmentSaveFailed: string;
+    configureEnvironmentSystemVarHint: string;
+    configureEnvironmentOpenDirectory: string;
+    configureEnvironmentClearPath: string;
 
     // WebView — toolbar & status
     connectionStatus: string;

@@ -2064,6 +2064,380 @@ body {
     justify-content: flex-end;
     margin-top: 16px;
 }
+.configure-env-body {
+    padding: clamp(10px, 2.5vw, 14px);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    font-size: 12px;
+    color: var(--fg);
+    min-height: 0;
+    overflow-y: auto;
+    max-height: min(calc(85vh - 44px), 100%);
+}
+.configure-env-modal-panel {
+    width: 100%;
+    max-width: min(560px, 100%);
+}
+.configure-env-field-label {
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+.configure-env-path-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: stretch;
+}
+.configure-env-path-input-wrap {
+    position: relative;
+    flex: 1 1 180px;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+}
+.configure-env-path-input-wrap input {
+    flex: 1;
+    min-width: 0;
+    width: 100%;
+    background: var(--input-bg);
+    color: var(--fg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 6px 28px 6px 8px;
+    font-size: 12px;
+    font-family: var(--vscode-font-family, monospace);
+}
+.configure-env-path-clear {
+    position: absolute;
+    right: 4px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    border: none;
+    border-radius: 3px;
+    background: transparent;
+    color: var(--dim);
+    cursor: pointer;
+    font-size: 12px;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+.configure-env-path-clear:hover:not(:disabled) {
+    color: var(--fg);
+    background: color-mix(in srgb, var(--border) 45%, transparent);
+}
+.configure-env-path-clear:disabled,
+.configure-env-path-clear[hidden] {
+    display: none;
+}
+.configure-env-path-row button {
+    flex: 0 1 auto;
+    min-width: 0;
+    background: var(--input-bg);
+    border: 1px solid var(--border);
+    color: var(--fg);
+    border-radius: 4px;
+    padding: 6px 10px;
+    font-size: 11px;
+    cursor: pointer;
+    white-space: nowrap;
+}
+.configure-env-path-row button:hover:not(:disabled) {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+.configure-env-path-row button:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+.configure-env-detect-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    position: relative;
+}
+.configure-env-detect-panel[hidden] {
+    display: none !important;
+}
+.configure-env-detect-bar {
+    width: 100%;
+    max-width: 100%;
+}
+.configure-env-detect-bar .detect-env-main {
+    flex: 1;
+    min-width: 0;
+}
+.configure-env-candidate-open svg path {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.6;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+.configure-env-candidate-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--input-bg);
+    opacity: 0;
+    transform: translateY(10px);
+    animation: configure-candidate-in 0.38s ease forwards;
+    transition: border-color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
+}
+.configure-env-candidate-row.is-selected {
+    border-color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 10%, var(--input-bg));
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent);
+}
+.configure-env-candidate-row:hover {
+    border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+}
+.configure-env-candidate-open {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    margin-top: 1px;
+    padding: 0;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: transparent;
+    color: var(--dim);
+    cursor: pointer;
+    transition: border-color 0.18s ease, color 0.18s ease, background 0.18s ease;
+}
+.configure-env-candidate-open svg {
+    width: 14px;
+    height: 14px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.6;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+.configure-env-candidate-open:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 8%, var(--input-bg));
+}
+.configure-env-candidate-actions {
+    flex-shrink: 0;
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    margin-top: 1px;
+}
+.configure-env-candidate-select {
+    flex-shrink: 0;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    padding: 0;
+    background: transparent;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    line-height: 1;
+    color: transparent;
+    cursor: pointer;
+    transition: border-color 0.18s ease, background 0.18s ease, color 0.18s ease, transform 0.18s ease;
+}
+.configure-env-candidate-select:hover {
+    border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+}
+.configure-env-candidate-row.is-selected .configure-env-candidate-select {
+    border-color: var(--accent);
+    background: var(--accent);
+    color: var(--vscode-button-foreground, #fff);
+    transform: scale(1.05);
+}
+.configure-env-candidate-body {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    cursor: pointer;
+}
+@keyframes configure-candidate-in {
+    to { opacity: 1; transform: translateY(0); }
+}
+.configure-env-candidate-icon {
+    margin-top: 2px;
+}
+.configure-env-detect-details {
+    position: static !important;
+    top: auto !important;
+    left: auto !important;
+    transform: none !important;
+    width: 100% !important;
+    margin-top: 0;
+    box-shadow: none;
+    max-height: min(280px, 36vh);
+}
+.configure-env-detect-bar .detect-env-text {
+    max-width: none;
+    flex: 1;
+}
+.configure-env-detect-details[hidden] {
+    display: none !important;
+}
+.configure-env-candidates-section {
+    opacity: 0;
+    transform: translateY(6px);
+    transition: opacity 0.28s ease, transform 0.28s ease;
+}
+.configure-env-candidates-section.is-visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+.configure-env-candidates-title {
+    font-weight: 600;
+    font-size: 11px;
+    color: var(--fg);
+    margin-bottom: 8px;
+}
+.configure-env-candidates {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-height: min(280px, 40vh);
+    overflow: auto;
+}
+.configure-env-candidate-main {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.configure-env-candidate-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+}
+.configure-env-candidate-name {
+    font-weight: 600;
+    font-size: 12px;
+}
+.configure-env-candidate-badge {
+    font-size: 10px;
+    padding: 1px 6px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+}
+.configure-env-candidate-badge.is-verified {
+    color: #5cb85c;
+    border-color: color-mix(in srgb, #5cb85c 45%, var(--border));
+    background: color-mix(in srgb, #5cb85c 12%, transparent);
+}
+.configure-env-candidate-badge.is-unverified {
+    color: var(--dim);
+}
+.configure-env-candidate-tag {
+    font-size: 10px;
+    color: var(--dim);
+    padding: 1px 6px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--border) 35%, transparent);
+}
+.configure-env-candidate-path {
+    font-family: var(--vscode-font-family, monospace);
+    font-size: 11px;
+    word-break: break-all;
+    line-height: 1.45;
+    color: var(--fg);
+}
+.configure-env-candidate-version {
+    font-size: 10px;
+    color: var(--dim);
+}
+.configure-env-empty {
+    font-size: 11px;
+    color: var(--dim);
+    padding: 10px 0;
+    text-align: center;
+}
+.configure-env-system-block {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    align-items: flex-start;
+}
+.configure-env-system-hint {
+    font-size: 10px;
+    color: var(--dim);
+    line-height: 1.45;
+    margin: 0;
+}
+.configure-env-system-hint code {
+    font-family: var(--vscode-font-family, monospace);
+    font-size: 10px;
+    color: var(--fg);
+}
+.configure-env-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    margin-top: 4px;
+}
+.configure-env-actions .toolbar-btn {
+    min-width: 0;
+}
+.configure-env-actions .toolbar-btn.primary {
+    background: var(--accent);
+    color: var(--vscode-button-foreground, #fff);
+    border-color: var(--accent);
+}
+@container app (max-width: 420px) {
+    .configure-env-path-input-wrap {
+        flex: 1 1 100%;
+    }
+    .configure-env-path-row button {
+        flex: 1 1 calc(50% - 3px);
+    }
+    .configure-env-actions {
+        flex-direction: column-reverse;
+    }
+    .configure-env-actions .toolbar-btn {
+        width: 100%;
+    }
+    .configure-env-system-block .toolbar-btn {
+        width: 100%;
+    }
+}
+@media (max-width: 420px) {
+    .configure-env-path-input-wrap {
+        flex: 1 1 100%;
+    }
+    .configure-env-path-row button {
+        flex: 1 1 calc(50% - 3px);
+    }
+    .configure-env-actions {
+        flex-direction: column-reverse;
+    }
+    .configure-env-actions .toolbar-btn,
+    .configure-env-system-block .toolbar-btn {
+        width: 100%;
+    }
+}
 .input-model-picker {
     max-width: min(160px, 36vw);
 }
@@ -2769,6 +3143,59 @@ mark.search-mark-active {
     </div>
 </div>
 
+<div id="configureEnvModal" class="modal-overlay">
+    <div class="modal-panel configure-env-modal-panel">
+        <div class="modal-header">
+            <span class="modal-header-title" id="configureEnvModalTitle"></span>
+            <button type="button" class="modal-close-btn" id="configureEnvCloseBtn" aria-label="✕">✕</button>
+        </div>
+        <div class="configure-env-body">
+            <div class="configure-env-path-field">
+                <div class="configure-env-field-label" id="configureEnvPathLabel"></div>
+                <div class="configure-env-path-row">
+                    <div class="configure-env-path-input-wrap">
+                        <input type="text" id="configureEnvPathInput" autocomplete="off" spellcheck="false" />
+                        <button type="button" id="configureEnvPathClearBtn" class="configure-env-path-clear" hidden aria-label="✕">✕</button>
+                    </div>
+                    <button type="button" id="configureEnvBrowseBtn"></button>
+                    <button type="button" id="configureEnvDetectBtn"></button>
+                </div>
+            </div>
+            <div id="configureEnvDetectSection" class="configure-env-detect-panel" hidden>
+                <div class="detect-env-bar-panel configure-env-detect-bar">
+                    <button type="button" class="detect-env-main" id="configureEnvDetectToggle" aria-expanded="false">
+                        <span class="detect-env-icon running" id="configureEnvDetectCompactIcon" aria-hidden="true"></span>
+                        <span class="detect-env-text" id="configureEnvDetectCompactText"></span>
+                        <span class="detect-env-hint" id="configureEnvDetectCompactHint" aria-hidden="true">
+                            <svg class="detect-env-chevron" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M4 6l4 4 4-4"/>
+                            </svg>
+                        </span>
+                    </button>
+                    <button type="button" class="detect-env-close" id="configureEnvDetectClose" aria-label="✕">✕</button>
+                </div>
+                <div class="detect-env-details configure-env-detect-details" id="configureEnvDetectDetails" hidden>
+                    <div class="detect-env-details-title" id="configureEnvDetectDetailsTitle"></div>
+                    <ul class="detect-env-steps" id="configureEnvDetectSteps"></ul>
+                </div>
+            </div>
+            <div id="configureEnvCandidatesSection" class="configure-env-candidates-section" hidden>
+                <div class="configure-env-candidates-title" id="configureEnvCandidatesTitle"></div>
+                <ul class="configure-env-candidates" id="configureEnvCandidatesList"></ul>
+                <div class="configure-env-empty" id="configureEnvCandidatesEmpty" hidden></div>
+            </div>
+            <div class="configure-env-system-block">
+                <button type="button" class="toolbar-btn" id="configureEnvSystemBtn"></button>
+                <p class="configure-env-system-hint" id="configureEnvSystemHint"></p>
+            </div>
+            <div class="configure-env-actions">
+                <button type="button" class="toolbar-btn" id="configureEnvCancelBtn"></button>
+                <button type="button" class="toolbar-btn primary" id="configureEnvSaveBtn"></button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div id="contextAttachTooltip" class="context-attach-tooltip" hidden></div>
 <div id="contextAttachPreview" class="context-attach-preview" hidden>
     <div class="context-attach-preview-header">
@@ -2951,32 +3378,79 @@ mark.search-mark-active {
         }
     }
 
-    function ensureDetectEnvironmentPanel() {
-        if (detectEnvPanelReady) return;
-        const list = document.getElementById('detectEnvSteps');
-        if (!list) return;
-        list.textContent = '';
+    function buildDetectStepRow(stepId, rowId) {
+        const li = document.createElement('li');
+        li.className = 'detect-env-step';
+        li.id = rowId;
+        li.style.display = 'none';
+        const stepIcon = document.createElement('span');
+        stepIcon.className = 'detect-env-step-icon detect-env-icon running';
+        const body = document.createElement('div');
+        body.className = 'detect-env-step-body';
+        const label = document.createElement('div');
+        label.className = 'detect-env-step-label';
+        label.textContent = detectStepLabel(stepId);
+        const detail = document.createElement('div');
+        detail.className = 'detect-env-step-detail';
+        body.appendChild(label);
+        body.appendChild(detail);
+        li.appendChild(stepIcon);
+        li.appendChild(body);
+        return li;
+    }
+
+    function ensureDetectStepsList(listEl, stepIdPrefix) {
+        if (!listEl || listEl.dataset.ready === '1') {
+            return;
+        }
+        listEl.textContent = '';
         DETECT_STEP_IDS.forEach(function(stepId) {
-            const li = document.createElement('li');
-            li.className = 'detect-env-step';
-            li.id = 'detectStep-' + stepId;
-            li.style.display = 'none';
-            const stepIcon = document.createElement('span');
-            stepIcon.className = 'detect-env-step-icon detect-env-icon running';
-            const body = document.createElement('div');
-            body.className = 'detect-env-step-body';
-            const label = document.createElement('div');
-            label.className = 'detect-env-step-label';
-            label.textContent = detectStepLabel(stepId);
-            const detail = document.createElement('div');
-            detail.className = 'detect-env-step-detail';
-            body.appendChild(label);
-            body.appendChild(detail);
-            li.appendChild(stepIcon);
-            li.appendChild(body);
-            list.appendChild(li);
+            listEl.appendChild(buildDetectStepRow(stepId, stepIdPrefix + stepId));
         });
-        detectEnvPanelReady = true;
+        listEl.dataset.ready = '1';
+    }
+
+    function refreshDetectStepLabels(listEl, stepIdPrefix) {
+        if (!listEl) return;
+        DETECT_STEP_IDS.forEach(function(stepId) {
+            const label = listEl.querySelector('#' + stepIdPrefix + stepId + ' .detect-env-step-label');
+            if (label) label.textContent = detectStepLabel(stepId);
+        });
+    }
+
+    function resetDetectStepsList(stepIdPrefix) {
+        DETECT_STEP_IDS.forEach(function(stepId) {
+            const row = document.getElementById(stepIdPrefix + stepId);
+            if (!row) return;
+            row.style.display = 'none';
+            setDetectEnvIcon(row.querySelector('.detect-env-step-icon'), 'running');
+            const detailEl = row.querySelector('.detect-env-step-detail');
+            if (detailEl) detailEl.textContent = '';
+        });
+    }
+
+    function updateDetectStepsList(msg, stepIdPrefix, compactIconEl, compactTextEl) {
+        const row = document.getElementById(stepIdPrefix + msg.step);
+        if (row) {
+            row.style.display = '';
+            setDetectEnvIcon(row.querySelector('.detect-env-step-icon'), msg.status || 'running');
+            const detailEl = row.querySelector('.detect-env-step-detail');
+            if (detailEl) detailEl.textContent = formatDetectStepDetail(msg);
+        }
+        if (compactIconEl && compactTextEl && msg.brief) {
+            setDetectEnvIcon(compactIconEl, msg.status || 'running');
+            const text = formatDetectProgressDisplay(msg.brief);
+            compactTextEl.textContent = text;
+            compactTextEl.title = text;
+        }
+    }
+
+    function ensureDetectEnvironmentPanel() {
+        const list = document.getElementById('detectEnvSteps');
+        ensureDetectStepsList(list, 'detectStep-');
+        if (!detectEnvPanelReady && list) {
+            detectEnvPanelReady = true;
+        }
     }
 
     function showDetectEnvironmentBar() {
@@ -3003,16 +3477,12 @@ mark.search-mark-active {
 
     function updateDetectEnvironmentStep(msg) {
         ensureDetectEnvironmentPanel();
-        const row = document.getElementById('detectStep-' + msg.step);
-        if (row) {
-            row.style.display = '';
-            setDetectEnvIcon(row.querySelector('.detect-env-step-icon'), msg.status || 'running');
-            const detailEl = row.querySelector('.detect-env-step-detail');
-            if (detailEl) detailEl.textContent = formatDetectStepDetail(msg);
-        }
-        if (msg.brief) {
-            setDetectEnvironmentCompact(msg.brief, msg.status || 'running');
-        }
+        updateDetectStepsList(
+            msg,
+            'detectStep-',
+            document.getElementById('detectEnvCompactIcon'),
+            document.getElementById('detectEnvCompactText'),
+        );
     }
 
     function initDetectEnvironmentStart(mode) {
@@ -3049,7 +3519,378 @@ mark.search-mark-active {
             brief: msg.brief,
         };
         updateDetectEnvironmentStep(summaryMsg);
-        setDetectEnvironmentCompact(msg.brief || '', summaryMsg.status);
+        setDetectEnvironmentCompact(formatDetectProgressDisplay(msg.brief || '100%'), summaryMsg.status);
+    }
+
+    const configureEnvModal = document.getElementById('configureEnvModal');
+    const configureEnvPathInput = document.getElementById('configureEnvPathInput');
+    const configureEnvPathClearBtn = document.getElementById('configureEnvPathClearBtn');
+    const configureEnvBrowseBtn = document.getElementById('configureEnvBrowseBtn');
+    const configureEnvDetectBtn = document.getElementById('configureEnvDetectBtn');
+    const configureEnvDetectSection = document.getElementById('configureEnvDetectSection');
+    const configureEnvDetectCompactIcon = document.getElementById('configureEnvDetectCompactIcon');
+    const configureEnvDetectCompactText = document.getElementById('configureEnvDetectCompactText');
+    const configureEnvDetectCompactHint = document.getElementById('configureEnvDetectCompactHint');
+    const configureEnvDetectToggle = document.getElementById('configureEnvDetectToggle');
+    const configureEnvDetectClose = document.getElementById('configureEnvDetectClose');
+    const configureEnvDetectDetails = document.getElementById('configureEnvDetectDetails');
+    const configureEnvDetectDetailsTitle = document.getElementById('configureEnvDetectDetailsTitle');
+    const configureEnvDetectSteps = document.getElementById('configureEnvDetectSteps');
+    const configureEnvCandidatesSection = document.getElementById('configureEnvCandidatesSection');
+    const configureEnvCandidatesList = document.getElementById('configureEnvCandidatesList');
+    const configureEnvCandidatesEmpty = document.getElementById('configureEnvCandidatesEmpty');
+    const configureEnvSaveBtn = document.getElementById('configureEnvSaveBtn');
+    const configureEnvCancelBtn = document.getElementById('configureEnvCancelBtn');
+    const configureEnvSystemBtn = document.getElementById('configureEnvSystemBtn');
+    const configureEnvSystemHint = document.getElementById('configureEnvSystemHint');
+    const configureEnvCloseBtn = document.getElementById('configureEnvCloseBtn');
+    let configureEnvSelectedPath = '';
+    let configureEnvDetectFinished = false;
+    let configureEnvDetectDetailsOpen = false;
+    let configureEnvDetectPanelVisible = false;
+    let configureEnvSystemVar = 'PATH';
+    let configureEnvSystemTarget = '';
+
+    function showConfigureEnvDetectPanel() {
+        configureEnvDetectPanelVisible = true;
+        if (configureEnvDetectSection) configureEnvDetectSection.hidden = false;
+    }
+
+    function updateConfigureEnvPathClearVisibility() {
+        if (!configureEnvPathClearBtn || !configureEnvPathInput) return;
+        const hasValue = !!configureEnvPathInput.value.trim();
+        configureEnvPathClearBtn.hidden = !hasValue;
+    }
+
+    function clearConfigureEnvPath() {
+        if (!configureEnvPathInput) return;
+        configureEnvPathInput.value = '';
+        configureEnvSelectedPath = '';
+        updateConfigureEnvPathClearVisibility();
+        if (configureEnvCandidatesList) {
+            configureEnvCandidatesList.querySelectorAll('.configure-env-candidate-row').forEach(function(el) {
+                el.classList.remove('is-selected');
+            });
+        }
+        configureEnvPathInput.focus();
+    }
+
+    function hideConfigureEnvDetectProgress() {
+        configureEnvDetectPanelVisible = false;
+        configureEnvDetectFinished = false;
+        configureEnvDetectDetailsOpen = false;
+        if (configureEnvDetectSection) configureEnvDetectSection.hidden = true;
+        setConfigureEnvDetectDetailsOpen(false);
+        resetDetectStepsList('configureDetectStep-');
+        if (configureEnvDetectCompactText) {
+            configureEnvDetectCompactText.textContent = '';
+            configureEnvDetectCompactText.title = '';
+        }
+        setDetectEnvIcon(configureEnvDetectCompactIcon, 'running');
+    }
+
+    function hideConfigureEnvDetectPanel() {
+        hideConfigureEnvDetectProgress();
+        if (configureEnvCandidatesSection) {
+            configureEnvCandidatesSection.hidden = true;
+            configureEnvCandidatesSection.classList.remove('is-visible');
+        }
+        if (configureEnvCandidatesList) configureEnvCandidatesList.textContent = '';
+        if (configureEnvCandidatesEmpty) configureEnvCandidatesEmpty.hidden = true;
+    }
+
+    function closeConfigureEnvDetectPanel() {
+        const wasVisible = configureEnvDetectPanelVisible;
+        hideConfigureEnvDetectProgress();
+        if (wasVisible) {
+            setConfigureEnvDetecting(false);
+            vscode.postMessage({ type: 'configureEnvironmentDetectClose' });
+        }
+    }
+
+    function createConfigureEnvFolderIcon() {
+        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svg.setAttribute('viewBox', '0 0 16 16');
+        svg.setAttribute('aria-hidden', 'true');
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path.setAttribute('d', 'M2 4.5h4.5L8 6h6v7.5H2z');
+        svg.appendChild(path);
+        return svg;
+    }
+
+    function setConfigureEnvDetectDetailsOpen(open) {
+        configureEnvDetectDetailsOpen = !!open;
+        if (configureEnvDetectDetails) configureEnvDetectDetails.hidden = !configureEnvDetectDetailsOpen;
+        if (configureEnvDetectCompactHint) {
+            configureEnvDetectCompactHint.classList.toggle('is-open', configureEnvDetectDetailsOpen);
+        }
+        if (configureEnvDetectToggle) {
+            configureEnvDetectToggle.setAttribute('aria-expanded', configureEnvDetectDetailsOpen ? 'true' : 'false');
+            configureEnvDetectToggle.title = configureEnvDetectDetailsOpen
+                ? (locale.detectEnvironmentHideDetails || '')
+                : (locale.detectEnvironmentViewDetails || '');
+        }
+    }
+
+    function setConfigureEnvDetectDetailsTitle() {
+        if (!configureEnvDetectDetailsTitle) return;
+        configureEnvDetectDetailsTitle.textContent = configureEnvDetectFinished
+            ? (locale.detectEnvironmentCompleteTitle || locale.detectEnvironmentStepSummary || '')
+            : (locale.detectEnvironmentDetectTitle || locale.detectEnvironment || '');
+    }
+
+    function updateConfigureEnvSystemHint() {
+        if (!configureEnvSystemHint) return;
+        const hint = localeText(
+            'configureEnvironmentSystemVarHint',
+            configureEnvSystemVar || 'PATH',
+            configureEnvSystemTarget || '',
+        );
+        configureEnvSystemHint.innerHTML = hint.replace(
+            configureEnvSystemVar,
+            '<code>' + escapeHtml(configureEnvSystemVar) + '</code>',
+        );
+        if (configureEnvSystemBtn) {
+            configureEnvSystemBtn.title = localeText(
+                'detectEnvironmentConfigureSystemDesc',
+                configureEnvSystemVar || 'PATH',
+                configureEnvSystemTarget || '',
+            );
+        }
+    }
+
+    function setConfigureEnvDetecting(detecting) {
+        if (configureEnvBrowseBtn) configureEnvBrowseBtn.disabled = !!detecting;
+        if (configureEnvDetectBtn) configureEnvDetectBtn.disabled = !!detecting;
+        if (configureEnvSaveBtn) configureEnvSaveBtn.disabled = !!detecting;
+        if (configureEnvSystemBtn) configureEnvSystemBtn.disabled = !!detecting;
+    }
+
+    function resetConfigureEnvDetectPanel() {
+        hideConfigureEnvDetectPanel();
+        configureEnvSelectedPath = '';
+    }
+
+    function openConfigureEnvModal(currentPath, systemEnvVar, systemEnvTarget) {
+        if (!configureEnvModal) return;
+        configureEnvSystemVar = systemEnvVar || 'PATH';
+        configureEnvSystemTarget = systemEnvTarget || '';
+        updateConfigureEnvSystemHint();
+        resetConfigureEnvDetectPanel();
+        if (configureEnvPathInput) configureEnvPathInput.value = currentPath || '';
+        updateConfigureEnvPathClearVisibility();
+        configureEnvModal.classList.add('is-open');
+        if (configureEnvPathInput) configureEnvPathInput.focus();
+    }
+
+    function closeConfigureEnvModal() {
+        if (!configureEnvModal) return;
+        configureEnvModal.classList.remove('is-open');
+        resetConfigureEnvDetectPanel();
+    }
+
+    function initConfigureEnvDetectStart() {
+        configureEnvDetectFinished = false;
+        ensureDetectStepsList(configureEnvDetectSteps, 'configureDetectStep-');
+        resetDetectStepsList('configureDetectStep-');
+        showConfigureEnvDetectPanel();
+        setConfigureEnvDetectDetailsOpen(false);
+        setConfigureEnvDetectDetailsTitle();
+        if (configureEnvDetectToggle) {
+            configureEnvDetectToggle.title = locale.detectEnvironmentViewDetails || '';
+        }
+        setDetectEnvIcon(configureEnvDetectCompactIcon, 'running');
+        if (configureEnvDetectCompactText) {
+            const text = formatDetectProgressDisplay('0%');
+            configureEnvDetectCompactText.textContent = text;
+            configureEnvDetectCompactText.title = text;
+        }
+    }
+
+    function updateConfigureEnvDetectProgress(msg) {
+        if (!configureEnvDetectSection || !configureEnvDetectPanelVisible) return;
+        updateDetectStepsList(
+            msg,
+            'configureDetectStep-',
+            configureEnvDetectCompactIcon,
+            configureEnvDetectCompactText,
+        );
+    }
+
+    function basenameFromPath(filePath) {
+        if (!filePath) return 'hermes';
+        const parts = filePath.split(/[/\\]/).filter(Boolean);
+        return parts.length ? parts[parts.length - 1] : 'hermes';
+    }
+
+    function selectConfigureEnvCandidate(path, rowEl) {
+        configureEnvSelectedPath = path || '';
+        if (configureEnvPathInput) {
+            configureEnvPathInput.value = configureEnvSelectedPath;
+            updateConfigureEnvPathClearVisibility();
+        }
+        if (configureEnvCandidatesList) {
+            configureEnvCandidatesList.querySelectorAll('.configure-env-candidate-row').forEach(function(el) {
+                el.classList.toggle('is-selected', el === rowEl);
+            });
+        }
+    }
+
+    function renderConfigureEnvCandidates(executables) {
+        if (!configureEnvCandidatesSection || !configureEnvCandidatesList || !configureEnvCandidatesEmpty) return;
+        configureEnvCandidatesList.textContent = '';
+        const list = Array.isArray(executables) ? executables : [];
+        configureEnvCandidatesSection.hidden = false;
+        configureEnvCandidatesSection.classList.remove('is-visible');
+        void configureEnvCandidatesSection.offsetWidth;
+        configureEnvCandidatesSection.classList.add('is-visible');
+        if (list.length === 0) {
+            configureEnvCandidatesEmpty.hidden = false;
+            configureEnvCandidatesEmpty.textContent = locale.configureEnvironmentNoCandidates || '';
+            return;
+        }
+        configureEnvCandidatesEmpty.hidden = true;
+        list.forEach(function(item, index) {
+            const li = document.createElement('li');
+            li.className = 'configure-env-candidate-row';
+            if (item.path === configureEnvSelectedPath) {
+                li.classList.add('is-selected');
+            }
+            li.style.animationDelay = (index * 0.06) + 's';
+
+            const body = document.createElement('div');
+            body.className = 'configure-env-candidate-body';
+            const icon = document.createElement('span');
+            icon.className = 'configure-env-candidate-icon detect-env-icon ' + (item.verified ? 'ok' : 'fail');
+            const main = document.createElement('div');
+            main.className = 'configure-env-candidate-main';
+            const head = document.createElement('div');
+            head.className = 'configure-env-candidate-head';
+            const name = document.createElement('span');
+            name.className = 'configure-env-candidate-name';
+            name.textContent = basenameFromPath(item.path);
+            const badge = document.createElement('span');
+            badge.className = 'configure-env-candidate-badge ' + (item.verified ? 'is-verified' : 'is-unverified');
+            badge.textContent = item.verified
+                ? (locale.detectEnvironmentCandidateVerified || 'verified')
+                : (locale.detectEnvironmentCandidateUnverified || 'unverified');
+            const tag = document.createElement('span');
+            tag.className = 'configure-env-candidate-tag';
+            tag.textContent = item.source || '';
+            head.appendChild(name);
+            head.appendChild(badge);
+            if (item.source) head.appendChild(tag);
+            const pathEl = document.createElement('div');
+            pathEl.className = 'configure-env-candidate-path';
+            pathEl.textContent = item.path || '';
+            main.appendChild(head);
+            main.appendChild(pathEl);
+            if (item.version) {
+                const versionEl = document.createElement('div');
+                versionEl.className = 'configure-env-candidate-version';
+                versionEl.textContent = item.version;
+                main.appendChild(versionEl);
+            }
+            body.appendChild(icon);
+            body.appendChild(main);
+            body.addEventListener('click', function() {
+                selectConfigureEnvCandidate(item.path || '', li);
+            });
+
+            const actions = document.createElement('div');
+            actions.className = 'configure-env-candidate-actions';
+
+            const openBtn = document.createElement('button');
+            openBtn.type = 'button';
+            openBtn.className = 'configure-env-candidate-open';
+            openBtn.title = locale.configureEnvironmentOpenDirectory || 'Open folder';
+            openBtn.setAttribute('aria-label', openBtn.title);
+            openBtn.appendChild(createConfigureEnvFolderIcon());
+            openBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                if (!item.path) return;
+                vscode.postMessage({
+                    type: 'configureEnvironmentOpenDirectory',
+                    path: item.path,
+                });
+            });
+
+            const selectBtn = document.createElement('button');
+            selectBtn.type = 'button';
+            selectBtn.className = 'configure-env-candidate-select';
+            selectBtn.setAttribute('aria-label', locale.configureEnvironmentSelectCandidate || 'Select');
+            selectBtn.textContent = '✓';
+            selectBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                selectConfigureEnvCandidate(item.path || '', li);
+            });
+
+            actions.appendChild(openBtn);
+            actions.appendChild(selectBtn);
+
+            li.appendChild(body);
+            li.appendChild(actions);
+            configureEnvCandidatesList.appendChild(li);
+        });
+    }
+
+    function finishConfigureEnvDetect(msg) {
+        setConfigureEnvDetecting(false);
+        if (msg.status === 'cancelled' || !configureEnvDetectPanelVisible) {
+            hideConfigureEnvDetectProgress();
+            return;
+        }
+        configureEnvDetectFinished = true;
+        setConfigureEnvDetectDetailsTitle();
+        const summaryStatus = msg.status === 'ready' ? 'ok' : (msg.executables && msg.executables.length ? 'ok' : 'fail');
+        updateConfigureEnvDetectProgress({
+            step: 'summary',
+            status: summaryStatus,
+            reportStatus: msg.status,
+            brief: '100%',
+            detail: msg.summary,
+        });
+        renderConfigureEnvCandidates(msg.executables || []);
+    }
+
+    function startConfigureEnvDetect() {
+        if (!configureEnvDetectBtn || configureEnvDetectBtn.disabled) return;
+        if (configureEnvCandidatesSection) {
+            configureEnvCandidatesSection.hidden = true;
+            configureEnvCandidatesSection.classList.remove('is-visible');
+        }
+        if (configureEnvCandidatesList) configureEnvCandidatesList.textContent = '';
+        if (configureEnvCandidatesEmpty) configureEnvCandidatesEmpty.hidden = true;
+        configureEnvSelectedPath = configureEnvPathInput ? configureEnvPathInput.value.trim() : '';
+        setConfigureEnvDetecting(true);
+        initConfigureEnvDetectStart();
+        vscode.postMessage({
+            type: 'configureEnvironmentDetect',
+            currentPath: configureEnvPathInput ? configureEnvPathInput.value.trim() : '',
+        });
+    }
+
+    function saveConfigureEnvPath() {
+        if (!configureEnvSaveBtn || configureEnvSaveBtn.disabled) return;
+        vscode.postMessage({
+            type: 'configureEnvironmentSave',
+            path: configureEnvPathInput ? configureEnvPathInput.value.trim() : '',
+        });
+    }
+
+    function browseConfigureEnvPath() {
+        if (!configureEnvBrowseBtn || configureEnvBrowseBtn.disabled) return;
+        vscode.postMessage({ type: 'configureEnvironmentBrowse' });
+    }
+
+    function requestConfigureEnvSystemPath() {
+        if (!configureEnvSystemBtn || configureEnvSystemBtn.disabled) return;
+        vscode.postMessage({
+            type: 'configureEnvironmentSystem',
+            path: configureEnvPathInput ? configureEnvPathInput.value.trim() : '',
+        });
     }
 
     function buildFaqAccordion(container) {
@@ -3234,6 +4075,43 @@ mark.search-mark-active {
         if (faqModalBody) {
             faqModalBody.innerHTML = locale.faqHtml || '';
             buildFaqAccordion(faqModalBody);
+        }
+        const configureEnvModalTitle = document.getElementById('configureEnvModalTitle');
+        if (configureEnvModalTitle) configureEnvModalTitle.textContent = locale.configureEnvironmentTitle || '';
+        const configureEnvPathLabel = document.getElementById('configureEnvPathLabel');
+        if (configureEnvPathLabel) configureEnvPathLabel.textContent = locale.configureEnvironmentPathLabel || '';
+        if (configureEnvPathInput) {
+            configureEnvPathInput.placeholder = locale.configureEnvironmentPathPlaceholder || '';
+        }
+        if (configureEnvPathClearBtn) {
+            configureEnvPathClearBtn.setAttribute(
+                'aria-label',
+                locale.configureEnvironmentClearPath || 'Clear path',
+            );
+            configureEnvPathClearBtn.title = locale.configureEnvironmentClearPath || 'Clear path';
+        }
+        updateConfigureEnvPathClearVisibility();
+        if (configureEnvBrowseBtn) configureEnvBrowseBtn.textContent = locale.configureEnvironmentBrowse || '';
+        if (configureEnvDetectBtn) configureEnvDetectBtn.textContent = locale.configureEnvironmentDetect || '';
+        const configureEnvCandidatesTitle = document.getElementById('configureEnvCandidatesTitle');
+        if (configureEnvCandidatesTitle) {
+            configureEnvCandidatesTitle.textContent = locale.configureEnvironmentCandidatesTitle || '';
+        }
+        if (configureEnvCandidatesEmpty) {
+            configureEnvCandidatesEmpty.textContent = locale.configureEnvironmentNoCandidates || '';
+        }
+        if (configureEnvSaveBtn) configureEnvSaveBtn.textContent = locale.configureEnvironmentSave || '';
+        if (configureEnvCancelBtn) configureEnvCancelBtn.textContent = locale.configureEnvironmentCancel || '';
+        if (configureEnvSystemBtn) {
+            configureEnvSystemBtn.textContent = locale.detectEnvironmentConfigureSystem || '';
+        }
+        updateConfigureEnvSystemHint();
+        refreshDetectStepLabels(configureEnvDetectSteps, 'configureDetectStep-');
+        setConfigureEnvDetectDetailsTitle();
+        if (configureEnvDetectToggle) {
+            configureEnvDetectToggle.title = configureEnvDetectDetailsOpen
+                ? (locale.detectEnvironmentHideDetails || '')
+                : (locale.detectEnvironmentViewDetails || '');
         }
         if (statusText) statusText.textContent = locale.statusDisconnected;
         pendingPermissions.forEach(function(group) {
@@ -6385,6 +7263,12 @@ mark.search-mark-active {
             const detectToggle = document.getElementById('detectEnvToggle');
             if (detectToggle) detectToggle.setAttribute('aria-expanded', 'false');
         }
+        if (e.key === 'Escape' && configureEnvDetectDetailsOpen) {
+            setConfigureEnvDetectDetailsOpen(false);
+        }
+        if (e.key === 'Escape' && configureEnvModal && configureEnvModal.classList.contains('is-open')) {
+            closeConfigureEnvModal();
+        }
     });
 
     const detectEnvToggle = document.getElementById('detectEnvToggle');
@@ -6431,6 +7315,57 @@ mark.search-mark-active {
     }
     if (detectEnvBtn) {
         detectEnvBtn.addEventListener('click', doDetectEnvironment);
+    }
+    if (configureEnvBrowseBtn) {
+        configureEnvBrowseBtn.addEventListener('click', browseConfigureEnvPath);
+    }
+    if (configureEnvDetectBtn) {
+        configureEnvDetectBtn.addEventListener('click', startConfigureEnvDetect);
+    }
+    if (configureEnvDetectClose) {
+        configureEnvDetectClose.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            closeConfigureEnvDetectPanel();
+        });
+    }
+    if (configureEnvPathClearBtn) {
+        configureEnvPathClearBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            clearConfigureEnvPath();
+        });
+    }
+    if (configureEnvPathInput) {
+        configureEnvPathInput.addEventListener('input', function() {
+            configureEnvSelectedPath = configureEnvPathInput.value.trim();
+            updateConfigureEnvPathClearVisibility();
+        });
+    }
+    if (configureEnvDetectToggle) {
+        configureEnvDetectToggle.addEventListener('click', function(e) {
+            e.stopPropagation();
+            setConfigureEnvDetectDetailsOpen(!configureEnvDetectDetailsOpen);
+        });
+    }
+    if (configureEnvSaveBtn) {
+        configureEnvSaveBtn.addEventListener('click', saveConfigureEnvPath);
+    }
+    if (configureEnvCancelBtn) {
+        configureEnvCancelBtn.addEventListener('click', closeConfigureEnvModal);
+    }
+    if (configureEnvCloseBtn) {
+        configureEnvCloseBtn.addEventListener('click', closeConfigureEnvModal);
+    }
+    if (configureEnvSystemBtn) {
+        configureEnvSystemBtn.addEventListener('click', requestConfigureEnvSystemPath);
+    }
+    if (configureEnvModal) {
+        configureEnvModal.addEventListener('click', function(e) {
+            if (e.target === configureEnvModal) {
+                closeConfigureEnvModal();
+            }
+        });
     }
 
     newChatBtn.addEventListener('click', function() {
@@ -7221,6 +8156,49 @@ mark.search-mark-active {
 
             case 'detectEnvironmentEnd':
                 finishDetectEnvironmentPanel(msg);
+                break;
+
+            case 'configureEnvironmentOpen':
+                openConfigureEnvModal(msg.currentPath || '', msg.systemEnvVar, msg.systemEnvTarget);
+                break;
+
+            case 'configureEnvironmentDetectStart':
+                setConfigureEnvDetecting(true);
+                break;
+
+            case 'configureEnvironmentDetectProgress':
+                updateConfigureEnvDetectProgress(msg);
+                break;
+
+            case 'configureEnvironmentDetectEnd':
+                finishConfigureEnvDetect(msg);
+                break;
+
+            case 'configureEnvironmentDetectClosed':
+                hideConfigureEnvDetectProgress();
+                setConfigureEnvDetecting(false);
+                break;
+
+            case 'configureEnvironmentBrowseResult':
+                if (msg.path && configureEnvPathInput) {
+                    configureEnvPathInput.value = msg.path;
+                    configureEnvSelectedPath = msg.path;
+                    updateConfigureEnvPathClearVisibility();
+                } else if (msg.error && configureEnvDetectCompactText) {
+                    showConfigureEnvDetectPanel();
+                    configureEnvDetectCompactText.textContent = msg.error;
+                    setDetectEnvIcon(configureEnvDetectCompactIcon, 'fail');
+                }
+                break;
+
+            case 'configureEnvironmentSaveResult':
+                if (msg.ok) {
+                    closeConfigureEnvModal();
+                } else if (msg.error && configureEnvDetectCompactText) {
+                    showConfigureEnvDetectPanel();
+                    configureEnvDetectCompactText.textContent = msg.error;
+                    setDetectEnvIcon(configureEnvDetectCompactIcon, 'fail');
+                }
                 break;
 
             case 'setLocale':

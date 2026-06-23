@@ -89,8 +89,10 @@ export interface DetectHermesEnvironmentOptions {
     signal?: AbortSignal;
 }
 
-const VERIFY_TIMEOUT_MS = 8000;
+const VERIFY_TIMEOUT_MS = 15_000;
 const PROBE_TIMEOUT_MS = 8000;
+/** `hermes acp --check` cold-starts Python + ACP and often exceeds 8s on real installs. */
+const ACP_CHECK_TIMEOUT_MS = 30_000;
 const ACP_INSTALL_TIMEOUT_MS = 120_000;
 export const ACP_PROTOCOL_PACKAGE = 'agent-client-protocol==0.9.0';
 
@@ -185,10 +187,19 @@ export async function checkHermesAcp(
         });
         let stdout = '';
         let stderr = '';
+        let timedOut = false;
+        let settled = false;
+        const finish = (result: { code: number | null; output: string }): void => {
+            if (settled) {
+                return;
+            }
+            settled = true;
+            resolve(result);
+        };
         const timer = setTimeout(() => {
+            timedOut = true;
             proc.kill();
-            resolve({ code: null, output: combineProcessOutput(stdout, stderr) });
-        }, VERIFY_TIMEOUT_MS);
+        }, ACP_CHECK_TIMEOUT_MS);
 
         proc.stdout?.on('data', (chunk: Buffer) => {
             stdout += chunk.toString();
@@ -198,11 +209,19 @@ export async function checkHermesAcp(
         });
         proc.on('error', () => {
             clearTimeout(timer);
-            resolve({ code: null, output: combineProcessOutput(stdout, stderr) });
+            finish({ code: null, output: combineProcessOutput(stdout, stderr) });
         });
         proc.on('exit', (code) => {
             clearTimeout(timer);
-            resolve({ code, output: combineProcessOutput(stdout, stderr) });
+            const output = combineProcessOutput(stdout, stderr);
+            if (timedOut && !output) {
+                finish({
+                    code: null,
+                    output: `hermes acp --check timed out after ${ACP_CHECK_TIMEOUT_MS / 1000}s`,
+                });
+                return;
+            }
+            finish({ code, output });
         });
     });
 
@@ -210,7 +229,9 @@ export async function checkHermesAcp(
         return { ok: false, output: checkResult.output };
     }
 
-    const versionResult = await execCommand(executable, ['acp', '--version']);
+    const versionResult = await execCommand(executable, ['acp', '--version'], {
+        timeout: ACP_CHECK_TIMEOUT_MS,
+    });
     const versionOutput = combineProcessOutput(versionResult.stdout, versionResult.stderr);
     const version = versionOutput.split(/\r?\n/).map((line) => line.trim()).find(Boolean);
     return { ok: true, output: checkResult.output, version };
@@ -471,17 +492,12 @@ export function buildRecommendation(
     const systemPathDir = getHermesExecutableDirectory(pluginPath);
     const extensionPath = process.env.PATH || process.env.Path || '';
     const visibleToExtension = isDirectoryOnPath(systemPathDir, extensionPath);
-    const visibleToRegistry = registryPath
-        ? isDirectoryOnPath(systemPathDir, registryPath)
-        : false;
 
     if (!preferred.verified) {
         return { pluginPath, systemPathDir, action: 'reinstall' };
     }
-    if (!visibleToExtension && !visibleToRegistry) {
-        return { pluginPath, systemPathDir, action: 'configure_system' };
-    }
-    if (!visibleToExtension) {
+    const pluginConfigured = executables.some((item) => item.source === 'config' && item.verified);
+    if (!pluginConfigured && !visibleToExtension) {
         return { pluginPath, systemPathDir, action: 'configure_plugin' };
     }
     return { pluginPath, systemPathDir, action: 'none' };
@@ -703,7 +719,10 @@ export async function detectHermesEnvironment(
                         : acpResult.output,
                 });
             } else {
-                acpDetail = acpResult.output || installResult.detail;
+                acpDetail = acpResult.output || acpDetail;
+                if (!acpDetail && !installResult.ok) {
+                    acpDetail = installResult.detail;
+                }
                 onProgress?.({
                     step: 'acp_check',
                     status: 'fail',
