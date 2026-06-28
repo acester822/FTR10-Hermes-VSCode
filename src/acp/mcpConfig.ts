@@ -32,6 +32,11 @@ export type SessionMcpServer =
           headers: Array<{ name: string; value: string }>;
       }
     | {
+          type: 'acp';
+          name: string;
+          id: string;
+      }
+    | {
           name: string;
           command: string;
           args: string[];

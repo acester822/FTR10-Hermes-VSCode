@@ -1,4 +1,5 @@
 import * as fs from 'fs';
+import * as path from 'path';
 import { findHermesExecutable, runHermesCommand } from './profileDiscovery';
 import { normalizeHermesCliProfile } from './hermesProfile';
 import {
@@ -98,7 +99,39 @@ async function resolveProviderModelNames(
             modelNames = draft.apiKey ? live : mergeModelNames(modelNames, live);
         }
     }
+
+    // For well-known providers without a custom base_url (e.g. OpenRouter),
+    // fetch their full curated model list from the live API so users see
+    // all available models even when the ACP session uses a different provider.
+    if (probeLive && !draft.baseUrl && draft.slug.endsWith('openrouter')) {
+        const live = await _fetchOpenRouterModels();
+        if (live?.length) {
+            modelNames = live;
+        }
+    }
+
     return modelNames;
+}
+
+/** Fetch model IDs from the OpenRouter live /v1/models endpoint. */
+async function _fetchOpenRouterModels(timeoutMs = 8000): Promise<string[] | null> {
+    try {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), timeoutMs);
+        const resp = await fetch('https://openrouter.ai/api/v1/models', {
+            headers: { Accept: 'application/json', 'User-Agent': 'rina-hermes-acp' },
+            signal: controller.signal,
+        });
+        clearTimeout(timer);
+        if (!resp.ok) return null;
+        const data = (await resp.json()) as { data?: Array<{ id?: string }> };
+        const ids = (data.data ?? [])
+            .map(m => (m.id ?? '').trim())
+            .filter(Boolean);
+        return ids.length ? ids : null;
+    } catch {
+        return null;
+}
 }
 
 export function resolveProfileDefaultModel(
@@ -528,4 +561,41 @@ function stripYamlScalar(raw: string): string {
 
 function escapeRegExp(value: string): string {
     return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/** Load provider -> models cache written by Hermes runtime.
+ *
+ * Path: ``~/.hermes/provider_models_cache.json``.
+ *
+ * Shape:
+ * ``{ "openrouter": { "models": ["anthropic/claude-...', ...], ... }, ... }``
+ *
+ * Returns an empty record when the file is missing, unreadable, or malformed
+ * — callers should fall back to other discovery mechanisms.
+ */
+export async function loadProviderModelsCache(hermesHome?: string): Promise<Record<string, string[]>> {
+    const home = hermesHome || process.env.HOME || '/tmp';
+    const cachePath = path.join(home, '.hermes', 'provider_models_cache.json');
+    try {
+        const raw = await fs.promises.readFile(cachePath, 'utf-8');
+        const parsed = JSON.parse(raw) as Record<string, { models?: unknown } | unknown>;
+
+        const result: Record<string, string[]> = {};
+        for (const [provider, entry] of Object.entries(parsed)) {
+            if (entry && typeof entry === 'object') {
+                const models = (entry as { models?: unknown }).models;
+                if (Array.isArray(models)) {
+                    const ids = models
+                        .map(m => String(m ?? '').trim())
+                        .filter(Boolean);
+                    if (ids.length) {
+                        result[provider] = ids;
+                    }
+                }
+            }
+        }
+        return result;
+    } catch {
+        return {};
+    }
 }

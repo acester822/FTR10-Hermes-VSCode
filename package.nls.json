@@ -17,6 +17,7 @@
   "commands.hermes.detectEnvironment.title": "Environment detection",
   "commands.hermes.detectEnvironmentBusy.title": "Detecting environment....",
   "commands.hermes.configureEnvironment.title": "Environment configuration",
+  "commands.hermes.setApiKey.title": "Hermes: Set API Key",
   "submenus.hermes.envMenu.label": "Environment",
   "submenus.hermes.reloadMenu.label": "Reload",
   "submenus.hermes.moreMenu.label": "More",

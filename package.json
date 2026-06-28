@@ -15,6 +15,36 @@
   ],
   "main": "./out/extension.js",
   "contributes": {
+    "walkthroughs": [
+      {
+        "id": "hermes.setup",
+        "title": "Get Started with Hermes",
+        "description": "Configure your agent in 3 easy steps.",
+        "steps": [
+          {
+            "id": "setApiKey",
+            "title": "1. Secure your API Key",
+            "description": "Store your key securely in VS Code.",
+            "media": { "markdown": "media/setup-key.md" },
+            "completionEvents": ["onCommand:hermes.setApiKey"]
+          },
+          {
+            "id": "configureAgent",
+            "title": "2. Open the Control Center",
+            "description": "Customize your agent's persona and tool permissions.",
+            "media": { "markdown": "media/setup-ui.md" },
+            "completionEvents": ["onView:hermes.settingsDashboard"]
+          },
+          {
+            "id": "startChat",
+            "title": "3. Start a Conversation",
+            "description": "Ask Hermes a question about your code.",
+            "media": { "markdown": "media/setup-chat.md" },
+            "completionEvents": ["onCommand:hermes.newChat"]
+          }
+        ]
+      }
+    ],
     "viewsContainers": {
       "activitybar": [
         {
@@ -31,10 +61,39 @@
           "id": "hermesChat",
           "name": "%views.hermesChat.name%",
           "icon": "media/activitybar.svg"
+        },
+        {
+          "type": "webview",
+          "id": "hermes.settingsDashboard",
+          "name": "Control Center"
         }
       ]
     },
     "commands": [
+      {
+        "command": "hermes.askAboutFile",
+        "title": "Ask Hermes about this file"
+      },
+      {
+        "command": "hermes.explainFunction",
+        "title": "Explain this function"
+      },
+      {
+        "command": "hermes.showDiff",
+        "title": "Show Diff"
+      },
+      {
+        "command": "hermes.previewDiff",
+        "title": "Preview Hermes Changes"
+      },
+      {
+        "command": "hermes.applyDiff",
+        "title": "Apply Hermes Changes"
+      },
+      {
+        "command": "hermes.setApiKey",
+        "title": "%commands.hermes.setApiKey.title%"
+      },
       {
         "command": "hermes.newChat",
         "title": "%commands.hermes.newChat.title%"

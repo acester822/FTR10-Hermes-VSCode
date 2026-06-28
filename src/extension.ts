@@ -1,6 +1,11 @@
 import * as vscode from 'vscode';
 import { HermesChatProvider } from './chat/HermesChatProvider';
 import { initI18n, t } from './i18n';
+import { registerToolInvocationCommand, getToolManifest, getEventsSubscriptions } from './acp/acpToolRegistration';
+import { registerCodeLensProvider } from './codeLens';
+import { registerDiffCommands } from './diffViewer';
+import { HermesCliBridge } from './settings/hermesCliBridge';
+import { HermesSettingsProvider } from './settings/hermesSettingsProvider';
 
 let chatProvider: HermesChatProvider | undefined;
 
@@ -28,6 +33,66 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(
         vscode.window.registerWebviewViewProvider('hermesChat', chatProvider, {
             webviewOptions: { retainContextWhenHidden: true }
+        })
+    );
+
+    // Feature 1 & 4: ACP Editor Context Tools + Deep Semantic Context
+    registerToolInvocationCommand(context);
+    for (const disposable of getEventsSubscriptions()) {
+        context.subscriptions.push(disposable);
+    }
+
+    // Feature 2: CodeLens providers
+    registerCodeLensProvider(context);
+
+    // Feature 3: Diff viewer commands
+    registerDiffCommands(context);
+
+    // Feature 5: Settings Webview Control Center + CLI Bridge
+    const cliBridge = new HermesCliBridge();
+    context.subscriptions.push(
+        vscode.window.registerWebviewViewProvider(
+            HermesSettingsProvider.viewType,
+            new HermesSettingsProvider(context.extensionUri, cliBridge),
+        ),
+    );
+    context.subscriptions.push({ dispose: () => cliBridge.dispose() });
+
+    // Secret Storage: set API key securely
+    context.subscriptions.push(
+        vscode.commands.registerCommand('hermes.setApiKey', async () => {
+            const key = await vscode.window.showInputBox({
+                prompt: 'Enter Hermes API Key',
+                password: true,
+                placeHolder: 'sk-...',
+                ignoreFocusOut: true,
+            });
+            if (key) {
+                await context.secrets.store('hermes.apiKey', key);
+                vscode.window.showInformationMessage('Hermes API Key saved securely!');
+            }
+        })
+    );
+
+    // Register commands for code lens actions
+    context.subscriptions.push(
+        vscode.commands.registerCommand('hermes.askAboutFile', async (filePath?: string) => {
+            const path = filePath || vscode.window.activeTextEditor?.document.uri.fsPath;
+            if (!path) {
+                vscode.window.showInformationMessage(t('noActiveEditor'));
+                return;
+            }
+            const text = `Tell me about \`${path}\`:\n- What does this file do?\n- What are the key functions/classes?\n- Are there any potential issues?`;
+            vscode.commands.executeCommand('workbench.view.extension.hermes-sidebar');
+            setTimeout(() => chatProvider?.insertIntoInput(text), 300);
+        })
+    );
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand('hermes.explainFunction', async (filePath: string, symbolName: string, line: number) => {
+            const text = `Explain the \`${symbolName}\` at \`${filePath}:${line + 1}\`:\n- What does it do?\n- How is it structured?\n- Are there edge cases I should know about?`;
+            vscode.commands.executeCommand('workbench.view.extension.hermes-sidebar');
+            setTimeout(() => chatProvider?.insertIntoInput(text), 300);
         })
     );
 
@@ -72,6 +137,10 @@ export function activate(context: vscode.ExtensionContext) {
     bindChatCommand(context, 'hermes.detectEnvironment', provider => provider.detectEnvironment());
     bindChatCommand(context, 'hermes.detectEnvironmentBusy', () => undefined);
     bindChatCommand(context, 'hermes.configureEnvironment', provider => provider.configureEnvironment());
+
+    // Log tool manifest
+    const manifest = getToolManifest();
+    console.log(`Hermes ACP tools registered: ${manifest.map(t => t.name).join(', ')}`);
 
     console.log('Rina Hermes ACP activated');
 }

@@ -28,6 +28,14 @@ import {
     formatToolCallDisplay,
     parseToolCallSessionUpdate,
 } from './toolCallUpdate';
+import {
+    VSCODE_MCP_SERVER_ID,
+    VSCODE_MCP_SERVER_NAME,
+    handleMcpConnect,
+    handleMcpMessage,
+    handleMcpDisconnect,
+} from './vscodeMcpBridge';
+import { EditorToolsMcpServer } from './editorToolsMcpServer';
 
 export type AcpStatus = 'idle' | 'connecting' | 'ready' | 'prompting' | 'error';
 export type { ModelListState } from './modelConfig';
@@ -154,6 +162,10 @@ export class AcpClient {
     private _modelOptionsFetchPromise: Promise<AcpModelOptionsResponse | null> | null = null;
     /** Full provider catalog from ``model.options``; survives sparse session model updates. */
     private _cachedModelOptions: AcpModelOptionsResponse | null = null;
+    /** Whether the agent declared mcpCapabilities.acp in its initialize response. */
+    private _agentSupportsMcpAcp = false;
+    /** Local HTTP server exposing editor tools as an MCP server to the agent. */
+    private _editorToolsMcpServer: EditorToolsMcpServer | null = null;
 
     private static readonly VALID: Record<AcpStatus, AcpStatus[]> = {
         idle:        ['connecting'],
@@ -397,16 +409,39 @@ export class AcpClient {
                 return this._handleTerminalKill(params);
             });
 
+            // Register ACP-transport MCP handlers for VS Code editor tools
+            this._app.onRequest('mcp/connect', (p: unknown) => p as any, async ({ params }: any) => {
+                return handleMcpConnect(params);
+            });
+            this._app.onRequest('mcp/message', (p: unknown) => p as any, async ({ params }: any) => {
+                return handleMcpMessage(params);
+            });
+            this._app.onRequest('mcp/disconnect', (p: unknown) => p as any, async ({ params }: any) => {
+                return handleMcpDisconnect(params);
+            });
+
             this._conn = this._app.connect(stream);
             const ctx = this._conn.agent;
 
-            await ctx.request(methods.agent.initialize, {
+            const initResponse = await ctx.request(methods.agent.initialize, {
                 protocolVersion: PROTOCOL_VERSION,
                 clientCapabilities: {
                     fs: { readTextFile: true, writeTextFile: true },
                     terminal: true
                 }
-            } as any);
+            } as any) as any;
+            // Check if the agent supports ACP-transport MCP servers
+            if (initResponse?.capabilities?.mcpCapabilities?.acp) {
+                this._agentSupportsMcpAcp = true;
+                this._onLog('Agent supports ACP-transport MCP servers — enabling VS Code editor tools bridge');
+            }
+
+            // Always start the local HTTP MCP server for editor tools.
+            // The agent discovers and connects to it via the mcpServers entry
+            // in session/new (type: 'http'), which Hermes already supports.
+            this._editorToolsMcpServer = new EditorToolsMcpServer();
+            await this._editorToolsMcpServer.start();
+            this._onLog(`Editor tools MCP server listening on ${this._editorToolsMcpServer.url}`);
             // Note: `as any` is needed because ClientContext.request() type
             // doesn't include the fs/terminal capability fields in its schema type.
             // When ACP SDK schema updates, this cast can be removed.
@@ -662,6 +697,10 @@ export class AcpClient {
         try {
             this._session?.dispose();
         } catch { /* ignore */ }
+        if (this._editorToolsMcpServer) {
+            this._editorToolsMcpServer.stop();
+            this._editorToolsMcpServer = null;
+        }
         for (const [, term] of this._terminals) {
             try { term.process.kill(); } catch { /* ignore */ }
         }
@@ -925,10 +964,29 @@ export class AcpClient {
 
     private _buildNewSessionRequest(cwd: string): { cwd: string; mcpServers: SessionMcpServer[] } {
         const mcpServers = this._resolveMcpServers(cwd);
+        // Always advertise the local HTTP MCP server for editor tools.
+        // The agent connects to it via its existing McpServerHttp support.
+        if (this._editorToolsMcpServer) {
+            mcpServers.push({
+                type: 'http',
+                name: VSCODE_MCP_SERVER_NAME,
+                url: this._editorToolsMcpServer.url,
+                headers: [],
+            });
+            this._onLog(`session/new: added editor tools MCP server at ${this._editorToolsMcpServer.url}`);
+        }
+        // Also advertise the ACP-transport MCP server if the agent supports it
+        if (this._agentSupportsMcpAcp) {
+            mcpServers.push({
+                type: 'acp',
+                name: VSCODE_MCP_SERVER_NAME + '-acp',
+                id: VSCODE_MCP_SERVER_ID,
+            });
+            this._onLog('session/new: added VS Code editor tools MCP server via ACP transport');
+        }
         this._onLog(`session/new cwd=${cwd} mcpServers=${mcpServers.length}`);
         return { cwd, mcpServers };
     }
-
     private _transitionTo(status: AcpStatus, message?: string): boolean {
         const allowed = AcpClient.VALID[this._status];
         if (!allowed || !allowed.includes(status)) {

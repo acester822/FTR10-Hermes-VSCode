@@ -2,11 +2,12 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import { AcpClient, AcpStatus, ModelListState, PermissionRequest, TokenUsage } from '../acp/AcpClient';
-import { buildFallbackModelListState, buildModelListStateFromCatalog, isRuntimeModelSource } from '../acp/modelConfig';
+import { buildFallbackModelListState, buildModelListStateFromCatalog, enrichModelListState, isRuntimeModelSource, mergeModelListItems, encodeHermesModelValueId, type ModelListItem } from '../acp/modelConfig';
 import { resolveModelCatalog } from '../acp/acpModelCatalog';
 import { resolveMcpServersForSession } from '../acp/mcpConfig';
 import { normalizeHermesCliProfile, scopeKeyForCliProfile } from '../acp/hermesProfile';
 import { discoverHermesProfiles, detectHermesEnvironment, tryResolveHermesQuick } from '../acp/profileDiscovery';
+import { loadProviderModelsCache } from '../acp/profileModels';
 import type {
     HermesDetectProgressEvent,
     HermesDetectSource,
@@ -114,6 +115,7 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
     private _view?: vscode.WebviewView;
     private _acp?: AcpClient;
     private _output: vscode.OutputChannel;
+    private _ftr10Watcher?: fs.FSWatcher;
 
     // ---- Session State ----
     private _historyDir: string;
@@ -132,6 +134,8 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
     private _activeSelectionId: string = '';
     private _discoveredProfiles: string[] | null = null;
     private _profileDiscoveryPromise: Promise<void> | undefined;
+    /** Models from additional Hermes config providers (beyond the ACP session provider). */
+    private _hermesConfigModels: ModelListItem[] = [];
     private _modelSwitchInFlight: Promise<void> | undefined;
     private _tokenUsage: TokenUsage | null = null;
     private _webviewLocale?: SupportedLocale;
@@ -237,6 +241,8 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
 
         webviewView.webview.html = this._getHtml();
         this._webviewLocale = getLocale();
+        this._postFtr10Vars();
+        this._startFtr10Watcher();
 
         webviewView.onDidChangeVisibility(() => {
             if (webviewView.visible) {
@@ -1013,16 +1019,29 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
         const config = vscode.workspace.getConfiguration('hermes');
         const settingsModels = config.get<Array<{ id: string; name: string }>>('models') || [];
 
+        // Merge VS Code hermes.models with models discovered from Hermes config
+        // (custom_providers, fallback_providers) so additional providers appear
+        // alongside the ACP session's single-provider model list.
+        const combinedSettings: Array<{ id: string; name: string }> = [
+            ...settingsModels,
+            ...this._hermesConfigModels.map(m => ({ id: m.valueId, name: m.name })),
+        ];
+        const combinedDeduped = mergeModelListItems(
+            combinedSettings.map(m => ({ valueId: m.id, name: m.name })),
+            []
+        );
+
         if (catalog?.groups.length) {
             this._modelState = buildModelListStateFromCatalog(catalog, agentState, {
                 modelId: session?.modelId || profileState.modelId,
                 modelLabel: session?.modelLabel || profileState.modelLabel,
-                settingsModels,
+                settingsModels: combinedDeduped.map(m => ({ id: m.valueId, name: m.name })),
             });
         } else if (agentState) {
-            this._modelState = agentState;
+            this._modelState = enrichModelListState(agentState, combinedDeduped);
         } else {
-            this._modelState = this._buildFallbackModelList();
+            const allModels = combinedDeduped.map(m => ({ id: m.valueId, name: m.name }));
+            this._modelState = this._buildFallbackModelList(allModels);
         }
         this._postModelList();
     }
@@ -1227,9 +1246,35 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
         this._deferReadyUntilSessionSetup = true;
         try {
             await this._acp.start(cwd, resolvedPath, target.cliProfile);
+
+            // Discover all provider models from the Hermes runtime cache file
+            // (~/.hermes/provider_models_cache.json). This is written by Hermes
+            // during sessions and contains the live model list for every provider
+            // it has queried — not just the current ACP session's provider.
+            try {
+                const cache = await loadProviderModelsCache();
+                const cacheProviders = Object.keys(cache).length;
+                const cacheModels = Object.values(cache).reduce((sum, m) => sum + m.length, 0);
+                for (const [provider, models] of Object.entries(cache)) {
+                    for (const modelId of models) {
+                        this._hermesConfigModels.push({
+                            valueId: encodeHermesModelValueId(provider, modelId),
+                            name: modelId,
+                        });
+                    }
+                }
+                this._log(`Provider cache: ${cacheProviders} providers, ${cacheModels} models`);
+            } catch (err) {
+                this._log(`Provider cache load failed: ${err instanceof Error ? err.message : String(err)}`);
+            }
+
             await this._syncModelState({ skipModelOptions: true });
             await this._applySessionModelPreference();
-            await this._syncModelState();
+
+            // No need for a second _syncModelState: it was already called by
+            // the first sync above (no model reset), inside _resetAgentWithModel
+            // (when _applySessionModelPreference reset the model), or by the
+            // background probe completion handler above.
         } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
             this._log(`Connect failed: ${msg}`);
@@ -1915,14 +1960,20 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
         }
     }
 
-    private _buildFallbackModelList(): ModelListState | null {
+    private _buildFallbackModelList(extraModels?: Array<{ id: string; name: string }>): ModelListState | null {
         const config = vscode.workspace.getConfiguration('hermes');
         const models = config.get<Array<{ id: string; name: string }>>('models') || [];
+        const allModels = extraModels?.length
+            ? mergeModelListItems(
+                  [...models, ...extraModels].map(m => ({ valueId: m.id, name: m.name })),
+                  []
+              ).map(m => ({ id: m.valueId, name: m.name }))
+            : models;
         const defaultModel = config.get<string>('defaultModel') || '';
         const session = this._sessions.find(s => s.id === this._sessionId);
         const profileState = loadProfileState(this._historyDir, this._scopeKey);
         const currentId = session?.modelId || profileState.modelId || defaultModel;
-        return buildFallbackModelListState(models, currentId);
+        return buildFallbackModelListState(allModels, currentId);
     }
 
     private _postProfileList(): void {
@@ -2777,6 +2828,10 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
         this._acp?.dispose();
         this._acp = undefined;
         this._view = undefined;
+        if (this._ftr10Watcher) {
+            try { this._ftr10Watcher.close(); } catch { /* ignore */ }
+            this._ftr10Watcher = undefined;
+        }
         this._output.dispose();
     }
 
@@ -2929,6 +2984,45 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
         await this._connect(this._activeSelectionId || undefined);
     }
 
+    private _readFtr10Vars(): Record<string, string> {
+        try {
+            const varsPath = path.join(
+                process.env.HOME || process.env.USERPROFILE || '~',
+                '.ftr10',
+                'vars.json',
+            );
+            if (!fs.existsSync(varsPath)) return {};
+            const raw = fs.readFileSync(varsPath, 'utf-8');
+            const parsed = JSON.parse(raw) as { values?: Record<string, string> };
+            return parsed.values ?? {};
+        } catch {
+            return {};
+        }
+    }
+
+    private _postFtr10Vars(): void {
+        const vars = this._readFtr10Vars();
+        if (Object.keys(vars).length === 0) return;
+        this._postMessage({ type: 'ftr10VarsUpdate', vars });
+    }
+
+    private _startFtr10Watcher(): void {
+        if (this._ftr10Watcher) return;
+        try {
+            const varsPath = path.join(
+                process.env.HOME || process.env.USERPROFILE || '~',
+                '.ftr10',
+                'vars.json',
+            );
+            if (!fs.existsSync(varsPath)) return;
+            this._ftr10Watcher = fs.watch(varsPath, () => {
+                this._postFtr10Vars();
+            });
+        } catch {
+            // FTR10 not installed — silently skip
+        }
+    }
+
     private _getHtml(): string {
         const htmlPath = path.join(this._extensionUri.fsPath, 'media', 'chat.html');
         let html = fs.readFileSync(htmlPath, 'utf-8');
@@ -2937,17 +3031,23 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
             const webview = this._view.webview;
             const vendorUri = (file: string) =>
                 webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'media', 'vendor', file)).toString();
+            const ftr10Vars = this._readFtr10Vars();
+            const ftr10VarsJson = Object.keys(ftr10Vars).length > 0
+                ? JSON.stringify(ftr10Vars).replace(/</g, '\\u003c')
+                : '{}';
             html = html
                 .replace('{{MARKED_URI}}', vendorUri('marked.min.js'))
                 .replace('{{HIGHLIGHT_URI}}', vendorUri('highlight.min.js'))
                 .replace('{{HIGHLIGHT_CSS_URI}}', vendorUri('github-dark.min.css'))
                 .replace('{{PURIFY_URI}}', vendorUri('purify.min.js'))
                 .replace('{{LOCALE_JSON}}', JSON.stringify(getWebviewLocale()).replace(/</g, '\\u003c'))
-                .replace('{{LOCALE_HELPER}}', WEBVIEW_LOCALE_HELPER);
+                .replace('{{LOCALE_HELPER}}', WEBVIEW_LOCALE_HELPER)
+                .replace('{{FTR10_VARS_JSON}}', ftr10VarsJson);
         } else {
             html = html
                 .replace('{{LOCALE_JSON}}', '{}')
-                .replace('{{LOCALE_HELPER}}', WEBVIEW_LOCALE_HELPER);
+                .replace('{{LOCALE_HELPER}}', WEBVIEW_LOCALE_HELPER)
+                .replace('{{FTR10_VARS_JSON}}', '{}');
         }
 
         return html;
