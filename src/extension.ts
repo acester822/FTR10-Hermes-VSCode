@@ -4,8 +4,7 @@ import { initI18n, t } from './i18n';
 import { registerToolInvocationCommand, getToolManifest, getEventsSubscriptions } from './acp/acpToolRegistration';
 import { registerCodeLensProvider } from './codeLens';
 import { registerDiffCommands } from './diffViewer';
-import { HermesCliBridge } from './settings/hermesCliBridge';
-import { HermesSettingsProvider } from './settings/hermesSettingsProvider';
+import { HermesSettingsPanel } from './settings/hermesSettingsPanel';
 
 let chatProvider: HermesChatProvider | undefined;
 
@@ -48,15 +47,14 @@ export function activate(context: vscode.ExtensionContext) {
     // Feature 3: Diff viewer commands
     registerDiffCommands(context);
 
-    // Feature 5: Settings Webview Control Center + CLI Bridge
-    const cliBridge = new HermesCliBridge();
+    // Feature 5: Main-editor Control Center (embedded desktop app)
     context.subscriptions.push(
-        vscode.window.registerWebviewViewProvider(
-            HermesSettingsProvider.viewType,
-            new HermesSettingsProvider(context.extensionUri, cliBridge),
-        ),
+        vscode.commands.registerCommand('hermes.openControlCenter', () => {
+            const gatewayUrl = 'http://127.0.0.1:9119';
+            const gatewayToken = process.env.HERMES_DASHBOARD_TOKEN || undefined;
+            HermesSettingsPanel.createOrShow(context.extensionUri, gatewayUrl, gatewayToken);
+        })
     );
-    context.subscriptions.push({ dispose: () => cliBridge.dispose() });
 
     // Secret Storage: set API key securely
     context.subscriptions.push(

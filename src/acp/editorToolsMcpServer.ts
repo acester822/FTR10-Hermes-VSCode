@@ -5,19 +5,6 @@ import { getRegisteredTools, type AcpToolDef } from './acpToolRegistration';
 /**
  * Minimal MCP Streamable-HTTP server that exposes the VS Code editor tools
  * to the Hermes agent.
- *
- * The Hermes agent already supports `McpServerHttp` / `McpServerSse` in its
- * `_register_session_mcp_servers`. By advertising an `http`-transport MCP
- * server pointing at this local HTTP endpoint, the agent discovers and calls
- * the 14 editor context tools through its existing MCP client infrastructure —
- * no ACP-transport MCP support required from the agent.
- *
- * Protocol: JSON-RPC 2.0 over HTTP POST. Each request body is a single
- * JSON-RPC request. The response is `application/json`.
- *
- * Supported MCP methods:
- *   `tools/list`  → return all registered tool schemas
- *   `tools/call`  → execute a tool via VS Code commands, return the result
  */
 export class EditorToolsMcpServer {
     private server: http.Server | null = null;
@@ -33,6 +20,24 @@ export class EditorToolsMcpServer {
         const tools = getRegisteredTools();
 
         this.server = http.createServer(async (req, res) => {
+            // 1. Handle GET for SSE stream (Required by MCP Streamable HTTP spec)
+            if (req.method === 'GET' && req.url === '/mcp') {
+                res.writeHead(200, {
+                    'Content-Type': 'text/event-stream',
+                    'Cache-Control': 'no-cache',
+                    'Connection': 'keep-alive',
+                });
+                // Send a comment to keep the connection alive
+                res.write(': connected\n\n');
+                
+                // Keep the connection open until the client disconnects
+                req.on('close', () => {
+                    res.end();
+                });
+                return;
+            }
+
+            // 2. Handle POST for JSON-RPC requests
             if (req.method !== 'POST' || req.url !== '/mcp') {
                 res.writeHead(404, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({ error: 'Not found' }));
@@ -57,12 +62,26 @@ export class EditorToolsMcpServer {
             const id = msg.id;
             const method = msg.method as string;
             const params = msg.params || {};
+            const isNotification = id === undefined || id === null;
 
             try {
                 const result = await this._handleMethod(method, params, tools);
+                
+                // JSON-RPC 2.0: Server MUST NOT reply with a body to a Notification
+                if (isNotification) {
+                    res.writeHead(202); // 202 Accepted is standard for notifications in HTTP
+                    res.end();
+                    return;
+                }
+
                 res.writeHead(200, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({ jsonrpc: '2.0', id, result }));
             } catch (err: any) {
+                if (isNotification) {
+                    res.writeHead(200);
+                    res.end();
+                    return;
+                }
                 res.writeHead(200, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({
                     jsonrpc: '2.0',
@@ -85,6 +104,28 @@ export class EditorToolsMcpServer {
 
     private async _handleMethod(method: string, params: any, tools: AcpToolDef[]): Promise<any> {
         switch (method) {
+            // 3. Add the missing 'initialize' handshake!
+            case 'initialize':
+                return {
+                    protocolVersion: '2024-11-05', // Latest stable MCP protocol version
+                    capabilities: {
+                        tools: {
+                            listChanged: false,
+                        },
+                    },
+                    serverInfo: {
+                        name: 'vscode-editor-tools',
+                        version: '1.0.0',
+                    },
+                };
+            
+            case 'notifications/initialized':
+                // Handled by the isNotification check above, but good to have explicit case
+                return null;
+
+            case 'ping':
+                return {};
+
             case 'tools/list':
                 return {
                     tools: tools.map(t => ({

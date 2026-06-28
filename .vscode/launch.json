@@ -6,7 +6,9 @@
             "type": "extensionHost",
             "request": "launch",
             "args": [
-                "--extensionDevelopmentPath=${workspaceFolder}"
+                "--extensionDevelopmentPath=${workspaceFolder}",
+                "--disable-extensions",
+                "--no-cache"
             ],
             "outFiles": [
                 "${workspaceFolder}/out/**/*.js"
@@ -19,6 +21,8 @@
             "request": "launch",
             "args": [
                 "--extensionDevelopmentPath=${workspaceFolder}",
+                "--disable-extensions",
+                "--no-cache",
                 "--extensionTestsPath=${workspaceFolder}/out/tests/suite/index"
             ],
             "outFiles": [
