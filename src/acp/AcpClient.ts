@@ -948,19 +948,10 @@ export class AcpClient {
     }
 
     private _emitToolCallUpdate(update: Record<string, unknown>, kind: 'tool_call' | 'tool_call_update'): void {
-        // Debug: log the raw update keys and title/content presence
-        const rawKeys = Object.keys(update).join(',');
-        const hasTitle = 'title' in update;
-        const hasContent = 'content' in update;
-        const hasRawInput = 'rawInput' in update || 'raw_input' in update;
-        const hasRawOutput = 'rawOutput' in update || 'raw_output' in update;
-        this._onLog(`[tool-call-debug] kind=${kind} keys=${rawKeys} hasTitle=${hasTitle} hasContent=${hasContent} hasRawInput=${hasRawInput} hasRawOutput=${hasRawOutput} title=${JSON.stringify(update.title)} content=${JSON.stringify(update.content)?.slice(0, 200)}`);
         const parsed = parseToolCallSessionUpdate(update, kind);
         if (!parsed) {
-            this._onLog(`[tool-call-debug] parseToolCallSessionUpdate returned null!`);
             return;
         }
-        this._onLog(`[tool-call-debug] parsed: toolCallId=${parsed.toolCallId} status=${parsed.status} title=${JSON.stringify(parsed.title)} bodyLen=${parsed.body?.length ?? 0}`);
         const merged = this._toolCallTracker.apply(parsed);
         this._onMessage('tool', formatToolCallDisplay(merged), merged.toolCallId);
     }

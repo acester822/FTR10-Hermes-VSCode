@@ -20,6 +20,23 @@ describe('toolCallUpdate', () => {
         assert.strictEqual(view!.title, 'Run npm install');
     });
 
+    it('parseToolCallSessionUpdate omits title when not provided', () => {
+        const view = parseToolCallSessionUpdate({
+            toolCallId: 'tc-1',
+        }, 'tool_call_update');
+        assert.ok(view);
+        assert.strictEqual(view!.title, undefined);
+    });
+
+    it('parseToolCallSessionUpdate reads explicit title', () => {
+        const view = parseToolCallSessionUpdate({
+            toolCallId: 'tc-1',
+            title: 'search: pattern',
+        }, 'tool_call');
+        assert.ok(view);
+        assert.strictEqual(view!.title, 'search: pattern');
+    });
+
     it('parseToolCallSessionUpdate defaults tool_call_update to in_progress', () => {
         const view = parseToolCallSessionUpdate({
             toolCallId: 'tc-1',
@@ -96,6 +113,34 @@ describe('ToolCallTracker', () => {
         });
         assert.strictEqual(second.status, 'in_progress');
         assert.strictEqual(tracker.activeCount, 1);
+    });
+
+    it('preserves title from start event when completion omits it', () => {
+        const tracker = new ToolCallTracker();
+        // Start event has the real title
+        tracker.apply({
+            toolCallId: 'tc-1',
+            status: 'pending',
+            title: 'search: quick.?action',
+            body: "Searching for 'quick.?action'",
+        });
+        // Completion event omits title (as Hermes does)
+        const completed = tracker.apply({
+            toolCallId: 'tc-1',
+            status: 'completed',
+            body: '{"total_count": 9}',
+        });
+        // Title must be preserved from the start event, not 'Tool'
+        assert.strictEqual(completed.title, 'search: quick.?action');
+    });
+
+    it('falls back to Tool when no title ever provided', () => {
+        const tracker = new ToolCallTracker();
+        const result = tracker.apply({
+            toolCallId: 'tc-1',
+            status: 'pending',
+        });
+        assert.strictEqual(result.title, 'Tool');
     });
 
     it('removes terminal statuses from active set', () => {

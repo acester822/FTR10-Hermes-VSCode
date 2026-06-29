@@ -6,6 +6,7 @@ out/
 .chat-history.json
 .sessions.json
 docs/**
+logs/**
 
 # npm only — ignore other package manager lock files
 yarn.lock

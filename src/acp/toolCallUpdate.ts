@@ -5,7 +5,7 @@ export type ToolCallStatus = 'pending' | 'in_progress' | 'completed' | 'failed' 
 export type ToolCallUpdateView = {
     toolCallId: string;
     status: ToolCallStatus;
-    title: string;
+    title?: string;
     body?: string;
     kind?: string;
 };
@@ -83,8 +83,8 @@ function formatToolCallRawValue(value: unknown): string | undefined {
     }
 }
 
-export function formatToolCallSummary(status: ToolCallStatus, title: string): string {
-    return `${TOOL_CALL_ICONS[status]} ${title}`;
+export function formatToolCallSummary(status: ToolCallStatus, title: string | undefined): string {
+    return `${TOOL_CALL_ICONS[status]} ${title || 'Tool'}`;
 }
 
 export function formatToolCallDisplay(view: ToolCallUpdateView): string {
@@ -106,7 +106,11 @@ export function parseToolCallSessionUpdate(
     }
 
     const status = normalizeToolCallStatus(update.status, kind);
-    const title = String(update.title ?? 'Tool');
+    // Only use the title if the update explicitly provides one.
+    // tool_call_update events from Hermes typically omit title; we must not
+    // overwrite the good title from the tool_call start event with the
+    // 'Tool' fallback.
+    const title = typeof update.title === 'string' && update.title ? update.title : undefined;
     const body = extractToolCallBody(update);
     const kindValue = update.kind;
 
