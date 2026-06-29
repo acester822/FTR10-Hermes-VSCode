@@ -18,6 +18,16 @@ Rina Hermes ACP is a VS Code / Cursor extension that brings your local Hermes Ag
 
 The extension connects to a local `hermes acp` subprocess over the [Agent Client Protocol (ACP)](https://agentclientprotocol.com), so you can ask questions, run tools, and iterate on code without leaving the IDE. Replies stream in real time with Markdown rendering; code blocks can be inserted into the editor with one click; file paths in messages open directly in VS Code.
 
+**What's new in v0.3.2**
+
+- **Editor Tools Bridge** — Hermes gains live access to your editor state: active file context, open tabs, cursor position, diagnostics, and file content via MCP
+- **CodeLens** — "Ask Hermes about this file" and "Explain this" lenses on every function and class
+- **Diff Viewer** — Preview and apply Hermes-suggested code changes with a visual diff
+- **Onboarding Walkthrough** — 3-step guided setup in VS Code's Welcome view
+- **Hermes Profile Discovery** — Auto-detects Hermes profiles and models from your config
+- **Context Attachment** — Carry conversation context from prior sessions into new chats
+- **Control Center** — Embedded Hermes dashboard panel for agent configuration
+
 **Who is it for?**
 
 - Developers already using Hermes Agent who want a smoother in-editor workflow
@@ -32,6 +42,8 @@ The extension connects to a local `hermes acp` subprocess over the [Agent Client
 | Multi-session | Tabbed conversations with local history persistence |
 | Transparent | Optional visibility into thinking steps and tool calls |
 | Bilingual UI | English and Simplified Chinese (follows VS Code display language) |
+| Editor context | Agent sees your cursor, selection, open tabs, and diagnostics |
+| Code actions | One-click "Ask Hermes" and "Explain this" on code symbols |
 
 ---
 
@@ -84,6 +96,36 @@ Visit [app.jove-rina.top](https://app.jove-rina.top) for guides, tips, and relat
 - **In-conversation search** — Find keywords in the current session
 - **Stop generation** — Cancel an in-progress response without saving partial output
 
+### Editor Tools Bridge
+
+Hermes Agent gains real-time access to your editor state through an in-process MCP server. The agent can query:
+
+- **Active editor context** — Current file path, language, cursor position, selection text, visible ranges, and full file content (for files under 500 lines)
+- **Open tabs** — List of all open editors with labels, language IDs, dirty state, and pinned state
+- **Diagnostics** — Current errors, warnings, and information from VS Code's language servers
+- **File operations** — Read and write files within the workspace
+
+This is exposed to the agent as the `vscode-editor-tools` MCP server, automatically registered at session start.
+
+### CodeLens
+
+- **"Ask Hermes about this file"** — Appears at the top of every file; opens the chat sidebar with a pre-filled prompt asking about the file's purpose, key functions/classes, and potential issues
+- **"Explain this"** — Appears above each `function` and `class` declaration; opens the chat with a prompt to explain that specific symbol
+
+### Diff Viewer
+
+- **Preview changes** — Hermes can suggest code modifications that render as a visual diff (original vs. proposed)
+- **Apply changes** — Accept a diff to write the changes to the file
+- Commands: `hermes.showDiff`, `hermes.previewDiff`, `hermes.applyDiff`
+
+### Context Attachment
+
+Carry context from prior sessions into new conversations:
+
+- **Modes**: Last 2 messages, last 10 messages, all messages (up to ~32K chars), or custom message indices
+- **Configurable visibility**: `onNewSession` (default), `always`, or `never`
+- Controlled via `hermes.contextAttachVisibility` setting
+
 ### Editor integration
 
 - **Insert code blocks** — Click a code block in a reply to insert it at the cursor
@@ -95,8 +137,19 @@ Visit [app.jove-rina.top](https://app.jove-rina.top) for guides, tips, and relat
 
 - **Multi-agent switching** — Configure named agents with different paths, profiles, and working directories
 - **Model selection** — Switch models via ACP `configOptions` or Hermes native `models` / `session/set_model`
-- **Profile selector** — Quick switch between Hermes profiles
+- **Profile selector** — Quick switch between Hermes profiles (auto-discovered from your Hermes config)
 - **Permission prompts** — Approve or deny tool / file access requests from the agent
+
+### Onboarding
+
+- **Walkthrough** — 3-step guided setup in the Welcome view:
+  1. Secure your API key (stored in VS Code Secret Storage)
+  2. Open the Control Center to configure agent persona and tool permissions
+  3. Start your first conversation
+
+### Control Center
+
+- **Embedded dashboard** — Opens the Hermes dashboard UI in an editor panel for configuring agent settings, tools, and permissions
 
 ### Visibility & diagnostics
 
@@ -115,30 +168,43 @@ Visit [app.jove-rina.top](https://app.jove-rina.top) for guides, tips, and relat
 
 ## How to Use
 
-### 1. Open the chat panel
+### 1. First-time setup (Walkthrough)
+
+Open the Welcome view (`Ctrl+Shift+X` → Hermes icon) and follow the 3-step walkthrough:
+
+1. **Set your API key** — Stored securely in VS Code Secret Storage
+2. **Open the Control Center** — Configure your agent's persona and tool permissions
+3. **Start a conversation** — Begin chatting with Hermes
+
+### 2. Open the chat panel
 
 - Click the **Hermes Agent** icon in the left activity bar, or
 - Run command palette (`Ctrl+Shift+P` / `Cmd+Shift+P`) → **Hermes: Open Chat**
 
-### 2. Start a conversation
+### 3. Start a conversation
 
 1. Wait for status **Ready**
 2. Type your message in the input box at the bottom
 3. Press **Enter** to send ( **Shift+Enter** for a new line)
 4. Watch the reply stream in; click **Stop** to cancel if needed
 
-### 3. Reference files
+### 4. Reference files
 
 - Type `@` in the input to open the file picker and attach a workspace file
 - Click any file path in a message to open it in the editor
 
-### 4. Work with code from the editor
+### 5. Work with code from the editor
 
 1. Select code in any editor tab
 2. Right-click → **Hermes: Insert Selection into Chat**
 3. The selection is inserted into the chat input with file path and line number
 
-### 5. Manage sessions
+### 6. Use CodeLens
+
+- Click **"Ask Hermes about this file"** at the top of any file to ask about its purpose
+- Click **"Explain this"** above a function or class to get an explanation of that symbol
+
+### 7. Manage sessions
 
 - Click **+ New** to start a fresh conversation
 - Switch between tabs to revisit local history
@@ -146,21 +212,35 @@ Visit [app.jove-rina.top](https://app.jove-rina.top) for guides, tips, and relat
 
 > **Note:** Switching sessions resets the agent's in-memory context. Previously saved messages are restored locally and marked with a **local history** banner — the agent does not retain that prior context unless Hermes adds session restore support.
 
-### 6. Switch model or profile
+### 8. Switch model or profile
 
 Use the **Model** and **Profile** dropdowns in the chat toolbar when your Hermes setup exposes them.
 
 If the agent does not provide a model list, configure fallback presets in Settings (see below).
 
-### 7. Commands
+### 9. Commands
 
 | Command | Description |
 |---------|-------------|
 | `Hermes: New Chat` | Start a new conversation |
 | `Hermes: Open Chat` | Open the chat sidebar |
 | `Hermes: Insert Selection into Chat` | Send selected editor code to the chat input |
+| `Hermes: Ask about this file` | Pre-fill a prompt about the active file |
+| `Hermes: Explain this function` | Pre-fill a prompt to explain a code symbol |
+| `Hermes: Show Diff` | Open a visual diff of proposed changes |
+| `Hermes: Preview Hermes Changes` | Preview changes as a diff |
+| `Hermes: Apply Hermes Changes` | Apply proposed changes to a file |
+| `Hermes: Open Control Center` | Open the embedded Hermes dashboard |
+| `Hermes: Set API Key` | Store an API key securely |
+| `Hermes: Detect Environment` | Scan for Hermes installation |
+| `Hermes: Configure Environment` | Configure detected Hermes installation |
+| `Hermes: Open Settings` | Open extension settings |
+| `Hermes: Check for Updates` | Check for extension updates |
+| `Hermes: Open Logs` | View ACP connection logs |
+| `Hermes: Reload Extension` | Reload the extension |
+| `Hermes: Reload Session` | Reload the current session |
 
-### 8. Settings
+### 10. Settings
 
 Open **Settings** (`Ctrl+,` / `Cmd+,`) and search for **Hermes**, or use **More options → Settings** in the chat view title bar (opens extension settings directly):
 
@@ -169,8 +249,9 @@ Open **Settings** (`Ctrl+,` / `Cmd+,`) and search for **Hermes**, or use **More 
 | `hermes.path` | Path to Hermes executable | auto-detect |
 | `hermes.cwd` | Working directory for sessions | workspace root |
 | `hermes.profile` | Hermes profile name | default |
-| `hermes.showThoughts` | Show agent thinking process | `false` |
-| `hermes.showToolCalls` | Show tool call notifications | `false` |
+| `hermes.showThoughts` | Show agent thinking process | `true` |
+| `hermes.showToolCalls` | Show tool call notifications | `true` |
+| `hermes.contextAttachVisibility` | When to show context attachment picker | `onNewSession` |
 | `hermes.models` | Fallback model list when agent provides none | `[]` |
 | `hermes.defaultModel` | Default model id (fallback list only) | `""` |
 | `hermes.agents` | Named agent configurations for quick switching | `[]` |

@@ -116,6 +116,16 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
     private _acp?: AcpClient;
     private _output: vscode.OutputChannel;
     private _ftr10Watcher?: fs.FSWatcher;
+    private _diffReview?: import('../acp/DiffReviewManager').DiffReviewManager;
+
+    public setDiffReviewManager(manager: import('../acp/DiffReviewManager').DiffReviewManager): void {
+        this._diffReview = manager;
+        this._diffReview.onEvent((e) => {
+            if (e.type === 'proposed') {
+                this._postMessage({ type: 'diffReviewRequest', filePath: e.filePath });
+            }
+        });
+    }
 
     // ---- Session State ----
     private _historyDir: string;
@@ -327,6 +337,9 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
                 case 'openSettings':
                     void this._openSettings();
                     break;
+                case 'openControlCenter':
+                    void this._openControlCenter();
+                    break;
                 case 'openExternal':
                     if (message.url) {
                         void vscode.env.openExternal(vscode.Uri.parse(message.url));
@@ -361,6 +374,15 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
                     break;
                 case 'permissionResponse':
                     this._handlePermissionResponse(message.id, message.optionId ?? null);
+                    break;
+                case 'permissionModeChange':
+                    this._handlePermissionModeChange(message.mode);
+                    break;
+                case 'acceptDiff':
+                    void this._handleAcceptDiff();
+                    break;
+                case 'rejectDiff':
+                    void this._handleRejectDiff();
                     break;
                 case 'insertEditor':
                     void this._handleInsertEditor(message.text || '');
@@ -1354,6 +1376,14 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
             this._postMessage({ type: 'permissionDismiss', id });
         }
         this._pendingPermissions.clear();
+    }
+
+    private _handlePermissionModeChange(mode: string | undefined): void {
+        const validModes = ['manual', 'autoApprove', 'denyAll'];
+        const resolved = validModes.includes(mode ?? '') ? mode! : 'manual';
+        this._log(`Permission mode changed: ${resolved}`);
+        const config = vscode.workspace.getConfiguration('hermes');
+        void config.update('permissionMode', resolved, vscode.ConfigurationTarget.Global);
     }
 
     private async _handleRetry(): Promise<void> {
@@ -2826,13 +2856,26 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
         this._cancelPendingPermissions();
         this._clearViewDetectProgress();
         this._acp?.dispose();
-        this._acp = undefined;
-        this._view = undefined;
-        if (this._ftr10Watcher) {
-            try { this._ftr10Watcher.close(); } catch { /* ignore */ }
-            this._ftr10Watcher = undefined;
-        }
+        this._diffReview = undefined;
         this._output.dispose();
+    }
+
+    private async _handleAcceptDiff(): Promise<void> {
+        if (!this._diffReview) {
+            this._postMessage({ type: 'diffReviewResult', status: 'error', message: 'Diff review not available.' });
+            return;
+        }
+        const result = await this._diffReview.accept();
+        this._postMessage({ type: 'diffReviewResult', ...result });
+    }
+
+    private async _handleRejectDiff(): Promise<void> {
+        if (!this._diffReview) {
+            this._postMessage({ type: 'diffReviewResult', status: 'error', message: 'Diff review not available.' });
+            return;
+        }
+        const result = await this._diffReview.reject();
+        this._postMessage({ type: 'diffReviewResult', ...result });
     }
 
     private _postMessage(msg: any): void {
@@ -2845,6 +2888,7 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
             type: 'config',
             showThoughts: config.get<boolean>('showThoughts', true),
             showToolCalls: config.get<boolean>('showToolCalls', true),
+            permissionMode: config.get<string>('permissionMode', 'manual'),
         });
     }
 
@@ -2946,8 +2990,12 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
         );
     }
 
+    private async _openControlCenter(): Promise<void> {
+        await vscode.commands.executeCommand('hermes.controlCenter');
+    }
+
     private async _onConfigurationChanged(e: vscode.ConfigurationChangeEvent): Promise<void> {
-        if (e.affectsConfiguration('hermes.showThoughts') || e.affectsConfiguration('hermes.showToolCalls')) {
+        if (e.affectsConfiguration('hermes.showThoughts') || e.affectsConfiguration('hermes.showToolCalls') || e.affectsConfiguration('hermes.permissionMode')) {
             this._postConfig();
         }
         if (e.affectsConfiguration('hermes.contextAttachVisibility')) {

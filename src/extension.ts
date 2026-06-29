@@ -1,9 +1,10 @@
 import * as vscode from 'vscode';
 import { HermesChatProvider } from './chat/HermesChatProvider';
 import { initI18n, t } from './i18n';
-import { registerToolInvocationCommand, getToolManifest, getEventsSubscriptions } from './acp/acpToolRegistration';
+import { registerToolInvocationCommand, getToolManifest, getEventsSubscriptions, setDiffReviewManager } from './acp/acpToolRegistration';
 import { registerCodeLensProvider } from './codeLens';
 import { registerDiffCommands } from './diffViewer';
+import { DiffReviewManager, registerDiffContentProvider } from './acp/DiffReviewManager';
 import { HermesSettingsPanel } from './settings/hermesSettingsPanel';
 
 let chatProvider: HermesChatProvider | undefined;
@@ -36,16 +37,28 @@ export function activate(context: vscode.ExtensionContext) {
     );
 
     // Feature 1 & 4: ACP Editor Context Tools + Deep Semantic Context
+    // DiffReviewManager must be created BEFORE tool registration so propose_diff
+    // and accept_diff/reject_diff are wired to it.
+    const diffReview = new DiffReviewManager();
+    setDiffReviewManager(diffReview);
+    context.subscriptions.push({ dispose: () => diffReview.dispose() });
+
     registerToolInvocationCommand(context);
     for (const disposable of getEventsSubscriptions()) {
         context.subscriptions.push(disposable);
     }
+
+    // Register the hermes-diff:// scheme for propose_diff virtual documents
+    registerDiffContentProvider(context);
 
     // Feature 2: CodeLens providers
     registerCodeLensProvider(context);
 
     // Feature 3: Diff viewer commands
     registerDiffCommands(context);
+
+    // Wire diff review into chat provider
+    chatProvider.setDiffReviewManager(diffReview);
 
     // Feature 5: Main-editor Control Center (embedded dashboard)
     context.subscriptions.push(

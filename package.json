@@ -301,6 +301,21 @@
           "default": true,
           "description": "%configuration.hermes.showToolCalls.description%"
         },
+        "hermes.permissionMode": {
+          "type": "string",
+          "default": "manual",
+          "enum": [
+            "manual",
+            "autoApprove",
+            "denyAll"
+          ],
+          "enumDescriptions": [
+            "%configuration.hermes.permissionMode.manual.description%",
+            "%configuration.hermes.permissionMode.autoApprove.description%",
+            "%configuration.hermes.permissionMode.denyAll.description%"
+          ],
+          "description": "%configuration.hermes.permissionMode.description%"
+        },
         "hermes.contextAttachVisibility": {
           "type": "string",
           "default": "onNewSession",

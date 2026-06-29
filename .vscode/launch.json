@@ -5,13 +5,15 @@
             "name": "Run Extension",
             "type": "extensionHost",
             "request": "launch",
+            "program": "${workspaceFolder}",
             "args": [
-                "--extensionDevelopmentPath=${workspaceFolder}",
+                "--extensionDevelopmentPath=/home/ftr/Apps/rina-hermes-acp",
                 "--disable-extensions",
                 "--no-cache"
             ],
+            "cwd": "/home/ftr/Apps/rina-hermes-acp",
             "outFiles": [
-                "${workspaceFolder}/out/**/*.js"
+                "/home/ftr/Apps/rina-hermes-acp/out/**/*.js"
             ],
             "preLaunchTask": "${defaultBuildTask}"
         },
@@ -19,14 +21,15 @@
             "name": "Extension Tests",
             "type": "extensionHost",
             "request": "launch",
+            "program": "${workspaceFolder}",
             "args": [
-                "--extensionDevelopmentPath=${workspaceFolder}",
+                "--extensionDevelopmentPath=/home/ftr/Apps/rina-hermes-acp",
                 "--disable-extensions",
-                "--no-cache",
-                "--extensionTestsPath=${workspaceFolder}/out/tests/suite/index"
+                "--no-cache"
             ],
+            "cwd": "/home/ftr/Apps/rina-hermes-acp",
             "outFiles": [
-                "${workspaceFolder}/out/**/*.js"
+                "/home/ftr/Apps/rina-hermes-acp/out/**/*.js"
             ],
             "preLaunchTask": "${defaultBuildTask}"
         }

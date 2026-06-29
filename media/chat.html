@@ -708,6 +708,11 @@ body {
     background: var(--primary-hover);
     border-color: var(--primary-hover);
 }
+.toolbar-btn svg {
+    width: 14px;
+    height: 14px;
+    display: block;
+}
 .delete-btn {
     background: none;
     border: none;
@@ -1304,7 +1309,7 @@ body {
 }
 .tool-call-summary {
     font-size: 12px;
-    font-weight: 600;
+    font-weight: 700;
     color: var(--accent-2);
     padding: 2px 0;
     line-height: 1.4;
@@ -1312,6 +1317,7 @@ body {
 }
 .tool-call-body {
     margin-top: 4px;
+    font-size: 12px;
 }
 .tool-call-body .aux-body-wrap {
     margin-top: 0;
@@ -1327,15 +1333,16 @@ body {
     border-left: 3px solid color-mix(in srgb, var(--primary) 40%, transparent);
 }
 .message.tool {
-    color: var(--dim);
-    border-left: 3px solid color-mix(in srgb, var(--dim) 50%, transparent);
+    color: var(--fg);
+    border-left: 3px solid color-mix(in srgb, var(--accent-2) 60%, transparent);
 }
 .message.thought .aux-label {
     color: var(--primary);
     opacity: 0.85;
 }
 .message.tool .aux-label {
-    opacity: 0.7;
+    color: var(--accent-2);
+    opacity: 1;
 }
 .message.thought .aux-header,
 .message.tool .aux-header {
@@ -2048,6 +2055,82 @@ body {
     color: var(--fg);
     background: color-mix(in srgb, var(--fg) 7%, transparent);
 }
+.permission-mode-picker .permission-mode-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    max-width: min(120px, 28vw);
+    padding: 3px 6px;
+    font-size: 11px;
+    line-height: 1.35;
+    font-family: inherit;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 3px;
+    color: var(--dim);
+    cursor: pointer;
+    transition: color 0.15s, background 0.15s;
+    overflow: hidden;
+}
+.permission-mode-picker .permission-mode-btn:hover {
+    color: var(--fg);
+    background: color-mix(in srgb, var(--fg) 7%, transparent);
+}
+.permission-mode-picker.is-open .permission-mode-btn {
+    color: var(--fg);
+}
+.permission-mode-picker .dropdown {
+    top: auto;
+    bottom: calc(100% + 6px);
+    left: 0;
+    min-width: 200px;
+    max-width: min(280px, 92vw);
+    border-radius: var(--radius-md);
+}
+.permission-mode-option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    cursor: pointer;
+    font-size: 12px;
+    line-height: 1.35;
+    border-left: 2px solid transparent;
+    transition: background 0.1s, border-color 0.1s;
+}
+.permission-mode-option:hover {
+    background: color-mix(in srgb, var(--primary) 8%, transparent);
+}
+.permission-mode-option.is-active {
+    border-left-color: var(--accent-2);
+    color: var(--fg);
+    font-weight: 600;
+}
+.permission-mode-option .mode-check {
+    width: 14px;
+    text-align: center;
+    flex-shrink: 0;
+    color: var(--accent-2);
+    font-size: 11px;
+}
+.permission-mode-option:not(.is-active) .mode-check {
+    visibility: hidden;
+}
+.permission-mode-option .mode-label {
+    flex: 1;
+    min-width: 0;
+}
+.permission-mode-option .mode-hint {
+    color: var(--dim);
+    font-size: 10px;
+    white-space: nowrap;
+}
+.permission-mode-picker.mode-autoApprove .permission-mode-btn {
+    color: var(--success);
+}
+.permission-mode-picker.mode-denyAll .permission-mode-btn {
+    color: var(--error);
+}
 .input-composite-shell:focus-within .input-model-btn,
 .input-composite-shell:focus-within .input-context-btn,
 .input-model-picker.is-open .input-model-btn,
@@ -2666,6 +2749,100 @@ body {
 .input-composite textarea:disabled {
     opacity: 0.45;
 }
+.diff-review-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 6px 10px;
+    margin-bottom: 4px;
+    border: 1px solid var(--ftr10-glass-border, var(--border));
+    border-radius: 6px;
+    background: var(--ftr10-glass-bg-widget, var(--vscode-input-background));
+    animation: diff-bar-enter 0.2s ease-out;
+}
+.diff-review-bar[hidden] {
+    display: none;
+}
+@keyframes diff-bar-enter {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+.diff-review-info {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: 1;
+    min-width: 0;
+}
+.diff-review-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+}
+.diff-review-icon svg {
+    width: 14px;
+    height: 14px;
+    fill: var(--vscode-editorGutter-addedBackground, #4caf50);
+}
+.diff-review-label {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--ftr10-text, var(--vscode-foreground));
+    white-space: nowrap;
+}
+.diff-review-file {
+    font-size: 11px;
+    color: var(--dim);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    direction: rtl;
+    text-align: left;
+}
+.diff-review-actions {
+    display: flex;
+    gap: 4px;
+    flex-shrink: 0;
+}
+.diff-review-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 10px;
+    font-size: 11px;
+    font-weight: 500;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+}
+.diff-review-btn svg {
+    width: 12px;
+    height: 12px;
+    fill: currentColor;
+}
+.diff-review-accept {
+    background: var(--vscode-editorGutter-addedBackground, #4caf50);
+    color: white;
+}
+.diff-review-accept:hover {
+    background: var(--vscode-editorGutter-addedBackground, #43a047);
+    filter: brightness(1.1);
+}
+.diff-review-reject {
+    background: transparent;
+    color: var(--vscode-foreground);
+    border-color: var(--border);
+}
+.diff-review-reject:hover {
+    background: var(--vscode-list-hoverBackground, rgba(255,255,255,0.05));
+    border-color: var(--vscode-editorGutter-deletedBackground, #f44336);
+    color: var(--vscode-editorGutter-deletedBackground, #f44336);
+}
 .input-action {
     flex-shrink: 0;
     padding: 0;
@@ -3140,6 +3317,9 @@ mark.search-mark-active {
         </div>
     </div>
     <div class="toolbar-actions">
+        <button class="toolbar-btn" id="controlCenterBtn" title="Control Center">
+            <svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M9.4 1.5a1 1 0 0 0-2 0l-.14.76a.6.6 0 0 1-.53.44l-.37.05a1 1 0 0 0-.78 1.6l.45.53a.6.6 0 0 1 0 .72l-.45.53a1 1 0 0 0 .78 1.6l.37.05a.6.6 0 0 1 .53.44l.14.76a1 1 0 0 0 2 0l.14-.76a.6.6 0 0 1 .53-.44l.37-.05a1 1 0 0 0 .78-1.6l-.45-.53a.6.6 0 0 1 0-.72l.45-.53a1 1 0 0 0-.78-1.6l-.37-.05a.6.6 0 0 1-.53-.44L9.4 1.5zm-1.6 5a1.6 1.6 0 1 1 3.2 0 1.6 1.6 0 0 1-3.2 0z"/></svg>
+        </button>
         <button class="toolbar-btn primary" id="newChatBtn"><span class="new-label-full" id="newChatLabelFull"></span><span class="new-label-short">+</span></button>
     </div>
 </div>
@@ -3212,11 +3392,30 @@ mark.search-mark-active {
             </div>
         </div>
     </div>
-    <div class="input-composite-wrap">
-        <button type="button" id="quickToggleBtn" class="quick-toggle-btn" aria-expanded="false" aria-controls="inputQuickPanel">
-            <svg class="quick-toggle-chevron" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M4.5 10.5 8 7l3.5 3.5-.7.7L8 8.4l-2.8 2.8-.7-.7z"/></svg>
-        </button>
-        <div class="input-composite-shell">
+     <div class="input-composite-wrap">
+         <button type="button" id="quickToggleBtn" class="quick-toggle-btn" aria-expanded="false" aria-controls="inputQuickPanel">
+             <svg class="quick-toggle-chevron" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M4.5 10.5 8 7l3.5 3.5-.7.7L8 8.4l-2.8 2.8-.7-.7z"/></svg>
+         </button>
+         <div class="diff-review-bar" id="diffReviewBar" hidden>
+             <div class="diff-review-info">
+                 <span class="diff-review-icon" aria-hidden="true">
+                     <svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M2 3h12v10H2V3zm1 1v8h10V4H3zm2 2h6v1H5V6zm0 2h4v1H5V8zm0 2h6v1H5v-1z"/></svg>
+                 </span>
+                 <span class="diff-review-label" id="diffReviewLabel">Review changes</span>
+                 <span class="diff-review-file" id="diffReviewFile"></span>
+             </div>
+             <div class="diff-review-actions">
+                 <button type="button" class="diff-review-btn diff-review-accept" id="diffAcceptBtn" title="Accept changes">
+                     <svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.75.75 0 0 1 1.06-1.06L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0z"/></svg>
+                     Accept
+                 </button>
+                 <button type="button" class="diff-review-btn diff-review-reject" id="diffRejectBtn" title="Reject changes">
+                     <svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M3.72 3.72a.75.75 0 0 1 1.06 0L8 6.94l3.22-3.22a.75.75 0 1 1 1.06 1.06L9.06 8l3.22 3.22a.75.75 0 1 1-1.06 1.06L8 9.06l-3.22 3.22a.75.75 0 0 1-1.06-1.06L6.94 8 3.72 4.78a.75.75 0 0 1 0-1.06z"/></svg>
+                     Reject
+                 </button>
+             </div>
+         </div>
+         <div class="input-composite-shell">
             <div class="input-picker-row">
             <div class="picker input-model-picker" id="modelPicker">
                 <button type="button" class="input-model-btn" id="modelBtn" title="">
@@ -3242,6 +3441,16 @@ mark.search-mark-active {
                     <div class="context-attach-options" id="contextAttachList"></div>
                 </div>
             </div>
+            </div>
+            <div class="picker permission-mode-picker" id="permissionModePicker">
+                <button type="button" class="permission-mode-btn" id="permissionModeBtn" title="Permission mode">
+                    <span class="input-picker-icon" aria-hidden="true"><svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm0 1.5a5.5 5.5 0 1 1 0 11 5.5 5.5 0 0 1 0-11zM8 4a1 1 0 1 1 0 2 1 1 0 0 1 0-2zm0 3.5a.75.75 0 0 1 .75.75v2.5a.75.75 0 0 1-1.5 0v-2.5A.75.75 0 0 1 8 7.5z"/></svg></span>
+                    <span class="input-picker-label" id="permissionModeLabel">Manual</span>
+                </button>
+                <div class="dropdown" id="permissionModeDropdown" style="display:none">
+                    <div class="dropdown-header">Permission mode</div>
+                    <div class="permission-mode-options" id="permissionModeList"></div>
+                </div>
             </div>
             <div class="input-composite" id="inputComposite">
             <textarea id="input" rows="1" disabled></textarea>
@@ -3417,6 +3626,11 @@ mark.search-mark-active {
     const chatSearchInput = document.getElementById('chatSearchInput');
     const chatSearchCount = document.getElementById('chatSearchCount');
     const chatSearchPrev = document.getElementById('chatSearchPrev');
+    const diffReviewBar = document.getElementById('diffReviewBar');
+    const diffReviewFile = document.getElementById('diffReviewFile');
+    const diffAcceptBtn = document.getElementById('diffAcceptBtn');
+    const diffRejectBtn = document.getElementById('diffRejectBtn');
+    let diffReviewVisible = false;
     const chatSearchNext = document.getElementById('chatSearchNext');
     const newChatBtn = document.getElementById('newChatBtn');
     const multiSelectToolbar = document.getElementById('multiSelectToolbar');
@@ -5256,10 +5470,11 @@ mark.search-mark-active {
     const TOOL_AGGREGATE_MAX_LINES = 12;
     const TOOL_AGGREGATE_SEPARATOR = '\n\n---\n\n';
     const pendingPermissions = new Map();
+    let permissionMode = 'manual'; // 'manual' | 'autoApprove' | 'denyAll'
     const PERM_COLLAPSED_LINES = 3;
     const PERM_LINE_HEIGHT_EM = 1.45;
     const THOUGHT_COLLAPSED_LINES = 5;
-    const TOOL_COLLAPSED_LINES = 3;
+    const TOOL_COLLAPSED_LINES = 8;
     const AUX_LINE_HEIGHT_EM = 1.35;
 
     function getAuxCollapsedLines(role) {
@@ -7641,6 +7856,13 @@ mark.search-mark-active {
         vscode.postMessage({ type: 'newChat' });
     });
 
+    const controlCenterBtn = document.getElementById('controlCenterBtn');
+    if (controlCenterBtn) {
+        controlCenterBtn.addEventListener('click', function() {
+            vscode.postMessage({ type: 'openControlCenter' });
+        });
+    }
+
     // About / Help / FAQ modals (opened from view title bar commands)
     const aboutModal = document.getElementById('aboutModal');
     const helpModal = document.getElementById('helpModal');
@@ -7750,9 +7972,11 @@ mark.search-mark-active {
         if (profilePicker) profilePicker.classList.remove('is-open');
         modelPicker.classList.remove('is-open');
         if (contextAttachPicker) contextAttachPicker.classList.remove('is-open');
+        if (permissionModePickerEl) permissionModePickerEl.classList.remove('is-open');
         if (profileDropdown) profileDropdown.style.display = 'none';
         modelDropdown.style.display = 'none';
         if (contextAttachDropdown) contextAttachDropdown.style.display = 'none';
+        if (permissionModeDropdownEl) permissionModeDropdownEl.style.display = 'none';
         hideContextAttachTooltip();
         hideContextAttachPreview();
     }
@@ -7811,6 +8035,68 @@ mark.search-mark-active {
         });
         contextAttachDropdown.addEventListener('click', function(e) { e.stopPropagation(); });
     }
+
+    // Permission mode picker
+    const permissionModePickerEl = document.getElementById('permissionModePicker');
+    const permissionModeBtnEl = document.getElementById('permissionModeBtn');
+    const permissionModeLabelEl = document.getElementById('permissionModeLabel');
+    const permissionModeDropdownEl = document.getElementById('permissionModeDropdown');
+    const permissionModeListEl = document.getElementById('permissionModeList');
+    const permissionModes = [
+        { id: 'manual', label: 'Manual', hint: 'Ask every time' },
+        { id: 'autoApprove', label: 'Auto Approve', hint: 'Approve all' },
+        { id: 'denyAll', label: 'Deny All', hint: 'Reject all' },
+    ];
+
+    function updatePermissionModeUI() {
+        if (permissionModeLabelEl) {
+            const mode = permissionModes.find(function(m) { return m.id === permissionMode; });
+            permissionModeLabelEl.textContent = mode ? mode.label : 'Manual';
+        }
+        if (permissionModePickerEl) {
+            permissionModePickerEl.classList.remove('mode-manual', 'mode-autoApprove', 'mode-denyAll');
+            permissionModePickerEl.classList.add('mode-' + permissionMode);
+        }
+        if (permissionModeListEl) {
+            permissionModeListEl.querySelectorAll('.permission-mode-option').forEach(function(el) {
+                el.classList.toggle('is-active', el.dataset.mode === permissionMode);
+            });
+        }
+    }
+
+    function renderPermissionModeOptions() {
+        if (!permissionModeListEl) return;
+        permissionModeListEl.innerHTML = '';
+        permissionModes.forEach(function(mode) {
+            const item = document.createElement('div');
+            item.className = 'permission-mode-option' + (mode.id === permissionMode ? ' is-active' : '');
+            item.dataset.mode = mode.id;
+            item.innerHTML = '<span class="mode-check">✓</span><span class="mode-label">' + mode.label + '</span><span class="mode-hint">' + mode.hint + '</span>';
+            item.addEventListener('click', function(e) {
+                e.stopPropagation();
+                permissionMode = mode.id;
+                updatePermissionModeUI();
+                closeAllDropdowns();
+                vscode.postMessage({ type: 'permissionModeChange', mode: permissionMode });
+            });
+            permissionModeListEl.appendChild(item);
+        });
+    }
+
+    if (permissionModeBtnEl && permissionModeDropdownEl) {
+        permissionModeBtnEl.addEventListener('click', function(e) {
+            e.stopPropagation();
+            const open = permissionModeDropdownEl.style.display === 'none';
+            closeAllDropdowns();
+            if (open) {
+                permissionModePickerEl.classList.add('is-open');
+                permissionModeDropdownEl.style.display = 'block';
+                renderPermissionModeOptions();
+            }
+        });
+        permissionModeDropdownEl.addEventListener('click', function(e) { e.stopPropagation(); });
+    }
+    updatePermissionModeUI();
     const switchSessionStayBtn = document.getElementById('switchSessionStayBtn');
     const switchSessionConfirmBtn = document.getElementById('switchSessionConfirmBtn');
     if (switchSessionStayBtn) {
@@ -8293,6 +8579,38 @@ mark.search-mark-active {
         messagesEl.appendChild(group);
         pendingPermissions.set(id, group);
         maybeScrollToBottom();
+
+        // Auto-resolve based on permission mode
+        if (permissionMode === 'autoApprove') {
+            const options = msg.options || [];
+            // Prefer allow_always, then allow_once, then first option
+            const allowAlways = options.find(function(o) { return o.kind === 'allow_always'; });
+            const allowOnce = options.find(function(o) { return o.kind === 'allow_once'; });
+            const chosenOpt = allowAlways || allowOnce || options[0];
+            if (chosenOpt) {
+                const label = chosenOpt.name || chosenOpt.optionId;
+                applyPermissionResolvedUI(group, (localeText('permissionSelected', label)) + ' (auto)');
+                pendingPermissions.delete(id);
+                vscode.postMessage({ type: 'permissionResponse', id: id, optionId: chosenOpt.optionId });
+            }
+        } else if (permissionMode === 'denyAll') {
+            const options = msg.options || [];
+            const rejectAlways = options.find(function(o) { return o.kind === 'reject_always'; });
+            const rejectOnce = options.find(function(o) { return o.kind === 'reject_once'; });
+            // Deny by finding a reject option or just cancelling
+            if (rejectAlways || rejectOnce) {
+                const chosenOpt = rejectAlways || rejectOnce;
+                const label = chosenOpt.name || chosenOpt.optionId;
+                applyPermissionResolvedUI(group, (localeText('permissionSelected', label)) + ' (auto)');
+                pendingPermissions.delete(id);
+                vscode.postMessage({ type: 'permissionResponse', id: id, optionId: chosenOpt.optionId });
+            } else {
+                // No reject option — cancel
+                pendingPermissions.delete(id);
+                applyPermissionResolvedUI(group, (locale.permissionCancelled || 'Cancelled') + ' (auto)');
+                vscode.postMessage({ type: 'permissionResponse', id: id, optionId: null });
+            }
+        }
     }
 
     function resolvePermission(id, optionId, selectedLabel) {
@@ -8549,6 +8867,11 @@ mark.search-mark-active {
                 document.querySelectorAll('.message-group.tool').forEach(function(el) {
                     el.style.display = msg.showToolCalls ? '' : 'none';
                 });
+                // Permission mode
+                if (msg.permissionMode && msg.permissionMode !== permissionMode) {
+                    permissionMode = msg.permissionMode;
+                    updatePermissionModeUI();
+                }
                 break;
 
             case 'activeAgent':
@@ -8618,11 +8941,57 @@ mark.search-mark-active {
             case 'markSessionReset':
                 insertLocalHistoryDivider();
                 break;
+
+            case 'diffReviewRequest':
+                showDiffReviewBar(msg.filePath || '');
+                break;
+
+            case 'diffReviewResult':
+                hideDiffReviewBar();
+                if (msg.status === 'accepted') {
+                    addMessage('assistant', 'Changes accepted and saved.');
+                } else if (msg.status === 'rejected') {
+                    addMessage('assistant', 'Changes rejected and reverted.');
+                } else if (msg.status === 'no_pending') {
+                    addMessage('assistant', 'No pending changes to review.');
+                } else if (msg.status === 'error') {
+                    addMessage('assistant', 'Error: ' + (msg.message || 'Unknown error'));
+                }
+                break;
         }
     });
 
     // Signal ready
     applyLocale();
+
+    function showDiffReviewBar(filePath) {
+        if (!diffReviewBar) return;
+        diffReviewBar.hidden = false;
+        diffReviewVisible = true;
+        if (diffReviewFile) {
+            const parts = filePath.split('/');
+            diffReviewFile.textContent = parts[parts.length - 1] || filePath;
+            diffReviewFile.title = filePath;
+        }
+    }
+
+    function hideDiffReviewBar() {
+        if (!diffReviewBar) return;
+        diffReviewBar.hidden = true;
+        diffReviewVisible = false;
+    }
+
+    if (diffAcceptBtn) {
+        diffAcceptBtn.addEventListener('click', function() {
+            vscode.postMessage({ type: 'acceptDiff' });
+        });
+    }
+    if (diffRejectBtn) {
+        diffRejectBtn.addEventListener('click', function() {
+            vscode.postMessage({ type: 'rejectDiff' });
+        });
+    }
+
     vscode.postMessage({ type: 'ready' });
 })();
 </script>

@@ -1,5 +1,9 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
+import type { DiffReviewManager } from './DiffReviewManager';
+
+// Diff content provider (hermes-diff:// scheme) is registered via DiffReviewManager.
+// See src/acp/DiffReviewManager.ts → registerDiffContentProvider().
 
 export interface AcpToolDef {
   name: string;
@@ -274,14 +278,24 @@ async function getDocumentSymbols(uri: vscode.Uri) {
   return symbols ? flattenSymbols(symbols) : [];
 }
 
-async function getReferencesAtCursor() {
-  const editor = vscode.window.activeTextEditor;
-  if (!editor) return [];
+async function getReferencesAtCursor(filePath?: string, line?: number) {
+  let uri: vscode.Uri;
+  let position: vscode.Position;
+
+  if (filePath && line !== undefined) {
+    uri = vscode.Uri.file(filePath);
+    position = new vscode.Position(line, 0);
+  } else {
+    const editor = vscode.window.activeTextEditor;
+    if (!editor) return [];
+    uri = editor.document.uri;
+    position = editor.selection.active;
+  }
 
   const locations = await vscode.commands.executeCommand<vscode.Location[]>(
     'vscode.executeReferenceProvider',
-    editor.document.uri,
-    editor.selection.active,
+    uri,
+    position,
   );
 
   return locations?.map(loc => ({
@@ -290,14 +304,24 @@ async function getReferencesAtCursor() {
   })) || [];
 }
 
-async function getDefinitionsAtCursor() {
-  const editor = vscode.window.activeTextEditor;
-  if (!editor) return [];
+async function getDefinitionsAtCursor(filePath?: string, line?: number) {
+  let uri: vscode.Uri;
+  let position: vscode.Position;
+
+  if (filePath && line !== undefined) {
+    uri = vscode.Uri.file(filePath);
+    position = new vscode.Position(line, 0);
+  } else {
+    const editor = vscode.window.activeTextEditor;
+    if (!editor) return [];
+    uri = editor.document.uri;
+    position = editor.selection.active;
+  }
 
   const locations = await vscode.commands.executeCommand<vscode.Location[]>(
     'vscode.executeDefinitionProvider',
-    editor.document.uri,
-    editor.selection.active,
+    uri,
+    position,
   );
 
   return locations?.map(loc => ({
@@ -316,7 +340,36 @@ async function readFileContent(filePath: string, startLine?: number, endLine?: n
   return { content: doc.getText(), filePath };
 }
 
-export function registerEditorContextTools(): AcpToolDef[] {
+async function applyDiff(filePath: string, content: string): Promise<any> {
+  const uri = vscode.Uri.file(filePath);
+  let originalContent = '';
+  try {
+    const doc = await vscode.workspace.openTextDocument(uri);
+    originalContent = doc.getText();
+  } catch {
+    // File doesn't exist yet
+  }
+
+  if (originalContent === content) {
+    return { status: 'no_changes', filePath, applied: false, message: 'Proposed content is identical to current file.' };
+  }
+
+  const doc = await vscode.workspace.openTextDocument(uri);
+  const fullRange = new vscode.Range(0, 0, doc.lineCount, 0);
+  const edit = new vscode.WorkspaceEdit();
+  edit.replace(uri, fullRange, content);
+  const applied = await vscode.workspace.applyEdit(edit);
+
+  if (applied) {
+    const savedDoc = await vscode.workspace.openTextDocument(uri);
+    await savedDoc.save();
+    return { status: 'applied', filePath, applied: true, message: `Changes applied to ${filePath}.` };
+  }
+
+  return { status: 'failed', filePath, applied: false, message: `Failed to apply changes to ${filePath}.` };
+}
+
+export function registerEditorContextTools(diffReview?: DiffReviewManager): AcpToolDef[] {
   return [
     {
       name: 'get_active_file',
@@ -425,14 +478,79 @@ export function registerEditorContextTools(): AcpToolDef[] {
     {
       name: 'get_references',
       description: 'Find where a specific symbol is used across the codebase (from cursor position)',
-      parameters: { type: 'object', properties: {} },
-      handler: async () => getReferencesAtCursor(),
+      parameters: {
+        type: 'object',
+        properties: {
+          filePath: { type: 'string', description: 'Optional: absolute path to file (defaults to active editor)' },
+          line: { type: 'number', description: 'Optional: 0-based line number (defaults to cursor line)' },
+        },
+      },
+      handler: async (args) => getReferencesAtCursor(args.filePath, args.line),
     },
     {
       name: 'get_definitions',
       description: 'Jump to the definition of a symbol under the cursor',
+      parameters: {
+        type: 'object',
+        properties: {
+          filePath: { type: 'string', description: 'Optional: absolute path to file (defaults to active editor)' },
+          line: { type: 'number', description: 'Optional: 0-based line number (defaults to cursor line)' },
+        },
+      },
+      handler: async (args) => getDefinitionsAtCursor(args.filePath, args.line),
+    },
+    {
+      name: 'propose_diff',
+      description: 'Propose file changes for user review. Applies the changes to the file with visual diff decorations (red for removed, green for added). The user can accept or reject via the chat interface. Returns status "awaiting_review" when decorations are shown.',
+      parameters: {
+        type: 'object',
+        required: ['filePath', 'content'],
+        properties: {
+          filePath: { type: 'string', description: 'Absolute path to the file to modify' },
+          content: { type: 'string', description: 'The proposed new content for the entire file' },
+        },
+      },
+      handler: async (args) => {
+        if (diffReview) {
+          return await diffReview.propose(args.filePath, args.content);
+        }
+        return { status: 'error', message: 'Diff review manager not available.' };
+      },
+    },
+    {
+      name: 'apply_diff',
+      description: 'Apply file changes directly without review. Writes the content to the file immediately. Use propose_diff instead if the user wants to review changes first.',
+      parameters: {
+        type: 'object',
+        required: ['filePath', 'content'],
+        properties: {
+          filePath: { type: 'string', description: 'Absolute path to the file to modify' },
+          content: { type: 'string', description: 'The new content for the entire file' },
+        },
+      },
+      handler: async (args) => applyDiff(args.filePath, args.content),
+    },
+    {
+      name: 'accept_diff',
+      description: 'Accept the currently pending diff. Saves the file with the proposed changes. Only valid after a propose_diff call that returned "awaiting_review".',
       parameters: { type: 'object', properties: {} },
-      handler: async () => getDefinitionsAtCursor(),
+      handler: async () => {
+        if (diffReview) {
+          return await diffReview.accept();
+        }
+        return { status: 'error', message: 'Diff review manager not available.' };
+      },
+    },
+    {
+      name: 'reject_diff',
+      description: 'Reject the currently pending diff. Reverts the file to its original content. Only valid after a propose_diff call that returned "awaiting_review".',
+      parameters: { type: 'object', properties: {} },
+      handler: async () => {
+        if (diffReview) {
+          return await diffReview.reject();
+        }
+        return { status: 'error', message: 'Diff review manager not available.' };
+      },
     },
   ];
 }

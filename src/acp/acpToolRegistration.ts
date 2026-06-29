@@ -1,13 +1,19 @@
 import * as vscode from 'vscode';
 import { registerEditorContextTools, type AcpToolDef } from './editorContextTools';
+import { DiffReviewManager } from './DiffReviewManager';
 
 export type { AcpToolDef } from './editorContextTools';
 
 let _registeredTools: AcpToolDef[] = [];
+let _diffReview: DiffReviewManager | undefined;
+
+export function setDiffReviewManager(manager: DiffReviewManager): void {
+  _diffReview = manager;
+}
 
 export function getRegisteredTools(): AcpToolDef[] {
   if (_registeredTools.length === 0) {
-    _registeredTools = registerEditorContextTools();
+    _registeredTools = registerEditorContextTools(_diffReview);
   }
   return _registeredTools;
 }
