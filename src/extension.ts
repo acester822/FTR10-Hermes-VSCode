@@ -47,12 +47,10 @@ export function activate(context: vscode.ExtensionContext) {
     // Feature 3: Diff viewer commands
     registerDiffCommands(context);
 
-    // Feature 5: Main-editor Control Center (embedded desktop app)
+    // Feature 5: Main-editor Control Center (embedded dashboard)
     context.subscriptions.push(
         vscode.commands.registerCommand('hermes.openControlCenter', () => {
-            const gatewayUrl = 'http://127.0.0.1:9119';
-            const gatewayToken = process.env.HERMES_DASHBOARD_TOKEN || undefined;
-            HermesSettingsPanel.createOrShow(context.extensionUri, gatewayUrl, gatewayToken);
+            HermesSettingsPanel.createOrShow(context.extensionUri);
         })
     );
 
