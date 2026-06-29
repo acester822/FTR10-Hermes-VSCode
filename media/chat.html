@@ -1336,6 +1336,13 @@ body {
     color: var(--fg);
     border-left: 3px solid color-mix(in srgb, var(--accent-2) 60%, transparent);
 }
+.message.tool:has(.tool-call-card) {
+    padding: 0;
+    border: none;
+    background: transparent;
+    border-radius: 0;
+    box-shadow: none;
+}
 .message.thought .aux-label {
     color: var(--primary);
     opacity: 0.85;
@@ -3270,6 +3277,158 @@ mark.search-mark-active {
     .toolbar-status #statusText { display: none; }
     .new-label-full { display: none; }
     .new-label-short { display: inline; }
+}
+
+/* Enhanced Tool Call Cards */
+.tool-call-card {
+    background: var(--ftr10-glass-bg-widget, var(--text-block));
+    border: 1px solid var(--border-base);
+    border-left: 3px solid var(--accent-2);
+    border-radius: var(--radius-md);
+    margin: 8px 0;
+    overflow: hidden;
+    transition: all 0.2s ease;
+}
+
+.tool-call-card.is-live {
+    border-left-color: var(--accent-2);
+    animation: tool-card-pulse 2s ease-in-out infinite;
+}
+
+.tool-call-card.is-complete {
+    border-left-color: var(--success);
+    opacity: 0.85;
+}
+
+.tool-call-card.is-failed {
+    border-left-color: var(--error);
+}
+
+@keyframes tool-card-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent-2) 30%, transparent); }
+    50% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent-2) 15%, transparent); }
+}
+
+.tool-call-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s ease;
+}
+
+.tool-call-header:hover {
+    background: color-mix(in srgb, var(--fg) 5%, transparent);
+}
+
+.tool-call-icon {
+    font-size: 16px;
+    flex-shrink: 0;
+    width: 20px;
+    text-align: center;
+}
+
+.tool-call-title {
+    flex: 1;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--fg);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.tool-call-status {
+    font-size: 11px;
+    color: var(--dim);
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.tool-call-status.is-running {
+    color: var(--accent-2);
+}
+
+.tool-call-status.is-complete {
+    color: var(--success);
+}
+
+.tool-call-status.is-failed {
+    color: var(--error);
+}
+
+.tool-call-chevron {
+    width: 12px;
+    height: 12px;
+    flex-shrink: 0;
+    transition: transform 0.2s ease;
+    color: var(--dim);
+}
+
+.tool-call-card.is-expanded .tool-call-chevron {
+    transform: rotate(180deg);
+}
+
+.tool-call-body {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease;
+    border-top: 1px solid transparent;
+}
+
+.tool-call-card.is-expanded .tool-call-body {
+    max-height: 500px;
+    border-top-color: var(--border-base);
+}
+
+.tool-call-section {
+    padding: 8px 12px;
+    font-size: 11px;
+}
+
+.tool-call-section-title {
+    font-weight: 600;
+    color: var(--dim);
+    margin-bottom: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-size: 10px;
+}
+
+.tool-call-section-content {
+    background: var(--vscode-textCodeBlock-background, #1e1e1e);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 8px;
+    font-family: var(--vscode-editor-font-family, monospace);
+    font-size: 11px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-height: 200px;
+    overflow-y: auto;
+    color: var(--fg);
+}
+
+.tool-call-section-content::-webkit-scrollbar {
+    width: 6px;
+}
+
+.tool-call-section-content::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.tool-call-section-content::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 3px;
+}
+
+.tool-call-section-content::-webkit-scrollbar-thumb:hover {
+    background: var(--dim);
 }
 </style>
 </head>
@@ -5577,10 +5736,32 @@ mark.search-mark-active {
             const group = document.getElementById(toolCallMap[toolCallId]);
             if (group && group._auxState) {
                 const { callPart, bodyPart } = splitToolText(text);
+                const toolInfo = parseToolCallText(callPart);
 
-                const callEl = group.querySelector('.tool-call-summary');
-                if (callEl) {
-                    callEl.textContent = callPart;
+                const msgEl = group.querySelector('.message.tool');
+                if (msgEl && msgEl._cardData) {
+                    const cd = msgEl._cardData;
+                    cd.titleEl.textContent = toolInfo.title;
+                    cd.iconEl.textContent = toolInfo.icon;
+                    cd.statusEl.className = 'tool-call-status';
+                    if (toolInfo.status === 'in_progress' || toolInfo.status === 'pending') {
+                        cd.statusEl.classList.add('is-running');
+                        cd.statusEl.textContent = 'Running...';
+                    } else if (toolInfo.status === 'completed') {
+                        cd.statusEl.classList.add('is-complete');
+                        cd.statusEl.textContent = 'Done';
+                    } else if (toolInfo.status === 'failed') {
+                        cd.statusEl.classList.add('is-failed');
+                        cd.statusEl.textContent = 'Failed';
+                    }
+                    cd.card.classList.remove('is-live', 'is-complete', 'is-failed');
+                    if (toolInfo.status === 'completed') {
+                        cd.card.classList.add('is-complete');
+                    } else if (toolInfo.status === 'failed') {
+                        cd.card.classList.add('is-failed');
+                    } else {
+                        cd.card.classList.add('is-live');
+                    }
                 }
 
                 if (group._auxState.contentEl && bodyPart) {
@@ -5633,12 +5814,83 @@ mark.search-mark-active {
         syncAuxiliaryDetailView(group);
     }
 
-    function buildAuxiliaryMessage(role, text) {
-        const div = document.createElement('div');
-        div.className = 'message ' + role;
+    function parseToolCallText(text) {
+        const result = {
+            icon: '🔧',
+            title: 'Tool',
+            status: 'in_progress',
+            toolType: 'default',
+            args: '',
+            output: ''
+        };
 
-        const header = document.createElement('div');
-        header.className = 'aux-header';
+        if (!text) return result;
+
+        // Detect status from original text BEFORE stripping icon
+        const lowerFull = text.toLowerCase();
+        if (text.includes('✅') || lowerFull.includes('completed')) {
+            result.status = 'completed';
+        } else if (text.includes('❌') || lowerFull.includes('failed')) {
+            result.status = 'failed';
+        } else if (text.includes('⏹') || lowerFull.includes('cancelled')) {
+            result.status = 'cancelled';
+        }
+
+        // Extract leading emoji icon (handles multi-codepoint emoji like ⚙️ ✏️)
+        const iconMatch = text.match(/^(\p{Emoji_Presentation}|\p{Emoji}\uFE0F?)\s*(.*)$/u);
+        if (iconMatch) {
+            result.icon = iconMatch[1];
+            text = iconMatch[2].trim();
+        }
+
+        // Remove any remaining status emoji from text
+        text = text.replace(/[✅❌⚙️⏹🔧]/g, '').trim();
+
+        // Detect tool type from title
+        const lowerText = text.toLowerCase();
+        if (lowerText.includes('search') || lowerText.includes('find') || lowerText.includes('grep')) {
+            result.toolType = 'search';
+            result.icon = '🔍';
+        } else if (lowerText.includes('terminal') || lowerText.includes('shell') || lowerText.includes('command') || lowerText.includes('execute')) {
+            result.toolType = 'terminal';
+            result.icon = '💻';
+        } else if (lowerText.includes('read') && lowerText.includes('file')) {
+            result.toolType = 'file_read';
+            result.icon = '📄';
+        } else if (lowerText.includes('write') && lowerText.includes('file')) {
+            result.toolType = 'file_write';
+            result.icon = '✏️';
+        } else if (lowerText.includes('edit') && lowerText.includes('file')) {
+            result.toolType = 'file_edit';
+            result.icon = '✏️';
+        }
+
+        const prefixes = ['search:', 'terminal:', 'file_read:', 'file_write:', 'file_edit:'];
+        for (const prefix of prefixes) {
+            if (lowerText.startsWith(prefix)) {
+                text = text.slice(prefix.length).trim();
+                break;
+            }
+        }
+
+        result.title = text || result.toolType.replace(/_/g, ' ');
+
+        const jsonMatch = text.match(/\{[^}]+\}/);
+        if (jsonMatch) {
+            try {
+                const args = JSON.parse(jsonMatch[0]);
+                result.args = JSON.stringify(args, null, 2);
+            } catch (e) {
+                result.args = jsonMatch[0];
+            }
+        }
+
+return result;
+    }
+
+    function buildAuxiliaryMessage(role, text) {
+        const msgEl = document.createElement('div');
+        msgEl.className = 'message ' + role;
 
         if (role === 'tool') {
             const summaryText = text || '';
@@ -5646,56 +5898,110 @@ mark.search-mark-active {
             const callPart = sepIdx >= 0 ? summaryText.slice(0, sepIdx).trim() : summaryText.trim();
             const bodyPart = sepIdx >= 0 ? summaryText.slice(sepIdx + 2).trim() : '';
 
-            if (callPart) {
-                const callEl = document.createElement('div');
-                callEl.className = 'tool-call-summary';
-                callEl.textContent = callPart;
-                header.appendChild(callEl);
+            const toolInfo = parseToolCallText(callPart);
+
+            const card = document.createElement('div');
+            card.className = 'tool-call-card';
+            if (toolInfo.status === 'completed') {
+                card.classList.add('is-complete');
+            } else if (toolInfo.status === 'failed') {
+                card.classList.add('is-failed');
+            } else {
+                card.classList.add('is-live');
             }
 
-            div.appendChild(header);
+            const header = document.createElement('div');
+            header.className = 'tool-call-header';
 
+            const iconEl = document.createElement('span');
+            iconEl.className = 'tool-call-icon';
+            iconEl.textContent = toolInfo.icon;
+
+            const titleEl = document.createElement('span');
+            titleEl.className = 'tool-call-title';
+            titleEl.textContent = toolInfo.title;
+
+            const statusEl = document.createElement('span');
+            statusEl.className = 'tool-call-status';
+            if (toolInfo.status === 'in_progress' || toolInfo.status === 'pending') {
+                statusEl.classList.add('is-running');
+                statusEl.textContent = 'Running...';
+            } else if (toolInfo.status === 'completed') {
+                statusEl.classList.add('is-complete');
+                statusEl.textContent = 'Done';
+            } else if (toolInfo.status === 'failed') {
+                statusEl.classList.add('is-failed');
+                statusEl.textContent = 'Failed';
+            }
+
+            const chevron = document.createElement('span');
+            chevron.className = 'tool-call-chevron';
+            chevron.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>';
+
+            header.appendChild(iconEl);
+            header.appendChild(titleEl);
+            header.appendChild(statusEl);
+            header.appendChild(chevron);
+
+            const bodyDiv = document.createElement('div');
+            bodyDiv.className = 'tool-call-body';
+
+            if (toolInfo.args) {
+                const argsSection = document.createElement('div');
+                argsSection.className = 'tool-call-section';
+                const argsTitle = document.createElement('div');
+                argsTitle.className = 'tool-call-section-title';
+                argsTitle.textContent = 'Arguments';
+                const argsContent = document.createElement('div');
+                argsContent.className = 'tool-call-section-content';
+                argsContent.textContent = toolInfo.args;
+                argsSection.appendChild(argsTitle);
+                argsSection.appendChild(argsContent);
+                bodyDiv.appendChild(argsSection);
+            }
+
+            const resultSection = document.createElement('div');
+            resultSection.className = 'tool-call-section';
+            const resultTitle = document.createElement('div');
+            resultTitle.className = 'tool-call-section-title';
+            resultTitle.textContent = 'Result';
+            const resultContent = document.createElement('div');
+            resultContent.className = 'tool-call-section-content';
             if (bodyPart) {
-                const bodyDiv = document.createElement('div');
-                bodyDiv.className = 'tool-call-body';
-
-                const wrap = document.createElement('div');
-                wrap.className = 'aux-body-wrap';
-
-                const scrollEl = document.createElement('div');
-                scrollEl.className = 'aux-body-scroll is-collapsed';
-                const contentEl = document.createElement('div');
-                contentEl.className = 'aux-body-content';
-                scrollEl.appendChild(contentEl);
-                wrap.appendChild(scrollEl);
-
-                const controls = document.createElement('div');
-                controls.className = 'aux-body-controls';
-                const moreBtn = document.createElement('button');
-                moreBtn.type = 'button';
-                moreBtn.className = 'aux-body-toggle';
-                moreBtn.textContent = locale.permissionShowMore || 'Show more';
-                const lessBtn = document.createElement('button');
-                lessBtn.type = 'button';
-                lessBtn.className = 'aux-body-toggle';
-                lessBtn.textContent = locale.permissionCollapse || 'Collapse';
-                lessBtn.hidden = true;
-                controls.appendChild(moreBtn);
-                controls.appendChild(lessBtn);
-                wrap.appendChild(controls);
-                bodyDiv.appendChild(wrap);
-
-                return { div: div, scrollEl: scrollEl, contentEl: contentEl, moreBtn: moreBtn, lessBtn: lessBtn, role: role, rawText: bodyPart, callText: callPart };
+                resultContent.innerHTML = renderMarkdown(bodyPart);
             }
+            resultSection.appendChild(resultTitle);
+            resultSection.appendChild(resultContent);
+            bodyDiv.appendChild(resultSection);
 
-            return { div: div, scrollEl: null, contentEl: null, moreBtn: null, lessBtn: null, role: role, rawText: '', callText: callPart };
+            card.appendChild(header);
+            card.appendChild(bodyDiv);
+            msgEl.appendChild(card);
+
+            header.addEventListener('click', function() {
+                card.classList.toggle('is-expanded');
+            });
+
+            msgEl._cardData = { card: card, header: header, titleEl: titleEl, statusEl: statusEl, iconEl: iconEl };
+
+            const scrollEl = document.createElement('div');
+            scrollEl.className = 'aux-body-scroll';
+            scrollEl.style.display = 'none';
+            const contentEl = resultContent;
+            const dummyBtn = document.createElement('button');
+            dummyBtn.style.display = 'none';
+            dummyBtn.hidden = true;
+
+            return { div: msgEl, scrollEl: scrollEl, contentEl: contentEl, moreBtn: dummyBtn, lessBtn: dummyBtn, role: role, rawText: bodyPart, callText: callPart };
         }
 
+        const header = document.createElement('div');
+        header.className = 'aux-header';
         const label = document.createElement('div');
         label.className = 'label aux-label';
         label.textContent = locale.roleThought || 'Thought';
         header.appendChild(label);
-        div.appendChild(header);
+        msgEl.appendChild(header);
 
         const wrap = document.createElement('div');
         wrap.className = 'aux-body-wrap';
@@ -5721,9 +6027,9 @@ mark.search-mark-active {
         controls.appendChild(moreBtn);
         controls.appendChild(lessBtn);
         wrap.appendChild(controls);
-        div.appendChild(wrap);
+        msgEl.appendChild(wrap);
 
-        return { div: div, scrollEl: scrollEl, contentEl: contentEl, moreBtn: moreBtn, lessBtn: lessBtn, role: role, rawText: text || '', callText: '' };
+        return { div: msgEl, scrollEl: scrollEl, contentEl: contentEl, moreBtn: moreBtn, lessBtn: lessBtn, role: role, rawText: text || '', callText: '' };
     }
 
     function wireAuxiliaryMessage(group, parts, deferMarkdown) {
@@ -8097,6 +8403,7 @@ mark.search-mark-active {
         permissionModeDropdownEl.addEventListener('click', function(e) { e.stopPropagation(); });
     }
     updatePermissionModeUI();
+
     const switchSessionStayBtn = document.getElementById('switchSessionStayBtn');
     const switchSessionConfirmBtn = document.getElementById('switchSessionConfirmBtn');
     if (switchSessionStayBtn) {
@@ -8867,11 +9174,6 @@ mark.search-mark-active {
                 document.querySelectorAll('.message-group.tool').forEach(function(el) {
                     el.style.display = msg.showToolCalls ? '' : 'none';
                 });
-                // Permission mode
-                if (msg.permissionMode && msg.permissionMode !== permissionMode) {
-                    permissionMode = msg.permissionMode;
-                    updatePermissionModeUI();
-                }
                 break;
 
             case 'activeAgent':

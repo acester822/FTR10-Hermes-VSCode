@@ -8,6 +8,7 @@ export type ToolCallUpdateView = {
     title?: string;
     body?: string;
     kind?: string;
+    toolType?: string;
 };
 
 export type ToolCallUpdateHandler = (update: ToolCallUpdateView) => void;
@@ -25,6 +26,93 @@ const TOOL_CALL_ICONS: Record<ToolCallStatus, string> = {
     failed: '❌',
     cancelled: '⏹',
 };
+
+// Tool type icons mapping
+const TOOL_TYPE_ICONS: Record<string, string> = {
+    search: '🔍',
+    find: '🔍',
+    grep: '🔍',
+    terminal: '💻',
+    shell: '💻',
+    command: '💻',
+    bash: '💻',
+    execute: '💻',
+    file_read: '📄',
+    read_file: '📄',
+    file_write: '✏️',
+    write_file: '✏️',
+    file_edit: '✏️',
+    edit_file: '✏️',
+    file: '📁',
+    directory: '📁',
+    list: '📋',
+    web: '🌐',
+    browser: '🌐',
+    fetch: '🌐',
+    http: '🌐',
+    think: '🧠',
+    reasoning: '🧠',
+    python: '🐍',
+    code: '🐍',
+    git: '🔀',
+    github: '🐙',
+    test: '🧪',
+    install: '📦',
+    npm: '📦',
+    pip: '📦',
+    default: '🔧'
+};
+
+export function detectToolType(title: string | undefined, kind: string | undefined): string {
+    const text = `${title || ''} ${kind || ''}`.toLowerCase();
+    
+    // Check for specific tool types
+    for (const [type, _icon] of Object.entries(TOOL_TYPE_ICONS)) {
+        if (type === 'default') continue;
+        if (text.includes(type.toLowerCase())) {
+            return type;
+        }
+    }
+    
+    // Check for common patterns
+    if (text.includes('search') || text.includes('find') || text.includes('grep')) {
+        return 'search';
+    }
+    if (text.includes('terminal') || text.includes('shell') || text.includes('command') || text.includes('execute')) {
+        return 'terminal';
+    }
+    if (text.includes('read') && text.includes('file')) {
+        return 'file_read';
+    }
+    if (text.includes('write') && text.includes('file')) {
+        return 'file_write';
+    }
+    if (text.includes('edit') && text.includes('file')) {
+        return 'file_edit';
+    }
+    
+    return 'default';
+}
+
+export function getToolTypeIcon(toolType: string): string {
+    return TOOL_TYPE_ICONS[toolType] || TOOL_TYPE_ICONS.default;
+}
+
+export function formatToolTitle(title: string | undefined, toolType: string): string {
+    if (!title) return toolType.replace(/_/g, ' ');
+    
+    // Clean up common prefixes
+    let cleaned = title;
+    const prefixes = ['search:', 'terminal:', 'file_read:', 'file_write:', 'file_edit:'];
+    for (const prefix of prefixes) {
+        if (cleaned.toLowerCase().startsWith(prefix.toLowerCase())) {
+            cleaned = cleaned.slice(prefix.length).trim();
+            break;
+        }
+    }
+    
+    return cleaned || toolType.replace(/_/g, ' ');
+}
 
 export function normalizeToolCallStatus(
     status: unknown,
@@ -106,13 +194,12 @@ export function parseToolCallSessionUpdate(
     }
 
     const status = normalizeToolCallStatus(update.status, kind);
-    // Only use the title if the update explicitly provides one.
-    // tool_call_update events from Hermes typically omit title; we must not
-    // overwrite the good title from the tool_call start event with the
-    // 'Tool' fallback.
     const title = typeof update.title === 'string' && update.title ? update.title : undefined;
     const body = extractToolCallBody(update);
     const kindValue = update.kind;
+    
+    // Detect tool type
+    const toolType = detectToolType(title, typeof kindValue === 'string' ? kindValue : undefined);
 
     return {
         toolCallId,
@@ -120,6 +207,7 @@ export function parseToolCallSessionUpdate(
         title,
         body: body || undefined,
         kind: typeof kindValue === 'string' ? kindValue : undefined,
+        toolType,
     };
 }
 
@@ -153,6 +241,7 @@ export class ToolCallTracker {
             title: incoming.title || prev?.title || 'Tool',
             kind: incoming.kind ?? prev?.kind,
             body: mergeToolCallBodies(prev?.body, incoming.body),
+            toolType: incoming.toolType ?? prev?.toolType ?? detectToolType(incoming.title || prev?.title, incoming.kind ?? prev?.kind),
         };
 
         if (TERMINAL_STATUSES.has(merged.status)) {
