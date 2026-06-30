@@ -1182,6 +1182,13 @@ body {
     margin: var(--space-sm) 0;
 }
 
+.message-group.assistant .message-group-inner,
+.message-group.thought .message-group-inner {
+    max-width: 88%;
+    margin-left: auto;
+    margin-right: auto;
+}
+
 .message-group.tool {
     margin: var(--space-xs) 0;
 }
@@ -1314,15 +1321,15 @@ body {
     ============================================ */
 
 .message.thought {
-    background: var(--reasoning-bg);
+    background: color-mix(in srgb, var(--reasoning-bg) 60%, transparent);
     border: 1px solid var(--reasoning-border);
-    border-left: 3px solid var(--reasoning-accent);
     border-radius: var(--radius-md);
     padding: var(--space-sm) var(--space-md);
     font-size: 12px;
     line-height: 1.5;
     position: relative;
     transition: all var(--transition-base);
+    opacity: 0.75;
 }
 
 .message.thought .aux-header {
@@ -1698,8 +1705,10 @@ body {
 .message.assistant {
     background: var(--text-block);
     color: var(--fg);
-    border-bottom-left-radius: var(--radius-xs);
     border: 1px solid var(--border);
+    border-left: 3px solid var(--primary);
+    border-radius: var(--radius-md);
+    padding: var(--space-md) var(--space-lg);
 }
 
 .message.assistant .content {
@@ -3894,15 +3903,15 @@ mark.search-mark-active {
 }
 
 .message.thought {
-    background: var(--reasoning-bg);
+    background: color-mix(in srgb, var(--reasoning-bg) 60%, transparent);
     border: 1px solid var(--reasoning-border);
-    border-left: 3px solid var(--reasoning-accent);
     border-radius: var(--radius-md);
     padding: var(--space-sm) var(--space-md);
     font-size: 12px;
     line-height: 1.5;
     position: relative;
     transition: all var(--transition-base);
+    opacity: 0.75;
 }
 
 .message.thought .aux-header {

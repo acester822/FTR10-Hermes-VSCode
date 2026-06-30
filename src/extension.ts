@@ -6,6 +6,7 @@ import { registerCodeLensProvider } from './codeLens';
 import { registerDiffCommands } from './diffViewer';
 import { DiffReviewManager, registerDiffContentProvider } from './acp/DiffReviewManager';
 import { HermesSettingsPanel } from './settings/hermesSettingsPanel';
+import { logToFile } from './acp/fileLogger';
 
 let chatProvider: HermesChatProvider | undefined;
 
@@ -26,7 +27,7 @@ function bindChatCommand(
 
 export function activate(context: vscode.ExtensionContext) {
     initI18n();
-    console.log('Rina Hermes ACP activating...');
+    logToFile('[Hermes ACP] Rina Hermes ACP activating...');
 
     // Register the chat webview provider
     chatProvider = new HermesChatProvider(context.extensionUri, context);
@@ -148,10 +149,19 @@ export function activate(context: vscode.ExtensionContext) {
     bindChatCommand(context, 'hermes.configureEnvironment', provider => provider.configureEnvironment());
 
     // Log tool manifest
-    const manifest = getToolManifest();
-    console.log(`Hermes ACP tools registered: ${manifest.map(t => t.name).join(', ')}`);
+    try {
+        const manifest = getToolManifest();
+        logToFile(`[Hermes ACP] Tool manifest: ${manifest.length} tools`);
+        if (manifest.length > 0) {
+            logToFile(`[Hermes ACP] Tools: ${manifest.map(t => t.name).join(', ')}`);
+        } else {
+            logToFile('[Hermes ACP] WARNING: No tools registered!');
+        }
+    } catch (err) {
+        logToFile('[Hermes ACP] Failed to get tool manifest: ' + (err instanceof Error ? err.message : String(err)));
+    }
 
-    console.log('Rina Hermes ACP activated');
+    logToFile('[Hermes ACP] Rina Hermes ACP activated');
 }
 
 export function deactivate() {

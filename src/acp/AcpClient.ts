@@ -19,6 +19,7 @@ import {
     type ModelListState
 } from './modelConfig';
 import type { SessionMcpServer } from './mcpConfig';
+import { logToFile } from './fileLogger';
 import { normalizeHermesCliProfile } from './hermesProfile';
 import { findHermesExecutableOrThrow } from './profileDiscovery';
 import type { AcpModelOptionsResponse } from './acpModelCatalog';
@@ -164,6 +165,8 @@ export class AcpClient {
     private _cachedModelOptions: AcpModelOptionsResponse | null = null;
     /** Whether the agent declared mcpCapabilities.acp in its initialize response. */
     private _agentSupportsMcpAcp = false;
+    /** Guards against concurrent start/newSession calls causing duplicate sessions. */
+    private _sessionStarting = false;
     /** Local HTTP server exposing editor tools as an MCP server to the agent. */
     private _editorToolsMcpServer: EditorToolsMcpServer | null = null;
 
@@ -276,6 +279,18 @@ export class AcpClient {
         if (!this._transitionTo('connecting', 'Starting Hermes ACP...')) {
             return;
         }
+
+        if (this._sessionStarting) {
+            logToFile('[Hermes ACP] start() called while session already starting — waiting');
+            while (this._sessionStarting && !this._session) {
+                await new Promise(resolve => setTimeout(resolve, 50));
+            }
+            if (this._session) {
+                logToFile('[Hermes ACP] start() returning after wait — session already exists');
+                return;
+            }
+        }
+        this._sessionStarting = true;
 
         try {
             const resolvedPath = await findHermesExecutableOrThrow(hermesPath);
@@ -434,6 +449,8 @@ export class AcpClient {
             if (initResponse?.capabilities?.mcpCapabilities?.acp) {
                 this._agentSupportsMcpAcp = true;
                 this._onLog('Agent supports ACP-transport MCP servers — enabling VS Code editor tools bridge');
+            } else {
+                logToFile('[Hermes ACP] Agent does NOT advertise mcpCapabilities.acp — HTTP MCP server will be used instead');
             }
 
             // Always start the local HTTP MCP server for editor tools.
@@ -456,6 +473,8 @@ export class AcpClient {
             this._cleanupResources();
             this._transitionTo('error', `Connection failed: ${msg}`);
             throw err;
+        } finally {
+            this._sessionStarting = false;
         }
     }
 
@@ -669,6 +688,18 @@ export class AcpClient {
             await this.start(cwd);
             return;
         }
+        if (this._sessionStarting) {
+            logToFile('[Hermes ACP] newSession() called while session already starting — waiting');
+            while (this._sessionStarting) {
+                await new Promise(resolve => setTimeout(resolve, 50));
+            }
+            if (this._session && this._status === 'ready') {
+                logToFile('[Hermes ACP] newSession() returning after wait — session already ready');
+                return;
+            }
+        }
+        this._sessionStarting = true;
+        logToFile(`[Hermes ACP] Creating new session (current status: ${this._status})`);
         if (this._status === 'prompting') {
             await this.cancel();
         }
@@ -681,10 +712,14 @@ export class AcpClient {
             this._session = await builder.start();
             this._syncSessionModels(this._session.newSessionResponse);
             this._transitionTo('ready');
+            logToFile(`[Hermes ACP] New session created successfully`);
         } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
+            logToFile(`[Hermes ACP] New session failed: ${msg}`);
             this._transitionTo('error', `New session failed: ${msg}`);
             this._onConnectionLost();
+        } finally {
+            this._sessionStarting = false;
         }
     }
 
@@ -964,26 +999,45 @@ export class AcpClient {
 
     private _buildNewSessionRequest(cwd: string): { cwd: string; mcpServers: SessionMcpServer[] } {
         const mcpServers = this._resolveMcpServers(cwd);
+
+        logToFile(`[Hermes ACP] Building session/new request for cwd: ${cwd}`);
+        logToFile(`[Hermes ACP] Initial mcpServers from resolver: ${mcpServers.length}`);
+
         // Always advertise the local HTTP MCP server for editor tools.
         // The agent connects to it via its existing McpServerHttp support.
         if (this._editorToolsMcpServer) {
-            mcpServers.push({
-                type: 'http',
+            const mcpServerConfig = {
+                type: 'http' as const,
                 name: VSCODE_MCP_SERVER_NAME,
                 url: this._editorToolsMcpServer.url,
                 headers: [],
-            });
+            };
+
+            logToFile(`[Hermes ACP] Adding HTTP MCP server: ${JSON.stringify(mcpServerConfig)}`);
+
+            mcpServers.push(mcpServerConfig);
             this._onLog(`session/new: added editor tools MCP server at ${this._editorToolsMcpServer.url}`);
+        } else {
+            logToFile('[Hermes ACP] WARNING: _editorToolsMcpServer is null! MCP tools will not be available.');
         }
+
         // Also advertise the ACP-transport MCP server if the agent supports it
         if (this._agentSupportsMcpAcp) {
-            mcpServers.push({
-                type: 'acp',
+            const acpMcpConfig = {
+                type: 'acp' as const,
                 name: VSCODE_MCP_SERVER_NAME + '-acp',
                 id: VSCODE_MCP_SERVER_ID,
-            });
+            };
+
+            logToFile(`[Hermes ACP] Adding ACP-transport MCP server: ${JSON.stringify(acpMcpConfig)}`);
+
+            mcpServers.push(acpMcpConfig);
             this._onLog('session/new: added VS Code editor tools MCP server via ACP transport');
         }
+
+        logToFile(`[Hermes ACP] Final mcpServers count: ${mcpServers.length}`);
+        logToFile(`[Hermes ACP] MCP servers being sent to agent: ${JSON.stringify(mcpServers.map(s => ({ name: s.name, type: 'type' in s ? s.type : 'stdio', url: (s as any).url || 'N/A' })))}`);
+
         this._onLog(`session/new cwd=${cwd} mcpServers=${mcpServers.length}`);
         return { cwd, mcpServers };
     }

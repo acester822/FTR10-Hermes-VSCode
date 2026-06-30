@@ -2058,7 +2058,7 @@
         syncAuxiliaryDetailView(group);
     }
 
-    function parseToolCallText(text) {
+function parseToolCallText(text) {
         const result = {
             icon: '🔧',
             title: 'Tool',
@@ -2129,7 +2129,7 @@
             }
         }
 
-return result;
+        return result;
     }
 
     // Format tool input name to be more readable
