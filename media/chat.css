@@ -27,6 +27,36 @@
     --chat-gutter: 2px;
     --glass-highlight: var(--ftr10-glass-border-top, none);
     --glass-shadow: var(--ftr10-inset-light-edges, none);
+
+    /* Spacing Scale */
+    --space-xs: 4px;
+    --space-sm: 8px;
+    --space-md: 12px;
+    --space-lg: 16px;
+    --space-xl: 24px;
+
+    /* Border Radius - override */
+    --radius-xs: 3px;
+    --radius-sm: 6px;
+    --radius-md: 8px;
+    --radius-lg: 12px;
+
+    /* Transitions */
+    --transition-fast: 0.15s ease;
+    --transition-base: 0.22s ease;
+    --transition-slow: 0.3s ease;
+
+    /* Tool Call Colors */
+    --tool-bg: color-mix(in srgb, var(--text-block) 60%, transparent);
+    --tool-border: color-mix(in srgb, var(--border) 40%, transparent);
+    --tool-accent: var(--accent-2);
+    --tool-success: var(--success);
+    --tool-error: var(--error);
+
+    /* Reasoning Colors */
+    --reasoning-bg: color-mix(in srgb, var(--primary) 8%, var(--text-block));
+    --reasoning-border: color-mix(in srgb, var(--primary) 25%, var(--border));
+    --reasoning-accent: var(--primary);
 }
 * {margin: 0;padding: 0;box-sizing: border-box;}
 body {
@@ -1106,27 +1136,56 @@ body {
     border-radius: 0;
     min-height: 0;
 }
+/* ============================================
+   MESSAGE GROUP LAYOUT - Consistent Alignment
+   ============================================ */
+
 .message-group {
     display: flex;
-    flex-direction: column;
-    gap: 1px;
+    gap: var(--space-md);
+    width: 100%;
     max-width: 100%;
+    padding: var(--space-sm) 0;
     position: relative;
+    animation: messageSlideIn 0.2s ease;
 }
+
+@keyframes messageSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(4px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.message-group-inner {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+}
+
+/* User messages - right aligned */
 .message-group.user {
-    align-self: flex-end;
-    max-width: 92%;
+    flex-direction: row-reverse;
 }
-.message-group.assistant {
-    align-self: flex-start;
+
+.message-group.user .message-group-inner {
+    align-items: flex-end;
 }
+
 .message-group.thought {
-    align-self: flex-start;
+    margin: var(--space-sm) 0;
 }
+
 .message-group.tool {
-    align-self: stretch;
-    max-width: 100%;
+    margin: var(--space-xs) 0;
 }
+
 .message-group.permission {
     align-self: stretch;
     max-width: 100%;
@@ -1250,81 +1309,112 @@ body {
     color: var(--dim);
     margin-top: 4px;
 }
-.message {
-    padding: 6px 6px;
-    border-radius: 4px;
-    word-break: break-word;
-    white-space: pre-wrap;
-    min-width: 96px;
+/* ============================================
+   REASONING/THOUGHT MESSAGES - Distinct Style
+   ============================================ */
+
+.message.thought {
+    background: var(--reasoning-bg);
+    border: 1px solid var(--reasoning-border);
+    border-left: 3px solid var(--reasoning-accent);
+    border-radius: var(--radius-md);
+    padding: var(--space-sm) var(--space-md);
+    font-size: 12px;
+    line-height: 1.5;
+    position: relative;
+    transition: all var(--transition-base);
+}
+
+.message.thought .aux-header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    margin-bottom: var(--space-xs);
+}
+
+.message.thought .aux-label {
+    color: var(--reasoning-accent);
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    opacity: 0.9;
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+}
+
+.message.thought .aux-label::before {
+    content: '';
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--reasoning-accent);
+    opacity: 0.7;
+}
+
+.message.thought.is-live .aux-label::before {
+    animation: reasoningPulse 1.6s ease-in-out infinite;
+}
+
+@keyframes reasoningPulse {
+    0%, 100% { opacity: 0.7; transform: scale(1); }
+    50% { opacity: 1; transform: scale(1.2); }
+}
+
+.message.thought .aux-body-scroll {
+    color: var(--fg);
+    opacity: 0.85;
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.message.thought .aux-body-scroll.is-collapsed {
+    max-height: 80px;
+    overflow: hidden;
     position: relative;
 }
-.message.user {
-    background: var(--ftr10-glass-bg-hover, color-mix(in srgb, var(--fg) 6%, var(--bg)));
-    border: 1px solid var(--border);
+
+.message.thought .aux-body-scroll.is-collapsed::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 40px;
+    background: linear-gradient(to bottom, transparent, var(--reasoning-bg));
+    pointer-events: none;
 }
-.message.assistant {
+
+.message.thought .aux-body-controls {
+    display: flex;
+    gap: var(--space-sm);
+    margin-top: var(--space-xs);
+}
+
+.message.thought .aux-body-toggle {
     background: transparent;
     border: none;
-    padding-left: 11px;
+    color: var(--reasoning-accent);
+    cursor: pointer;
+    font-size: 11px;
+    padding: var(--space-xs) var(--space-sm);
+    border-radius: var(--radius-xs);
+    transition: all var(--transition-fast);
+    opacity: 0.8;
 }
-.message.assistant .label {
-    color: var(--accent-2);
+
+.message.thought .aux-body-toggle:hover {
+    background: color-mix(in srgb, var(--reasoning-accent) 10%, transparent);
     opacity: 1;
-    letter-spacing: 0.02em;
+    text-decoration: none;
 }
-.message.assistant.streaming {
-    border-left: 3px solid var(--primary);
-}
-.message.thought,
-.message.tool {
-    font-size: 12px;
-    padding: 6px 10px;
-    border-radius: 4px;
-    background: var(--ftr10-glass-bg-widget, var(--text-block));
-    border: 1px solid var(--border-base);
-    white-space: normal;
-}
-.message.thought {
-    border-left: 3px solid var(--accent-2);
-}
-.message.tool {
-    color: var(--fg);
-    border-left: 3px solid var(--accent-2);
-}
-.message.thought .aux-label,
-.message.tool .aux-label {
-    color: var(--accent-2);
-    opacity: 0.85;
-}
-.tool-call-summary {
-    font-size: 12px;
-    font-weight: 700;
-    color: var(--accent-2);
-    padding: 2px 0;
-    line-height: 1.4;
-    letter-spacing: 0.01em;
-}
-.tool-call-body {
-    margin-top: 4px;
-    font-size: 12px;
-}
-.tool-call-body .aux-body-wrap {
-    margin-top: 0;
-}
-.message.thought {
-    border-left: 3px solid color-mix(in srgb, var(--primary) 50%, transparent);
-}
-.message.tool {
-    color: var(--dim);
-    border-left: 3px solid color-mix(in srgb, var(--dim) 50%, transparent);
-}
-.message.thought {
-    border-left: 3px solid color-mix(in srgb, var(--primary) 40%, transparent);
-}
-.message.tool {
-    color: var(--fg);
-    border-left: 3px solid color-mix(in srgb, var(--accent-2) 60%, transparent);
-}
+
+/* ============================================
+   TOOL CALL CARDS - Clean Hierarchical Design
+   ============================================ */
+
 .message.tool:has(.tool-call-card) {
     border: none;
     border-left: none;
@@ -1332,65 +1422,288 @@ body {
     border-radius: 0;
     box-shadow: none;
 }
-.message.thought .aux-label {
-    color: var(--primary);
-    opacity: 0.85;
+
+.tool-call-card {
+    background: var(--tool-bg);
+    border: 1px solid var(--tool-border);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    transition: all var(--transition-base);
+    position: relative;
 }
-.message.tool .aux-label {
-    color: var(--accent-2);
+
+.tool-call-card::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: var(--tool-accent);
+    transition: background var(--transition-base);
+}
+
+.tool-call-card.is-complete::before {
+    background: var(--tool-success);
+}
+
+.tool-call-card.is-failed::before {
+    background: var(--tool-error);
+}
+
+.tool-call-card.is-live {
+    animation: toolCardPulse 2s ease-in-out infinite;
+}
+
+@keyframes toolCardPulse {
+    0%, 100% {
+        box-shadow: 0 0 0 0 color-mix(in srgb, var(--tool-accent) 20%, transparent);
+    }
+    50% {
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--tool-accent) 10%, transparent);
+    }
+}
+
+.tool-call-header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: var(--space-sm) var(--space-md);
+    cursor: pointer;
+    user-select: none;
+    transition: background var(--transition-fast);
+    position: relative;
+    z-index: 1;
+}
+
+.tool-call-header:hover {
+    background: color-mix(in srgb, var(--fg) 4%, transparent);
+}
+
+.tool-call-icon {
+    flex-shrink: 0;
+    width: 18px;
+    height: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    opacity: 0.8;
+}
+
+.tool-call-title {
+    flex: 1;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--fg);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+}
+
+.tool-call-status {
+    font-size: 11px;
+    color: var(--dim);
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    opacity: 0.7;
+}
+
+.tool-call-status.is-running {
+    color: var(--tool-accent);
     opacity: 1;
 }
-.message.thought .aux-header,
-.message.tool .aux-header {
-    margin-bottom: 4px;
+
+.tool-call-status.is-complete {
+    color: var(--tool-success);
+    opacity: 1;
 }
-.message.thought .aux-body-scroll,
-.message.tool .aux-body-scroll {
-    font-size: 12px;
-    line-height: 1.35;
-    color: var(--fg);
+
+.tool-call-status.is-failed {
+    color: var(--tool-error);
+    opacity: 1;
+}
+
+.tool-call-chevron {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+    transition: transform var(--transition-base);
+    color: var(--dim);
+    opacity: 0;
+}
+
+.tool-call-header:hover .tool-call-chevron,
+.tool-call-card.is-expanded .tool-call-chevron {
+    opacity: 1;
+}
+
+.tool-call-card.is-expanded .tool-call-chevron {
+    transform: rotate(180deg);
+}
+
+/* Tool Call Body - Smooth Collapse Animation */
+.tool-call-body {
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows var(--transition-base);
+}
+
+.tool-call-card.is-expanded .tool-call-body {
+    grid-template-rows: 1fr;
+}
+
+.tool-call-body-inner {
+    overflow: hidden;
+    min-height: 0;
+}
+
+.tool-call-section {
+    padding: var(--space-sm) var(--space-md);
+    border-top: 1px solid var(--tool-border);
+    font-size: 11px;
+}
+
+.tool-call-section:first-child {
+    border-top: none;
+}
+
+.tool-call-section-title {
+    font-weight: 600;
+    color: var(--dim);
+    margin-bottom: var(--space-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-size: 10px;
+    opacity: 0.8;
+}
+
+.tool-call-section-content {
+    background: color-mix(in srgb, var(--vscode-textCodeBlock-background, #1e1e1e) 80%, transparent);
+    border: 1px solid var(--tool-border);
+    border-radius: var(--radius-sm);
+    padding: var(--space-sm);
+    font-family: var(--vscode-editor-font-family, monospace);
+    font-size: 11px;
+    line-height: 1.5;
+    white-space: pre-wrap;
     word-break: break-word;
+    color: var(--fg);
+    position: relative;
 }
-.message.thought .aux-body-scroll.is-collapsed,
-.message.tool .aux-body-scroll.is-collapsed {
-    overflow: auto;
-    scrollbar-width: thin;
+
+/* Preview Mode - Show first 10 lines */
+.tool-call-section-content.is-preview {
+    max-height: 180px;
+    overflow: hidden;
 }
-.message.thought .aux-body-content > :first-child,
-.message.tool .aux-body-content > :first-child {
-    margin-top: 0;
+
+.tool-call-section-content.is-preview::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 40px;
+    background: linear-gradient(to bottom, transparent, var(--tool-bg));
+    pointer-events: none;
 }
-.message.thought .aux-body-content > :last-child,
-.message.tool .aux-body-content > :last-child {
-    margin-bottom: 0;
+
+.tool-call-section-content.is-expanded {
+    max-height: none;
+    overflow-y: auto;
 }
-.message.thought .aux-body-content p,
-.message.tool .aux-body-content p {
-    margin: 0 0 4px;
+
+.tool-call-section-content::-webkit-scrollbar {
+    width: 6px;
 }
-.message.thought .aux-body-controls,
-.message.tool .aux-body-controls {
+
+.tool-call-section-content::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.tool-call-section-content::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 3px;
+}
+
+.tool-call-section-content::-webkit-scrollbar-thumb:hover {
+    background: var(--dim);
+}
+
+/* Expand/Collapse Button for Tool Results */
+.tool-result-toggle {
     display: flex;
-    gap: 8px;
-    margin-top: 4px;
-}
-.message.thought .aux-body-toggle,
-.message.tool .aux-body-toggle {
+    align-items: center;
+    gap: var(--space-xs);
     background: transparent;
     border: none;
     color: var(--primary);
     cursor: pointer;
-    font-size: var(--font-size-sm);
-    padding: 0;
+    font-size: 11px;
+    padding: var(--space-xs) var(--space-sm);
+    margin-top: var(--space-xs);
+    border-radius: var(--radius-xs);
+    transition: all var(--transition-fast);
+    opacity: 0.8;
 }
-.message.thought .aux-body-toggle:hover,
-.message.tool .aux-body-toggle:hover {
-    text-decoration: underline;
+
+.tool-result-toggle:hover {
+    background: color-mix(in srgb, var(--primary) 10%, transparent);
+    opacity: 1;
 }
-.message.thought .aux-body-toggle[hidden],
-.message.tool .aux-body-toggle[hidden] {
-    display: none;
+
+.tool-result-toggle svg {
+    width: 12px;
+    height: 12px;
+    transition: transform var(--transition-fast);
 }
+
+.tool-result-toggle.is-expanded svg {
+    transform: rotate(180deg);
+}
+
+/* ============================================
+   MESSAGE BUBBLES - Consistent Styling
+   ============================================ */
+
+.message {
+    padding: var(--space-md) var(--space-lg);
+    border-radius: var(--radius-lg);
+    word-break: break-word;
+    white-space: pre-wrap;
+    min-width: 96px;
+    position: relative;
+    font-size: 13px;
+    line-height: 1.65;
+    max-width: 85%;
+}
+
+.message.user,
+.message.assistant {
+    max-width: 85%;
+}
+
+.message.user {
+    background: var(--primary);
+    color: var(--primary-fg);
+    border-bottom-right-radius: var(--radius-xs);
+}
+
+.message.assistant {
+    background: var(--text-block);
+    color: var(--fg);
+    border-bottom-left-radius: var(--radius-xs);
+    border: 1px solid var(--border);
+}
+
+.message.assistant .content {
+    white-space: normal;
+}
+
 .message .label {
     font-size: var(--font-size-sm);
     font-weight: 600;
@@ -1499,55 +1812,27 @@ body {
     background: color-mix(in srgb, var(--fg) 7%, var(--input-bg));
 }
 
-/* Copy action below each bubble (outside bubble body) */
+/* Message Actions - Hidden by default, shown on hover */
 .message-actions {
     position: absolute;
-    top: -2px;
-    right: 0;
+    top: var(--space-sm);
+    right: var(--space-sm);
+    display: flex;
+    gap: var(--space-xs);
     opacity: 0;
-    transition: opacity 0.15s;
-    pointer-events: none;
-    z-index: 5;
-    background: var(--ftr10-glass-bg, var(--bg));
-    border-radius: 4px 4px 0 0;
-    border: 1px solid var(--border);
-    border-bottom: none;
+    transition: opacity var(--transition-fast);
+    z-index: 10;
 }
+
 .message-group:hover .message-actions {
     opacity: 1;
-    pointer-events: auto;
 }
-.copy-btn {
-    border: none;
-    border-radius: 4px;
-    padding: 3px 8px;
-    cursor: pointer;
-    font-size: 11px;
-    font-weight: 600;
-    line-height: 1.2;
-    background: var(--primary);
-    color: var(--primary-fg);
-    opacity: 0.85;
-    transition: opacity 0.15s;
+
+.message-group.user:hover .message-actions {
+    right: auto;
+    left: var(--space-sm);
 }
-.copy-btn:hover {
-    opacity: 1;
-}
-.copy-btn.copied {
-    background: var(--success);
-}
-.message-group:hover .message-actions {
-    opacity: 1;
-    pointer-events: auto;
-}
-.message-group.user .message-actions {
-    justify-content: flex-end;
-}
-.message-group.assistant .message-actions,
-.message-group.tool .message-actions,
-.message-group.thought .message-actions {
-    justify-content: flex-start;
-}
+
 .copy-btn {
     display: inline-flex;
     align-items: center;
@@ -1560,18 +1845,22 @@ body {
     border-radius: 3px;
     line-height: 1;
 }
+
 .copy-btn:hover {
     color: var(--fg);
     background: var(--text-block);
 }
+
 .copy-btn.copied {
     color: var(--primary);
 }
+
 .copy-btn svg {
     width: 14px;
     height: 14px;
     fill: currentColor;
 }
+
 .message-actions .action-btn {
     display: inline-flex;
     align-items: center;
@@ -1584,21 +1873,26 @@ body {
     border-radius: 3px;
     line-height: 1;
 }
+
 .message-actions .action-btn:hover {
     color: var(--fg);
     background: var(--text-block);
 }
+
 .message-actions .action-btn.copied {
     color: var(--primary);
 }
+
 .message-actions .action-btn svg {
     width: 14px;
     height: 14px;
     fill: currentColor;
 }
+
 .message-actions .select-btn.action-btn {
     color: color-mix(in srgb, var(--primary) 75%, var(--dim));
 }
+
 .message-actions .select-btn.action-btn:hover {
     color: var(--primary);
     background: color-mix(in srgb, var(--primary) 12%, var(--text-block));
@@ -3310,70 +3604,92 @@ mark.search-mark-active {
     .new-label-short { display: inline; }
 }
 
-/* Enhanced Tool Call Cards */
+/* ============================================
+   UNIFIED DESIGN SYSTEM - Hermes Desktop Inspired
+   ============================================ */
+
+/* Tool Call Cards - Clean Hierarchical Design */
+.message-group.tool {
+    margin: var(--space-xs) 0;
+}
+
 .tool-call-card {
-    background: var(--ftr10-glass-bg-widget, var(--text-block));
-    border: 1px solid var(--border-base);
-    border-top: 2px solid var(--accent-2);
-    border-bottom: 1px solid var(--accent-2);
-    border-radius: 4px;
-    margin: 8px 0;
+    background: var(--tool-bg);
+    border: 1px solid var(--tool-border);
+    border-radius: var(--radius-md);
     overflow: hidden;
-    transition: all 0.2s ease;
-    width: 100%;
-    box-sizing: border-box;
+    transition: all var(--transition-base);
+    position: relative;
+}
+
+.tool-call-card::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: var(--tool-accent);
+    transition: background var(--transition-base);
+}
+
+.tool-call-card.is-complete::before {
+    background: var(--tool-success);
+}
+
+.tool-call-card.is-failed::before {
+    background: var(--tool-error);
 }
 
 .tool-call-card.is-live {
-    border-top-color: var(--accent-2);
-    border-bottom-color: var(--accent-2);
-    animation: tool-card-pulse 2s ease-in-out infinite;
+    animation: toolCardPulse 2s ease-in-out infinite;
 }
 
-.tool-call-card.is-complete {
-    border-top-color: var(--success);
-    border-bottom-color: var(--success);
-}
-
-.tool-call-card.is-failed {
-    border-top-color: var(--error);
-    border-bottom-color: var(--error);
-}
-
-@keyframes tool-card-pulse {
-    0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent-2) 30%, transparent); }
-    50% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent-2) 15%, transparent); }
+@keyframes toolCardPulse {
+    0%, 100% {
+        box-shadow: 0 0 0 0 color-mix(in srgb, var(--tool-accent) 20%, transparent);
+    }
+    50% {
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--tool-accent) 10%, transparent);
+    }
 }
 
 .tool-call-header {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 6px 6px;
+    gap: var(--space-sm);
+    padding: var(--space-sm) var(--space-md);
     cursor: pointer;
     user-select: none;
-    transition: background 0.15s ease;
+    transition: background var(--transition-fast);
+    position: relative;
+    z-index: 1;
 }
 
 .tool-call-header:hover {
-    background: color-mix(in srgb, var(--fg) 5%, transparent);
+    background: color-mix(in srgb, var(--fg) 4%, transparent);
 }
 
 .tool-call-icon {
-    font-size: 16px;
     flex-shrink: 0;
-    width: 20px;
-    text-align: center;
+    width: 18px;
+    height: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    opacity: 0.8;
 }
 
 .tool-call-title {
     flex: 1;
     font-size: 12px;
-    font-weight: 600;
+    font-weight: 500;
     color: var(--fg);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    min-width: 0;
 }
 
 .tool-call-status {
@@ -3382,72 +3698,113 @@ mark.search-mark-active {
     flex-shrink: 0;
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: var(--space-xs);
+    opacity: 0.7;
 }
 
 .tool-call-status.is-running {
-    color: var(--accent-2);
+    color: var(--tool-accent);
+    opacity: 1;
 }
 
 .tool-call-status.is-complete {
-    color: var(--success);
+    color: var(--tool-success);
+    opacity: 1;
 }
 
 .tool-call-status.is-failed {
-    color: var(--error);
+    color: var(--tool-error);
+    opacity: 1;
 }
 
 .tool-call-chevron {
-    width: 12px;
-    height: 12px;
+    width: 14px;
+    height: 14px;
     flex-shrink: 0;
-    transition: transform 0.2s ease;
+    transition: transform var(--transition-base);
     color: var(--dim);
+    opacity: 0;
+}
+
+.tool-call-header:hover .tool-call-chevron,
+.tool-call-card.is-expanded .tool-call-chevron {
+    opacity: 1;
 }
 
 .tool-call-card.is-expanded .tool-call-chevron {
     transform: rotate(180deg);
 }
 
+/* Tool Call Body - Smooth Collapse Animation */
 .tool-call-body {
-    max-height: 0;
-    overflow: hidden;
-    transition: max-height 0.3s ease;
-    border-top: 1px solid transparent;
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows var(--transition-base);
 }
 
 .tool-call-card.is-expanded .tool-call-body {
-    max-height: 500px;
-    border-top-color: var(--border-base);
+    grid-template-rows: 1fr;
+}
+
+.tool-call-body-inner {
+    overflow: hidden;
+    min-height: 0;
 }
 
 .tool-call-section {
-    padding: 8px 12px;
+    padding: var(--space-sm) var(--space-md);
+    border-top: 1px solid var(--tool-border);
     font-size: 11px;
+}
+
+.tool-call-section:first-child {
+    border-top: none;
 }
 
 .tool-call-section-title {
     font-weight: 600;
     color: var(--dim);
-    margin-bottom: 4px;
+    margin-bottom: var(--space-xs);
     text-transform: uppercase;
     letter-spacing: 0.5px;
     font-size: 10px;
+    opacity: 0.8;
 }
 
 .tool-call-section-content {
-    background: var(--vscode-textCodeBlock-background, #1e1e1e);
-    border: 1px solid var(--border);
-    border-radius: 3px;
-    padding: 8px;
+    background: color-mix(in srgb, var(--vscode-textCodeBlock-background, #1e1e1e) 80%, transparent);
+    border: 1px solid var(--tool-border);
+    border-radius: var(--radius-sm);
+    padding: var(--space-sm);
     font-family: var(--vscode-editor-font-family, monospace);
     font-size: 11px;
     line-height: 1.5;
     white-space: pre-wrap;
     word-break: break-word;
-    max-height: 200px;
-    overflow-y: auto;
     color: var(--fg);
+    position: relative;
+}
+
+/* Preview Mode - Show first 10 lines */
+.tool-call-section-content.is-preview {
+    max-height: 180px;
+    overflow: hidden;
+}
+
+.tool-call-section-content.is-preview::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 40px;
+    background: linear-gradient(to bottom, transparent, var(--tool-bg));
+    pointer-events: none;
+}
+
+.tool-call-section-content.is-expanded {
+    max-height: none;
+    overflow-y: auto;
 }
 
 .tool-call-section-content::-webkit-scrollbar {
@@ -3465,4 +3822,181 @@ mark.search-mark-active {
 
 .tool-call-section-content::-webkit-scrollbar-thumb:hover {
     background: var(--dim);
+}
+
+/* Expand/Collapse Button for Tool Results */
+.tool-result-toggle {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    background: transparent;
+    border: none;
+    color: var(--primary);
+    cursor: pointer;
+    font-size: 11px;
+    padding: var(--space-xs) var(--space-sm);
+    margin-top: var(--space-xs);
+    border-radius: var(--radius-xs);
+    transition: all var(--transition-fast);
+    opacity: 0.8;
+}
+
+.tool-result-toggle:hover {
+    background: color-mix(in srgb, var(--primary) 10%, transparent);
+    opacity: 1;
+}
+
+.tool-result-toggle svg {
+    width: 12px;
+    height: 12px;
+    transition: transform var(--transition-fast);
+}
+
+.tool-result-toggle.is-expanded svg {
+    transform: rotate(180deg);
+}
+
+/* Reasoning/Thought Messages - Distinct Style */
+.message-group.thought {
+    margin: var(--space-sm) 0;
+}
+
+.message.thought {
+    background: var(--reasoning-bg);
+    border: 1px solid var(--reasoning-border);
+    border-left: 3px solid var(--reasoning-accent);
+    border-radius: var(--radius-md);
+    padding: var(--space-sm) var(--space-md);
+    font-size: 12px;
+    line-height: 1.5;
+    position: relative;
+    transition: all var(--transition-base);
+}
+
+.message.thought .aux-header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    margin-bottom: var(--space-xs);
+}
+
+.message.thought .aux-label {
+    color: var(--reasoning-accent);
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    opacity: 0.9;
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+}
+
+.message.thought .aux-label::before {
+    content: '';
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--reasoning-accent);
+    opacity: 0.7;
+}
+
+.message.thought.is-live .aux-label::before {
+    animation: reasoningPulse 1.6s ease-in-out infinite;
+}
+
+@keyframes reasoningPulse {
+    0%, 100% { opacity: 0.7; transform: scale(1); }
+    50% { opacity: 1; transform: scale(1.2); }
+}
+
+.message.thought .aux-body-scroll {
+    color: var(--fg);
+    opacity: 0.85;
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.message.thought .aux-body-scroll.is-collapsed {
+    max-height: 80px;
+    overflow: hidden;
+    position: relative;
+}
+
+.message.thought .aux-body-scroll.is-collapsed::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 40px;
+    background: linear-gradient(to bottom, transparent, var(--reasoning-bg));
+    pointer-events: none;
+}
+
+.message.thought .aux-body-controls {
+    display: flex;
+    gap: var(--space-sm);
+    margin-top: var(--space-xs);
+}
+
+.message.thought .aux-body-toggle {
+    background: transparent;
+    border: none;
+    color: var(--reasoning-accent);
+    cursor: pointer;
+    font-size: 11px;
+    padding: var(--space-xs) var(--space-sm);
+    border-radius: var(--radius-xs);
+    transition: all var(--transition-fast);
+    opacity: 0.8;
+}
+
+.message.thought .aux-body-toggle:hover {
+    background: color-mix(in srgb, var(--reasoning-accent) 10%, transparent);
+    opacity: 1;
+    text-decoration: none;
+}
+
+/* Status Indicators */
+.status-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-xs);
+    font-size: 11px;
+    padding: 2px var(--space-sm);
+    border-radius: var(--radius-xs);
+    background: color-mix(in srgb, var(--dim) 10%, transparent);
+}
+
+.status-indicator.is-running {
+    background: color-mix(in srgb, var(--tool-accent) 15%, transparent);
+    color: var(--tool-accent);
+}
+
+.status-indicator.is-complete {
+    background: color-mix(in srgb, var(--tool-success) 15%, transparent);
+    color: var(--tool-success);
+}
+
+.status-indicator.is-failed {
+    background: color-mix(in srgb, var(--tool-error) 15%, transparent);
+    color: var(--tool-error);
+}
+
+/* Responsive Adjustments */
+@media (max-width: 600px) {
+    .message.user,
+    .message.assistant {
+        max-width: 95%;
+    }
+
+    .tool-call-title {
+        font-size: 11px;
+    }
+
+    .tool-call-section-content {
+        font-size: 10px;
+    }
 }

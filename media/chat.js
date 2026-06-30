@@ -1886,18 +1886,38 @@
     function syncAuxiliaryDetailView(group) {
         const state = group._auxState;
         if (!state || !state.scrollEl) return;
-        const maxLines = getAuxCollapsedLines(state.role);
-        state.scrollEl.classList.toggle('is-collapsed', !state.detailExpanded);
-        state.scrollEl.classList.toggle('is-expanded', state.detailExpanded);
-        if (!state.detailExpanded) {
-            state.scrollEl.style.maxHeight = getAuxCollapsedMaxHeight(state.role);
-            state.scrollEl.scrollTop = state.scrollEl.scrollHeight;
+
+        if (state.role === 'thought') {
+            if (state.contentEl) {
+                state.contentEl.innerHTML = renderMarkdown(state.rawText || '');
+            }
+
+            state.scrollEl.classList.toggle('is-collapsed', !state.detailExpanded);
+            state.scrollEl.classList.toggle('is-expanded', state.detailExpanded);
+
+            if (!state.detailExpanded) {
+                state.scrollEl.style.maxHeight = '80px';
+            } else {
+                state.scrollEl.style.maxHeight = '';
+            }
+
+            const overflow = state.scrollEl.scrollHeight > state.scrollEl.clientHeight + 10;
+            if (state.moreBtn) state.moreBtn.hidden = state.detailExpanded || !overflow;
+            if (state.lessBtn) state.lessBtn.hidden = !state.detailExpanded || !overflow;
         } else {
-            state.scrollEl.style.maxHeight = '';
+            const maxLines = getAuxCollapsedLines(state.role);
+            state.scrollEl.classList.toggle('is-collapsed', !state.detailExpanded);
+            state.scrollEl.classList.toggle('is-expanded', state.detailExpanded);
+            if (!state.detailExpanded) {
+                state.scrollEl.style.maxHeight = getAuxCollapsedMaxHeight(state.role);
+                state.scrollEl.scrollTop = state.scrollEl.scrollHeight;
+            } else {
+                state.scrollEl.style.maxHeight = '';
+            }
+            const overflow = auxDetailOverflows(state.scrollEl, state.rawText, maxLines);
+            state.moreBtn.hidden = state.detailExpanded || !overflow;
+            state.lessBtn.hidden = !state.detailExpanded || !overflow;
         }
-        const overflow = auxDetailOverflows(state.scrollEl, state.rawText, maxLines);
-        state.moreBtn.hidden = state.detailExpanded || !overflow;
-        state.lessBtn.hidden = !state.detailExpanded || !overflow;
     }
 
     function countNonemptyLines(text) {
@@ -2158,13 +2178,13 @@ return result;
             statusEl.className = 'tool-call-status';
             if (toolInfo.status === 'in_progress' || toolInfo.status === 'pending') {
                 statusEl.classList.add('is-running');
-                statusEl.textContent = 'Running...';
+                statusEl.innerHTML = '<span class="status-dot"></span> Running';
             } else if (toolInfo.status === 'completed') {
                 statusEl.classList.add('is-complete');
-                statusEl.textContent = 'Done';
+                statusEl.innerHTML = '<span class="status-dot"></span> Done';
             } else if (toolInfo.status === 'failed') {
                 statusEl.classList.add('is-failed');
-                statusEl.textContent = 'Failed';
+                statusEl.innerHTML = '<span class="status-dot"></span> Failed';
             }
 
             const chevron = document.createElement('span');
@@ -2179,6 +2199,9 @@ return result;
             const bodyDiv = document.createElement('div');
             bodyDiv.className = 'tool-call-body';
 
+            const bodyInner = document.createElement('div');
+            bodyInner.className = 'tool-call-body-inner';
+
             if (toolInfo.args) {
                 const argsSection = document.createElement('div');
                 argsSection.className = 'tool-call-section';
@@ -2190,23 +2213,49 @@ return result;
                 argsContent.textContent = toolInfo.args;
                 argsSection.appendChild(argsTitle);
                 argsSection.appendChild(argsContent);
-                bodyDiv.appendChild(argsSection);
+                bodyInner.appendChild(argsSection);
             }
 
-            const resultSection = document.createElement('div');
-            resultSection.className = 'tool-call-section';
-            const resultTitle = document.createElement('div');
-            resultTitle.className = 'tool-call-section-title';
-            resultTitle.textContent = 'Result';
-            const resultContent = document.createElement('div');
-            resultContent.className = 'tool-call-section-content';
             if (bodyPart) {
-                resultContent.innerHTML = renderMarkdown(bodyPart);
-            }
-            resultSection.appendChild(resultTitle);
-            resultSection.appendChild(resultContent);
-            bodyDiv.appendChild(resultSection);
+                const resultSection = document.createElement('div');
+                resultSection.className = 'tool-call-section';
+                const resultTitle = document.createElement('div');
+                resultTitle.className = 'tool-call-section-title';
+                resultTitle.textContent = 'Result';
 
+                const resultContent = document.createElement('div');
+                resultContent.className = 'tool-call-section-content is-preview';
+                resultContent.innerHTML = renderMarkdown(bodyPart);
+
+                // Check if content needs expand button
+                setTimeout(() => {
+                    if (resultContent.scrollHeight > resultContent.clientHeight + 10) {
+                        const toggleBtn = document.createElement('button');
+                        toggleBtn.type = 'button';
+                        toggleBtn.className = 'tool-result-toggle';
+                        toggleBtn.innerHTML = '<span>Show more</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>';
+
+                        toggleBtn.addEventListener('click', function(e) {
+                            e.stopPropagation();
+                            const isExpanded = resultContent.classList.contains('is-expanded');
+                            resultContent.classList.toggle('is-preview', !isExpanded);
+                            resultContent.classList.toggle('is-expanded', isExpanded);
+                            toggleBtn.classList.toggle('is-expanded', !isExpanded);
+                            toggleBtn.querySelector('span').textContent = isExpanded ? 'Show more' : 'Show less';
+                        });
+
+                        resultSection.appendChild(resultContent);
+                        resultSection.appendChild(toggleBtn);
+                    } else {
+                        resultContent.classList.remove('is-preview');
+                        resultSection.appendChild(resultContent);
+                    }
+                }, 100);
+
+                bodyInner.appendChild(resultSection);
+            }
+
+            bodyDiv.appendChild(bodyInner);
             card.appendChild(header);
             card.appendChild(bodyDiv);
             msgEl.appendChild(card);
@@ -2215,24 +2264,24 @@ return result;
                 card.classList.toggle('is-expanded');
             });
 
-            msgEl._cardData = { card: card, header: header, titleEl: titleEl, statusEl: statusEl, iconEl: iconEl };
+            msgEl._cardData = { card: card, header: header, titleEl: titleEl, statusEl: statusEl, iconEl: iconEl, bodyDiv: bodyDiv };
 
             const scrollEl = document.createElement('div');
             scrollEl.className = 'aux-body-scroll';
             scrollEl.style.display = 'none';
-            const contentEl = resultContent;
+            const contentEl = bodyDiv;
             const dummyBtn = document.createElement('button');
             dummyBtn.style.display = 'none';
             dummyBtn.hidden = true;
 
-            return { div: msgEl, scrollEl: scrollEl, contentEl: contentEl, moreBtn: dummyBtn, lessBtn: dummyBtn, role: role, rawText: bodyPart, callText: callPart };
+            return { div: msgEl, scrollEl: scrollEl, contentEl: contentEl, moreBtn: dummyBtn, lessBtn: dummyBtn, role: role, rawText: bodyPart, callText: callPart, bodyDiv: bodyDiv };
         }
 
         const header = document.createElement('div');
         header.className = 'aux-header';
         const label = document.createElement('div');
         label.className = 'label aux-label';
-        label.textContent = locale.roleThought || 'Thought';
+        label.textContent = locale.roleThought || 'Reasoning';
         header.appendChild(label);
         msgEl.appendChild(header);
 
@@ -2262,7 +2311,7 @@ return result;
         wrap.appendChild(controls);
         msgEl.appendChild(wrap);
 
-        return { div: msgEl, scrollEl: scrollEl, contentEl: contentEl, moreBtn: moreBtn, lessBtn: lessBtn, role: role, rawText: text || '', callText: '' };
+        return { div: msgEl, scrollEl: scrollEl, contentEl: contentEl, moreBtn: moreBtn, lessBtn: lessBtn, role: role, rawText: text || '', callText: '', bodyDiv: wrap };
     }
 
     function wireAuxiliaryMessage(group, parts, deferMarkdown) {
@@ -2290,8 +2339,8 @@ return result;
                 syncAuxiliaryDetailView(group);
             });
         }
-        if (parts.bodyDiv) {
-            const msgEl = group.querySelector('.message.' + parts.role);
+        if (parts.bodyDiv && parts.role === 'thought') {
+            const msgEl = group.querySelector('.message.thought');
             if (msgEl) {
                 msgEl.appendChild(parts.bodyDiv);
             }
