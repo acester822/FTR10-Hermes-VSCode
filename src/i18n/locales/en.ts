@@ -263,7 +263,7 @@ hermes --profile &lt;name&gt; acp</code></pre>
 
     roleYou: 'You',
     roleHermes: 'Hermes',
-    roleThought: 'Thought',
+    roleThought: 'Reasoning',
     roleTool: 'Tool',
     roleMessage: 'Message',
     permissionTitle: 'Permission required',

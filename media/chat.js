@@ -1891,19 +1891,10 @@
             if (state.contentEl) {
                 state.contentEl.innerHTML = renderMarkdown(state.rawText || '');
             }
-
-            state.scrollEl.classList.toggle('is-collapsed', !state.detailExpanded);
-            state.scrollEl.classList.toggle('is-expanded', state.detailExpanded);
-
-            if (!state.detailExpanded) {
-                state.scrollEl.style.maxHeight = '80px';
-            } else {
-                state.scrollEl.style.maxHeight = '';
-            }
-
-            const overflow = state.scrollEl.scrollHeight > state.scrollEl.clientHeight + 10;
-            if (state.moreBtn) state.moreBtn.hidden = state.detailExpanded || !overflow;
-            if (state.lessBtn) state.lessBtn.hidden = !state.detailExpanded || !overflow;
+            state.scrollEl.classList.remove('is-collapsed');
+            state.scrollEl.classList.add('is-expanded');
+            state.scrollEl.style.maxHeight = '';
+            return;
         } else {
             const maxLines = getAuxCollapsedLines(state.role);
             state.scrollEl.classList.toggle('is-collapsed', !state.detailExpanded);
@@ -2141,6 +2132,158 @@
 return result;
     }
 
+    // Format tool input name to be more readable
+    function formatToolName(name) {
+        if (!name) return 'Tool';
+
+        // Remove common prefixes
+        var cleaned = name
+            .replace(/^mcp_/i, '')
+            .replace(/_VS_Code_Editor_Tools_/i, ' ')
+            .replace(/_Tools?_/g, ' ')
+            .replace(/_/g, ' ')
+            .trim();
+
+        // Convert to title case
+        cleaned = cleaned.replace(/\b\w/g, function(l) { return l.toUpperCase(); });
+
+        // Add action verb if missing
+        if (!cleaned.match(/^(Get|Set|Read|Write|Edit|Create|Delete|Search|Find|Execute|Run|List|Show|Hide|Open|Close|Update|Add|Remove)/i)) {
+            cleaned = 'Running ' + cleaned;
+        }
+
+        return cleaned;
+    }
+
+    // Format JSON object with syntax highlighting
+    function formatJsonObject(obj, indent) {
+        var spaces = '  '.repeat(indent || 0);
+        var nextSpaces = '  '.repeat((indent || 0) + 1);
+
+        if (obj === null) {
+            return '<span class="json-null">null</span>';
+        }
+
+        if (typeof obj === 'boolean') {
+            return '<span class="json-boolean">' + obj + '</span>';
+        }
+
+        if (typeof obj === 'number') {
+            return '<span class="json-number">' + obj + '</span>';
+        }
+
+        if (typeof obj === 'string') {
+            // Escape HTML and format
+            var escaped = obj
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/\n/g, '<br>');
+            return '<span class="json-string">"' + escaped + '"</span>';
+        }
+
+        if (Array.isArray(obj)) {
+            if (obj.length === 0) return '[]';
+
+            var items = obj.map(function(item) {
+                return nextSpaces + formatJsonObject(item, (indent || 0) + 1);
+            });
+
+            return '[\n' + items.join(',\n') + '\n' + spaces + ']';
+        }
+
+        if (typeof obj === 'object') {
+            var keys = Object.keys(obj);
+            if (keys.length === 0) return '{}';
+
+            var items = keys.map(function(key) {
+                var value = formatJsonObject(obj[key], (indent || 0) + 1);
+                return nextSpaces + '<span class="json-key">"' + key + '"</span>: ' + value;
+            });
+
+            return '{\n' + items.join(',\n') + '\n' + spaces + '}';
+        }
+
+        return String(obj);
+    }
+
+    // Format a string as a formatted code block for display in tool output
+    function formatStringAsCode(str, langHint) {
+        if (!str) return '';
+        var lines = str.split('\n');
+        var htmlLines = lines.map(function(line) {
+            return escapeHtml(line);
+        });
+        return '<pre style="margin:0;padding:0;background:transparent;border:none;border-radius:0;overflow:auto;font-family:var(--vscode-editor-font-family,monospace);font-size:11px;line-height:1.5;white-space:pre-wrap;word-break:break-all;"><code>' + htmlLines.join('\n') + '</code></pre>';
+    }
+
+    // Parse and format tool output with proper handling of file content and JSON
+    function formatToolOutput(text) {
+        if (!text || !text.trim()) return '';
+
+        var trimmed = text.trim();
+
+        // Strip preamble text to find JSON
+        var jsonStart = trimmed.indexOf('{');
+        if (jsonStart >= 0) {
+            var candidate = trimmed.slice(jsonStart);
+            try {
+                var parsed = JSON.parse(candidate);
+
+                // Handle .result field - it may contain file content as JSON string
+                if (typeof parsed.result === 'string') {
+                    var resultStr = parsed.result.trim();
+
+                    // Inner string appears to be independent JSON
+                    if ((resultStr.startsWith('{') || resultStr.startsWith('[')) && resultStr.length > 2) {
+                        try {
+                            var innerParsed = JSON.parse(resultStr);
+                            // File read result - extract text content
+                            if (innerParsed.visibleText || innerParsed.fullText) {
+                                var codeText = innerParsed.visibleText || innerParsed.fullText || '';
+                                var langHint = innerParsed.languageId || innerParsed.fileName || innerParsed.filePath || 'plaintext';
+                                return formatStringAsCode(codeText, langHint);
+                            }
+                            // Nested object - format as JSON
+                            return formatJsonObject(innerParsed);
+                        } catch (e) {
+                            // Inner parse failed - use as raw string if it looks like code
+                            if (resultStr.includes('\n') && resultStr.length > 100) {
+                                return formatStringAsCode(resultStr, parsed.languageId || '');
+                            }
+                        }
+                    }
+
+                    // Long non-JSON string
+                    if (resultStr.length > 100) {
+                        return formatStringAsCode(resultStr, parsed.languageId || '');
+                    }
+
+                    return '<span class="json-string">"' + escapeHtml(resultStr) + '"</span>';
+                }
+
+                // No .result field - format the whole object as JSON
+                return formatJsonObject(parsed);
+            } catch (e) {
+                // Not valid JSON
+            }
+        }
+
+        // Check if content starts with array or object
+        if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+            try {
+                var parsed = JSON.parse(trimmed);
+                return formatJsonObject(parsed);
+            } catch (e) {
+                // Not valid JSON
+            }
+        }
+
+        // Not JSON - render as markdown
+        return renderMarkdown(text);
+    }
+
     function buildAuxiliaryMessage(role, text) {
         const msgEl = document.createElement('div');
         msgEl.className = 'message ' + role;
@@ -2153,8 +2296,11 @@ return result;
 
             const toolInfo = parseToolCallText(callPart);
 
+            // Format the tool name better
+            toolInfo.title = formatToolName(toolInfo.title);
+
             const card = document.createElement('div');
-            card.className = 'tool-call-card';
+            card.className = 'tool-call-card is-expanded';
             if (toolInfo.status === 'completed') {
                 card.classList.add('is-complete');
             } else if (toolInfo.status === 'failed') {
@@ -2210,7 +2356,15 @@ return result;
                 argsTitle.textContent = 'Arguments';
                 const argsContent = document.createElement('div');
                 argsContent.className = 'tool-call-section-content';
-                argsContent.textContent = toolInfo.args;
+
+                // Format arguments if JSON
+                try {
+                    var parsed = JSON.parse(toolInfo.args);
+                    argsContent.innerHTML = formatJsonObject(parsed);
+                } catch (e) {
+                    argsContent.textContent = toolInfo.args;
+                }
+
                 argsSection.appendChild(argsTitle);
                 argsSection.appendChild(argsContent);
                 bodyInner.appendChild(argsSection);
@@ -2225,7 +2379,10 @@ return result;
 
                 const resultContent = document.createElement('div');
                 resultContent.className = 'tool-call-section-content is-preview';
-                resultContent.innerHTML = renderMarkdown(bodyPart);
+
+                // Format the output properly
+                var formattedOutput = formatToolOutput(bodyPart);
+                resultContent.innerHTML = formattedOutput;
 
                 // Check if content needs expand button
                 setTimeout(() => {
@@ -2289,29 +2446,19 @@ return result;
         wrap.className = 'aux-body-wrap';
 
         const scrollEl = document.createElement('div');
-        scrollEl.className = 'aux-body-scroll is-collapsed';
+        scrollEl.className = 'aux-body-scroll is-expanded';
         const contentEl = document.createElement('div');
         contentEl.className = 'aux-body-content';
+        contentEl.innerHTML = renderMarkdown(text || '');
         scrollEl.appendChild(contentEl);
         wrap.appendChild(scrollEl);
-
-        const controls = document.createElement('div');
-        controls.className = 'aux-body-controls';
-        const moreBtn = document.createElement('button');
-        moreBtn.type = 'button';
-        moreBtn.className = 'aux-body-toggle';
-        moreBtn.textContent = locale.permissionShowMore || 'Show more';
-        const lessBtn = document.createElement('button');
-        lessBtn.type = 'button';
-        lessBtn.className = 'aux-body-toggle';
-        lessBtn.textContent = locale.permissionCollapse || 'Collapse';
-        lessBtn.hidden = true;
-        controls.appendChild(moreBtn);
-        controls.appendChild(lessBtn);
-        wrap.appendChild(controls);
         msgEl.appendChild(wrap);
 
-        return { div: msgEl, scrollEl: scrollEl, contentEl: contentEl, moreBtn: moreBtn, lessBtn: lessBtn, role: role, rawText: text || '', callText: '', bodyDiv: wrap };
+        const dummyBtn = document.createElement('button');
+        dummyBtn.style.display = 'none';
+        dummyBtn.hidden = true;
+
+        return { div: msgEl, scrollEl: scrollEl, contentEl: contentEl, moreBtn: dummyBtn, lessBtn: dummyBtn, role: role, rawText: text || '', callText: '', bodyDiv: wrap };
     }
 
     function wireAuxiliaryMessage(group, parts, deferMarkdown) {
@@ -3507,6 +3654,8 @@ return result;
         if (content) return content.textContent || '';
         const aux = bubble.querySelector('.aux-body-content');
         if (aux) return aux.textContent || '';
+        const toolSection = bubble.querySelector('.tool-call-section-content');
+        if (toolSection) return toolSection.textContent || '';
         return '';
     }
 

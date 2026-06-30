@@ -522,7 +522,7 @@ body {
     padding: 8px 10px;
     font-size: 11px;
     line-height: 1.5;
-    overflow-x: auto;
+    overflow: auto;
     margin: 6px 0 10px;
     white-space: pre-wrap;
     word-break: break-all;
@@ -640,7 +640,7 @@ body {
     padding: 8px 10px;
     font-size: 11px;
     line-height: 1.5;
-    overflow-x: auto;
+    overflow: auto;
     margin: 6px 0 8px;
     white-space: pre-wrap;
     word-break: break-all;
@@ -752,7 +752,7 @@ body {
     gap: 0;
     border-bottom: 1px solid var(--border);
     flex-shrink: 0;
-    overflow-x: auto;
+    overflow: auto;
     overflow-y: hidden;
     scrollbar-width: thin;
     min-height: 30px;
@@ -1138,7 +1138,7 @@ body {
 }
 /* ============================================
    MESSAGE GROUP LAYOUT - Consistent Alignment
-   ============================================ */
+    ============================================ */
 
 .message-group {
     display: flex;
@@ -1311,7 +1311,7 @@ body {
 }
 /* ============================================
    REASONING/THOUGHT MESSAGES - Distinct Style
-   ============================================ */
+    ============================================ */
 
 .message.thought {
     background: var(--reasoning-bg);
@@ -1413,7 +1413,7 @@ body {
 
 /* ============================================
    TOOL CALL CARDS - Clean Hierarchical Design
-   ============================================ */
+    ============================================ */
 
 .message.tool:has(.tool-call-card) {
     border: none;
@@ -1421,6 +1421,7 @@ body {
     background: transparent;
     border-radius: 0;
     box-shadow: none;
+    padding: var(--space-sm) var(--space-md);
 }
 
 .tool-call-card {
@@ -1430,6 +1431,7 @@ body {
     overflow: hidden;
     transition: all var(--transition-base);
     position: relative;
+    width: 100%;
 }
 
 .tool-call-card::before {
@@ -1545,26 +1547,28 @@ body {
     transform: rotate(180deg);
 }
 
-/* Tool Call Body - Smooth Collapse Animation */
+/* Tool Call Body */
 .tool-call-body {
-    display: grid;
-    grid-template-rows: 0fr;
-    transition: grid-template-rows var(--transition-base);
+    display: none;
+    background: var(--ftr10-glass-bg-breadcrumb-hover);
 }
 
 .tool-call-card.is-expanded .tool-call-body {
-    grid-template-rows: 1fr;
+    display: block;
 }
 
 .tool-call-body-inner {
     overflow: hidden;
     min-height: 0;
+    width: 100%;
 }
 
 .tool-call-section {
-    padding: var(--space-sm) var(--space-md);
+    padding: var(--space-md) var(--space-lg);
     border-top: 1px solid var(--tool-border);
     font-size: 11px;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .tool-call-section:first-child {
@@ -1585,7 +1589,7 @@ body {
     background: color-mix(in srgb, var(--vscode-textCodeBlock-background, #1e1e1e) 80%, transparent);
     border: 1px solid var(--tool-border);
     border-radius: var(--radius-sm);
-    padding: var(--space-sm);
+    padding: var(--space-md);
     font-family: var(--vscode-editor-font-family, monospace);
     font-size: 11px;
     line-height: 1.5;
@@ -1593,12 +1597,15 @@ body {
     word-break: break-word;
     color: var(--fg);
     position: relative;
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
 }
 
 /* Preview Mode - Show first 10 lines */
 .tool-call-section-content.is-preview {
     max-height: 180px;
-    overflow: hidden;
+    overflow-y: auto;
 }
 
 .tool-call-section-content.is-preview::after {
@@ -1634,41 +1641,34 @@ body {
     background: var(--dim);
 }
 
-/* Expand/Collapse Button for Tool Results */
-.tool-result-toggle {
-    display: flex;
-    align-items: center;
-    gap: var(--space-xs);
-    background: transparent;
-    border: none;
+/* JSON syntax highlighting in tool call sections */
+.tool-call-section-content .json-key {
+    color: var(--accent-2);
+    font-weight: 500;
+}
+
+.tool-call-section-content .json-string {
+    color: var(--success);
+}
+
+.tool-call-section-content .json-number {
     color: var(--primary);
-    cursor: pointer;
-    font-size: 11px;
-    padding: var(--space-xs) var(--space-sm);
-    margin-top: var(--space-xs);
-    border-radius: var(--radius-xs);
-    transition: all var(--transition-fast);
-    opacity: 0.8;
 }
 
-.tool-result-toggle:hover {
-    background: color-mix(in srgb, var(--primary) 10%, transparent);
-    opacity: 1;
+.tool-call-section-content .json-boolean {
+    color: var(--error);
 }
 
-.tool-result-toggle svg {
-    width: 12px;
-    height: 12px;
-    transition: transform var(--transition-fast);
+.tool-call-section-content .json-null {
+    color: var(--dim);
+    font-style: italic;
 }
 
-.tool-result-toggle.is-expanded svg {
-    transform: rotate(180deg);
-}
+/* Expand/Collapse Button for Tool Results */
 
 /* ============================================
    MESSAGE BUBBLES - Consistent Styling
-   ============================================ */
+    ============================================ */
 
 .message {
     padding: var(--space-md) var(--space-lg);
@@ -1679,18 +1679,20 @@ body {
     position: relative;
     font-size: 13px;
     line-height: 1.65;
-    max-width: 85%;
+    /* max-width: 85%; */
 }
 
-.message.user,
+/* .message.user,
 .message.assistant {
-    max-width: 85%;
-}
+     max-width: 85%;
+} */
 
 .message.user {
-    background: var(--primary);
-    color: var(--primary-fg);
-    border-bottom-right-radius: var(--radius-xs);
+    background: var(--ftr10-accent-1-70);
+    /* color: var(
+    --primary-fg); */
+    border-bottom-right-radius: var(
+    --radius-xs);
 }
 
 .message.assistant {
@@ -1712,7 +1714,7 @@ body {
     letter-spacing: 0.01em;
 }
 
-/* Live activity labels â€” unified breathing pulse */
+/* Live activity labels Ã¢â‚¬â€ unified breathing pulse */
 .message.assistant.streaming .label,
 .message.thought.is-live .aux-label,
 .message.tool.is-live .aux-label {
@@ -1739,7 +1741,7 @@ body {
     border-left: 2px solid var(--ftr10-code-border-l, var(--primary));
     border-radius: var(--radius-sm);
     padding: 8px;
-    overflow-x: auto;
+    overflow: auto;
     font-size: 12px;
     line-height: 1.4;
     margin: 0;
@@ -1757,9 +1759,9 @@ body {
     border-radius: 3px;
     font-size: 0.9em;
     font-family: var(--ftr10-code-font, var(--vscode-editor-font-family, 'Cascadia Code', monospace));
-    color: var(--ftr10-accent-3, inherit);
+    color: var(--ftr10-info);
 }
-.message p { margin: 2px 0; }
+
 .message ul, .message ol { padding-left: 18px; margin: 2px 0; }
 .message li { margin: 1px 0; }
 .message li > p { margin: 0; }
@@ -1787,7 +1789,7 @@ body {
     border-radius: 6px;
     padding: 6px 8px;
     margin: 6px 0;
-    overflow-x: auto;
+    overflow: auto;
 }
 .message table {
     border-collapse: collapse;
@@ -2189,7 +2191,7 @@ body {
 
 /* Streaming cursor */
 .message.assistant.streaming::after {
-    content: 'â–Ž';
+    content: 'Ã¢â€“Å½';
     animation: blink 0.8s step-end infinite;
     margin-left: 2px;
     color: var(--primary);
@@ -2202,7 +2204,7 @@ body {
                 var(--glass-shadow);
 }
 .message.assistant.streaming::after {
-    content: 'â–Ž';
+    content: 'Ã¢â€“Å½';
     animation: blink 0.8s step-end infinite;
     margin-left: 2px;
     color: var(--accent-2);
@@ -3486,7 +3488,7 @@ mark.search-mark-active {
     flex-shrink: 0;
 }
 
-/* Modals â€” responsive shell */
+/* Modals Ã¢â‚¬â€ responsive shell */
 .modal-overlay {
     display: none;
     position: fixed;
@@ -3606,7 +3608,7 @@ mark.search-mark-active {
 
 /* ============================================
    UNIFIED DESIGN SYSTEM - Hermes Desktop Inspired
-   ============================================ */
+    ============================================ */
 
 /* Tool Call Cards - Clean Hierarchical Design */
 .message-group.tool {
@@ -3620,6 +3622,7 @@ mark.search-mark-active {
     overflow: hidden;
     transition: all var(--transition-base);
     position: relative;
+    width: 100%;
 }
 
 .tool-call-card::before {
@@ -3634,7 +3637,7 @@ mark.search-mark-active {
 }
 
 .tool-call-card.is-complete::before {
-    background: var(--tool-success);
+    border: var(--tool-success);
 }
 
 .tool-call-card.is-failed::before {
@@ -3656,6 +3659,7 @@ mark.search-mark-active {
 
 .tool-call-header {
     display: flex;
+    background: var(--border);
     align-items: center;
     gap: var(--space-sm);
     padding: var(--space-sm) var(--space-md);
@@ -3735,26 +3739,28 @@ mark.search-mark-active {
     transform: rotate(180deg);
 }
 
-/* Tool Call Body - Smooth Collapse Animation */
+/* Tool Call Body */
 .tool-call-body {
-    display: grid;
-    grid-template-rows: 0fr;
-    transition: grid-template-rows var(--transition-base);
+    display: none;
+    padding: 12px;
 }
 
 .tool-call-card.is-expanded .tool-call-body {
-    grid-template-rows: 1fr;
+    display: block;
 }
 
 .tool-call-body-inner {
     overflow: hidden;
     min-height: 0;
+    width: 100%;
 }
 
 .tool-call-section {
-    padding: var(--space-sm) var(--space-md);
+    padding: var(--space-md) var(--space-lg);
     border-top: 1px solid var(--tool-border);
     font-size: 11px;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .tool-call-section:first-child {
@@ -3775,7 +3781,7 @@ mark.search-mark-active {
     background: color-mix(in srgb, var(--vscode-textCodeBlock-background, #1e1e1e) 80%, transparent);
     border: 1px solid var(--tool-border);
     border-radius: var(--radius-sm);
-    padding: var(--space-sm);
+    padding: var(--space-md);
     font-family: var(--vscode-editor-font-family, monospace);
     font-size: 11px;
     line-height: 1.5;
@@ -3783,12 +3789,15 @@ mark.search-mark-active {
     word-break: break-word;
     color: var(--fg);
     position: relative;
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
 }
 
 /* Preview Mode - Show first 10 lines */
 .tool-call-section-content.is-preview {
     max-height: 180px;
-    overflow: hidden;
+    overflow-y: auto;
 }
 
 .tool-call-section-content.is-preview::after {
@@ -3854,6 +3863,29 @@ mark.search-mark-active {
 
 .tool-result-toggle.is-expanded svg {
     transform: rotate(180deg);
+}
+
+/* JSON syntax highlighting in tool call sections */
+.tool-call-section-content .json-key {
+    color: var(--accent-2);
+    font-weight: 500;
+}
+
+.tool-call-section-content .json-string {
+    color: var(--success);
+}
+
+.tool-call-section-content .json-number {
+    color: var(--primary);
+}
+
+.tool-call-section-content .json-boolean {
+    color: var(--error);
+}
+
+.tool-call-section-content .json-null {
+    color: var(--dim);
+    font-style: italic;
 }
 
 /* Reasoning/Thought Messages - Distinct Style */
