@@ -3084,6 +3084,8 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
                 ? JSON.stringify(ftr10Vars).replace(/</g, '\\u003c')
                 : '{}';
             html = html
+                .replace('{{CHAT_CSS_URI}}', webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'media', 'chat.css')).toString())
+                .replace('{{CHAT_JS_URI}}', webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'media', 'chat.js')).toString())
                 .replace('{{MARKED_URI}}', vendorUri('marked.min.js'))
                 .replace('{{HIGHLIGHT_URI}}', vendorUri('highlight.min.js'))
                 .replace('{{HIGHLIGHT_CSS_URI}}', vendorUri('github-dark.min.css'))
@@ -3093,6 +3095,8 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
                 .replace('{{FTR10_VARS_JSON}}', ftr10VarsJson);
         } else {
             html = html
+                .replace('{{CHAT_CSS_URI}}', '')
+                .replace('{{CHAT_JS_URI}}', '')
                 .replace('{{LOCALE_JSON}}', '{}')
                 .replace('{{LOCALE_HELPER}}', WEBVIEW_LOCALE_HELPER)
                 .replace('{{FTR10_VARS_JSON}}', '{}');
