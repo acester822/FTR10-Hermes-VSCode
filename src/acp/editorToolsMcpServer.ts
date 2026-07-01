@@ -6,6 +6,7 @@ import { logToFile } from './fileLogger';
 export class EditorToolsMcpServer {
     private server: http.Server | null = null;
     private port = 0;
+    private sseConnections: http.ServerResponse[] = [];
 
     get url(): string {
         return `http://127.0.0.1:${this.port}/mcp`;
@@ -25,9 +26,13 @@ export class EditorToolsMcpServer {
                         'Cache-Control': 'no-cache',
                         'Connection': 'keep-alive',
                     });
-                    res.write(': connected\n\n');
-                    
+
+                    res.write('event: endpoint\ndata: /mcp\n\n');
+
+                    this.sseConnections.push(res);
                     req.on('close', () => {
+                        const index = this.sseConnections.indexOf(res);
+                        if (index !== -1) this.sseConnections.splice(index, 1);
                         res.end();
                     });
                     return;
@@ -54,29 +59,39 @@ export class EditorToolsMcpServer {
                     return;
                 }
 
-                const id = msg.id;
-                const method = msg.method as string;
-                const params = msg.params || {};
-                const isNotification = id === undefined || id === null;
+                try {
+                    const result = await this._handleJsonRpc(msg, tools);
 
-                const result = await this._handleMethod(method, params, tools);
-                
-                if (isNotification) {
                     res.writeHead(202);
                     res.end();
-                    return;
-                }
 
-                res.writeHead(200, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ jsonrpc: '2.0', id, result }));
-            } catch (err: any) {
+                    if (msg.id !== undefined) {
+                        const response = JSON.stringify({ jsonrpc: '2.0', result, id: msg.id });
+                        for (const sseRes of this.sseConnections) {
+                            sseRes.write(`event: message\ndata: ${response}\n\n`);
+                        }
+                    }
+                } catch (err) {
+                    logToFile(`[Hermes ACP] MCP Server JSON-RPC error: ${err}`);
+
+                    res.writeHead(202);
+                    res.end();
+
+                    if (msg.id !== undefined) {
+                        const errorResponse = JSON.stringify({
+                            jsonrpc: '2.0',
+                            error: { code: -32603, message: 'Internal error' },
+                            id: msg.id,
+                        });
+                        for (const sseRes of this.sseConnections) {
+                            sseRes.write(`event: message\ndata: ${errorResponse}\n\n`);
+                        }
+                    }
+                }
+            } catch (err) {
                 logToFile('[Hermes ACP] MCP Server error: ' + (err instanceof Error ? err.message : String(err)));
                 res.writeHead(500, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({
-                    jsonrpc: '2.0',
-                    id: null,
-                    error: { code: -32603, message: err?.message || String(err) },
-                }));
+                res.end(JSON.stringify({ error: 'Internal server error' }));
             }
         });
 
@@ -96,7 +111,10 @@ export class EditorToolsMcpServer {
         });
     }
 
-    private async _handleMethod(method: string, params: any, tools: AcpToolDef[]): Promise<any> {
+    private async _handleJsonRpc(msg: any, tools: AcpToolDef[]): Promise<any> {
+        const method = msg.method as string;
+        const params = msg.params || {};
+
         switch (method) {
             case 'initialize':
                 return {
@@ -111,7 +129,7 @@ export class EditorToolsMcpServer {
                         version: '1.0.0',
                     },
                 };
-            
+
             case 'notifications/initialized':
                 return null;
 
@@ -152,6 +170,10 @@ export class EditorToolsMcpServer {
 
     stop(): void {
         if (this.server) {
+            for (const sseRes of this.sseConnections) {
+                try { sseRes.end(); } catch { /* ignore */ }
+            }
+            this.sseConnections = [];
             this.server.close();
             this.server = null;
             this.port = 0;

@@ -445,15 +445,26 @@ export class AcpClient {
                     terminal: true
                 }
             } as any) as any;
+            // Log the full capabilities for debugging
+            logToFile(`[Hermes ACP] Agent initialize response capabilities: ${JSON.stringify(initResponse?.capabilities ?? {})}`);
+            logToFile(`[Hermes ACP] Agent protocol version: ${initResponse?.protocolVersion ?? 'unknown'}`);
+            logToFile(`[Hermes ACP] Agent serverInfo: ${JSON.stringify(initResponse?.serverInfo ?? {})}`);
+
             // Check if the agent supports ACP-transport MCP servers
             if (initResponse?.capabilities?.mcpCapabilities?.acp) {
                 this._agentSupportsMcpAcp = true;
                 this._onLog('Agent supports ACP-transport MCP servers — enabling VS Code editor tools bridge');
             } else {
-                logToFile('[Hermes ACP] Agent does NOT advertise mcpCapabilities.acp — HTTP MCP server will be used instead');
+                logToFile('[Hermes ACP] Agent does NOT advertise mcpCapabilities.acp — SSE MCP server will be used instead');
+            }
+            // Check if agent supports HTTP MCP servers
+            if (initResponse?.capabilities?.mcpCapabilities?.http) {
+                logToFile('[Hermes ACP] Agent DOES advertise mcpCapabilities.http — HTTP MCP supported natively');
+            } else {
+                logToFile('[Hermes ACP] Agent does NOT advertise mcpCapabilities.http either');
             }
 
-            // Always start the local HTTP MCP server for editor tools.
+            // Always start the local SSE MCP server for editor tools.
             // The agent discovers and connects to it via the mcpServers entry
             // in session/new (type: 'http'), which Hermes already supports.
             this._editorToolsMcpServer = new EditorToolsMcpServer();
@@ -463,9 +474,18 @@ export class AcpClient {
             // doesn't include the fs/terminal capability fields in its schema type.
             // When ACP SDK schema updates, this cast can be removed.
 
-            const builder = this._conn.agent.buildSession(this._buildNewSessionRequest(cwd));
+            const request = this._buildNewSessionRequest(cwd);
+            logToFile(`[Hermes ACP] session/new request: ${JSON.stringify(request)}`);
+            const builder = this._conn.agent.buildSession(request);
+            logToFile('[Hermes ACP] Calling builder.start() to create session...');
             this._session = await builder.start();
+            logToFile('[Hermes ACP] Session created successfully');
             this._syncSessionModels(this._session.newSessionResponse);
+            logToFile(`[Hermes ACP] Session ID: ${(this._session as any)?.sessionId ?? (this._session.newSessionResponse as any)?.sessionId ?? 'unknown'}`);
+            // Log the full newSessionResponse for debugging
+            const nsr = this._session.newSessionResponse;
+            logToFile(`[Hermes ACP] newSessionResponse keys: ${nsr ? Object.keys(nsr as object).join(', ') : 'null'}`);
+            logToFile(`[Hermes ACP] newSessionResponse: ${JSON.stringify(nsr ?? {})}`);
             this._transitionTo('ready');
 
         } catch (err) {
@@ -1003,17 +1023,17 @@ export class AcpClient {
         logToFile(`[Hermes ACP] Building session/new request for cwd: ${cwd}`);
         logToFile(`[Hermes ACP] Initial mcpServers from resolver: ${mcpServers.length}`);
 
-        // Always advertise the local HTTP MCP server for editor tools.
-        // The agent connects to it via its existing McpServerHttp support.
+        // Always advertise the local SSE MCP server for editor tools.
+        // The agent connects to it via its existing MCP SSE transport support.
         if (this._editorToolsMcpServer) {
             const mcpServerConfig = {
-                type: 'http' as const,
+                type: 'sse' as const,
                 name: VSCODE_MCP_SERVER_NAME,
                 url: this._editorToolsMcpServer.url,
                 headers: [],
             };
 
-            logToFile(`[Hermes ACP] Adding HTTP MCP server: ${JSON.stringify(mcpServerConfig)}`);
+            logToFile(`[Hermes ACP] Adding SSE MCP server: ${JSON.stringify(mcpServerConfig)}`);
 
             mcpServers.push(mcpServerConfig);
             this._onLog(`session/new: added editor tools MCP server at ${this._editorToolsMcpServer.url}`);

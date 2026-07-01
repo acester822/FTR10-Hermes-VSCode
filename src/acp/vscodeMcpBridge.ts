@@ -6,7 +6,7 @@ import { getToolManifest } from './acpToolRegistration';
  * The agent uses this ID when sending `mcp/connect` to reach us.
  */
 export const VSCODE_MCP_SERVER_ID = 'vscode-editor-tools';
-export const VSCODE_MCP_SERVER_NAME = 'VS Code Editor Tools';
+export const VSCODE_MCP_SERVER_NAME = 'vscode';
 
 /** ACP connection ID → metadata. */
 interface McpConnection {

@@ -35,6 +35,7 @@ import {
     rebuildAggregatedToolText,
 } from './toolAggregate';
 import { classifyLogLevel, LogLevel } from '../logLevel';
+import { logToFile } from '../acp/fileLogger';
 import {
     composePromptWithContext,
     ContextAttachOption,
@@ -1260,6 +1261,7 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
             }
         );
         this._acp.onLog = (line: string) => {
+            logToFile(`[Hermes Agent stderr] ${line}`);
             const level = classifyLogLevel(line);
             if (level) {
                 this._postWebviewLog(line, level);
