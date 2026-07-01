@@ -50,21 +50,9 @@
 
     const LOCAL_HISTORY_DIVIDER_ID = 'localHistoryDivider';
 
-    function removeLocalHistoryDivider() {
-        const divider = document.getElementById(LOCAL_HISTORY_DIVIDER_ID);
-        if (divider) divider.remove();
-    }
+    function removeLocalHistoryDivider() {}
 
-    function insertLocalHistoryDivider() {
-        removeLocalHistoryDivider();
-        const divider = document.createElement('div');
-        divider.id = LOCAL_HISTORY_DIVIDER_ID;
-        divider.className = 'local-history-divider';
-        divider.title = locale.localHistoryDividerTitle || '';
-        divider.textContent = locale.localHistoryDivider || '';
-        placeholder.style.display = 'none';
-        messagesEl.appendChild(divider);
-    }
+    function insertLocalHistoryDivider() {}
 
     function setConnectingPlaceholder() {
         if (!placeholder) return;
@@ -3776,6 +3764,9 @@ function parseToolCallText(text) {
         }
         attachMessageActions(group, inner);
         group.appendChild(inner);
+        if (options && options.skipAppend) {
+            return group;
+        }
         messagesEl.appendChild(group);
         // Apply visibility filter for thought/tool messages
         if (role === 'thought' && !window._showThoughts) group.style.display = 'none';
@@ -4264,7 +4255,10 @@ function parseToolCallText(text) {
         resetChatView();
     }
 
-    function restoreHistory(messages, localHistoryOnly) {
+    var _restoredTotalCount = 0;
+    var _restoredScrollLoadMore = null;
+
+    function restoreHistory(messages, totalCount, loadedCount, headerText) {
         cancelSessionMarkdownRender();
         streamingMessageId = null;
         thoughtMsgId = null;
@@ -4275,10 +4269,23 @@ function parseToolCallText(text) {
         window._hermesRendered = false;
         exitMultiSelectMode();
         if (!messages || messages.length === 0) {
-            removeLocalHistoryDivider();
             return;
         }
         placeholder.style.display = 'none';
+        removeLocalHistoryDivider();
+        _restoredTotalCount = totalCount || messages.length;
+        _restoredLoadedCount = loadedCount || messages.length;
+
+        // Insert a header if provided (e.g. "Prior Session Loaded Successfully!")
+        removeHermesHistoryHeader();
+        if (headerText) {
+            var header = document.createElement('div');
+            header.className = 'hermes-history-header';
+            header.id = HERMES_HISTORY_HEADER_ID;
+            header.textContent = headerText;
+            messagesEl.insertBefore(header, messagesEl.firstChild);
+        }
+
         let cursor = 0;
         function appendRestoreBatch() {
             const end = Math.min(cursor + RESTORE_BATCH_SIZE, messages.length);
@@ -4295,24 +4302,82 @@ function parseToolCallText(text) {
                 return;
             }
             updateQuickActionBtns();
-            if (localHistoryOnly) {
-                insertLocalHistoryDivider();
-            } else {
-                removeLocalHistoryDivider();
-            }
             scheduleSessionMarkdownRender();
+            // Wire scroll-to-top to load more history
+            wireScrollToTopLoadMore();
         }
         requestAnimationFrame(appendRestoreBatch);
+    }
+
+    var HERMES_HISTORY_HEADER_ID = 'hermesHistoryHeader';
+    function removeHermesHistoryHeader() {
+        var el = document.getElementById(HERMES_HISTORY_HEADER_ID);
+        if (el) el.remove();
+    }
+
+    function wireScrollToTopLoadMore() {
+        if (_restoredScrollLoadMore) {
+            messagesEl.removeEventListener('scroll', _restoredScrollLoadMore);
+        }
+        _restoredScrollLoadMore = function() {
+            if (_restoredLoadedCount >= _restoredTotalCount) return;
+            if (messagesEl.scrollTop <= 20) {
+                vscode.postMessage({ type: 'loadMoreHistory', loadedCount: _restoredLoadedCount });
+            }
+        };
+        messagesEl.addEventListener('scroll', _restoredScrollLoadMore, { passive: true });
+    }
+
+    function prependHistory(messages, totalCount, loadedCount) {
+        _restoredTotalCount = totalCount || _restoredTotalCount;
+        _restoredLoadedCount = loadedCount || _restoredLoadedCount;
+        if (!messages || messages.length === 0) return;
+
+        if (_restoredScrollLoadMore) {
+            messagesEl.removeEventListener('scroll', _restoredScrollLoadMore);
+        }
+
+        var firstMsg = messagesEl.querySelector('.message-group');
+        var rendered = 0;
+        var pendingElements = [];
+
+        function appendPrependBatch() {
+            var end = Math.min(rendered + RESTORE_BATCH_SIZE, messages.length);
+            for (; rendered < end; rendered++) {
+                var m = messages[rendered];
+                var el;
+                if (m.role === 'permission') {
+                    el = addMessage('permission', m.text, { restore: true, skipAppend: true });
+                } else {
+                    el = addMessage(m.role, m.text, { restore: true, deferMarkdown: true, skipAppend: true });
+                }
+                if (el) {
+                    pendingElements.push(el);
+                }
+            }
+            if (rendered < messages.length) {
+                requestAnimationFrame(appendPrependBatch);
+                return;
+            }
+            // Insert all pending elements at the top
+            var fragment = document.createDocumentFragment();
+            for (var i = 0; i < pendingElements.length; i++) {
+                fragment.appendChild(pendingElements[i]);
+            }
+            if (firstMsg && firstMsg.parentNode) {
+                messagesEl.insertBefore(fragment, firstMsg);
+            } else {
+                messagesEl.appendChild(fragment);
+            }
+            scheduleSessionMarkdownRender();
+            wireScrollToTopLoadMore();
+        }
+        requestAnimationFrame(appendPrependBatch);
     }
 
     function sendMessage() {
         const text = inputEl.value.trim();
         if (!text || !canSend) return;
-
-        if (hasUnconfirmedCustomMemorySelection()) {
-            openContextAttachSendModal(text);
-            return;
-        }
 
         executeSendMessage(text);
     }
@@ -4678,6 +4743,139 @@ function parseToolCallText(text) {
     const contextAttachPreviewList = document.getElementById('contextAttachPreviewList');
     const contextAttachSendModal = document.getElementById('contextAttachSendModal');
     const switchSessionModal = document.getElementById('switchSessionModal');
+    // Session picker helpers
+    const sessionPickerModal = document.getElementById('sessionPickerModal');
+    const sessionPickerList = document.getElementById('sessionPickerList');
+    const sessionPickerEmpty = document.getElementById('sessionPickerEmpty');
+    const sessionPickerTitle = document.getElementById('sessionPickerTitle');
+    const sessionPickerSubtitle = document.getElementById('sessionPickerSubtitle');
+    const sessionPickerRefreshBtn = document.getElementById('sessionPickerRefreshBtn');
+    const sessionPickerNewBtn = document.getElementById('sessionPickerNewBtn');
+    let hermesSessionList = [];
+
+    let hermesLoadingInterval = null;
+    const hermesLoadingEl = document.getElementById('hermesLoading');
+    const hermesLoadingText = document.querySelector('.hermes-loading-text');
+
+    function showHermesLoading(message) {
+        if (hermesLoadingEl) {
+            hermesLoadingEl.hidden = false;
+            placeholder.style.display = 'block';
+            placeholder.className = 'placeholder';
+            if (hermesLoadingText) {
+                hermesLoadingText.textContent = message || 'Connecting to Hermes';
+            }
+            // Animate dots with JS
+            if (hermesLoadingInterval) clearInterval(hermesLoadingInterval);
+            let dotCount = 0;
+            hermesLoadingInterval = setInterval(function() {
+                dotCount = (dotCount + 1) % 5;
+                if (hermesLoadingText) {
+                    var base = hermesLoadingText.textContent.replace(/\.\.\.\.?$/, '').trim();
+                    hermesLoadingText.textContent = base + '.'.repeat(dotCount);
+                }
+            }, 500);
+        }
+    }
+
+    function hideHermesLoading() {
+        if (hermesLoadingEl) {
+            hermesLoadingEl.hidden = true;
+        }
+        if (hermesLoadingInterval) {
+            clearInterval(hermesLoadingInterval);
+            hermesLoadingInterval = null;
+        }
+    }
+
+    function showHermesSessionPicker(sessions) {
+        hideHermesLoading();
+        hermesSessionList = sessions || [];
+        sessionPickerTitle.textContent = 'Welcome to Hermes';
+        sessionPickerSubtitle.textContent = 'Select a session to resume or start a new one';
+
+        const list = sessionPickerList;
+        list.textContent = '';
+
+        if (!hermesSessionList || hermesSessionList.length === 0) {
+            sessionPickerEmpty.hidden = false;
+            sessionPickerEmpty.textContent = 'No previous sessions found — create a new one to get started.';
+            sessionPickerEmpty.style.display = 'block';
+        } else {
+            sessionPickerEmpty.hidden = true;
+            hermesSessionList.forEach(function(session) {
+                const card = document.createElement('div');
+                card.className = 'session-picker-card';
+                card.dataset.sessionId = session.sessionId;
+
+                const icon = document.createElement('span');
+                icon.className = 'session-picker-card-icon';
+                icon.textContent = '💬';
+
+                const body = document.createElement('div');
+                body.className = 'session-picker-card-body';
+
+                const title = document.createElement('div');
+                title.className = 'session-picker-card-title';
+                title.textContent = session.title || 'Untitled';
+
+                const meta = document.createElement('div');
+                meta.className = 'session-picker-card-meta';
+                const cwdLabel = session.cwd ? session.cwd.split('/').pop() || session.cwd : '';
+                const timeLabel = session.updatedAt ? formatSessionTime(session.updatedAt) : '';
+                meta.textContent = [cwdLabel, timeLabel].filter(Boolean).join(' \u00b7 ');
+
+                const sid = document.createElement('span');
+                sid.className = 'session-picker-card-id';
+                sid.textContent = session.sessionId.slice(0, 8);
+
+                body.appendChild(title);
+                body.appendChild(meta);
+                card.appendChild(icon);
+                card.appendChild(body);
+                card.appendChild(sid);
+
+                card.addEventListener('click', function() {
+                    vscode.postMessage({ type: 'pickSession', sessionId: session.sessionId });
+                    hideHermesSessionPicker();
+                });
+
+                list.appendChild(card);
+            });
+        }
+
+        sessionPickerModal.hidden = false;
+    }
+
+    function hideHermesSessionPicker() {
+        sessionPickerModal.hidden = true;
+    }
+
+    function formatSessionTime(isoStr) {
+        if (!isoStr) return '';
+        try {
+            const d = new Date(isoStr);
+            if (isNaN(d.getTime())) return '';
+            const hours = d.getHours().toString().padStart(2, '0');
+            const mins = d.getMinutes().toString().padStart(2, '0');
+            return hours + ':' + mins;
+        } catch { return ''; }
+    }
+
+    if (sessionPickerNewBtn) {
+        sessionPickerNewBtn.textContent = '\u2795 New Session';
+        sessionPickerNewBtn.addEventListener('click', function() {
+            vscode.postMessage({ type: 'pickSession', action: 'new' });
+            hideHermesSessionPicker();
+        });
+    }
+
+    if (sessionPickerRefreshBtn) {
+        sessionPickerRefreshBtn.textContent = 'Refresh';
+        sessionPickerRefreshBtn.addEventListener('click', function() {
+            vscode.postMessage({ type: 'refreshSessions' });
+        });
+    }
 
     function closeAllDropdowns() {
         if (profilePicker) profilePicker.classList.remove('is-open');
@@ -5384,8 +5582,10 @@ function parseToolCallText(text) {
                 }
                 if (msg.status === 'connecting') {
                     connectionAttempted = true;
+                    showHermesLoading('Connecting to Hermes');
                 }
                 updateStatus(msg.status, msg.message);
+                hideHermesLoading();
                 if (msg.status === 'ready') {
                     isPrompting = false;
                     awaitingFirstChunk = false;
@@ -5447,7 +5647,11 @@ function parseToolCallText(text) {
                 break;
 
             case 'restoreHistory':
-                restoreHistory(msg.messages, msg.localHistoryOnly);
+                restoreHistory(msg.messages, msg.totalCount, msg.loadedCount, msg.headerText);
+                break;
+
+            case 'prependHistory':
+                prependHistory(msg.messages, msg.totalCount, msg.loadedCount);
                 break;
 
             case 'detectEnvironmentStart':
@@ -5515,10 +5719,18 @@ function parseToolCallText(text) {
                     }
                     const divider = document.getElementById(LOCAL_HISTORY_DIVIDER_ID);
                     if (divider) {
-                        divider.textContent = locale.localHistoryDivider || '';
-                        divider.title = locale.localHistoryDividerTitle || '';
+                        divider.textContent = '';
+                
                     }
                 }
+                break;
+
+            case 'showSessionPicker':
+                showHermesSessionPicker(msg.sessions);
+                break;
+
+            case 'hideSessionPicker':
+                hideHermesSessionPicker();
                 break;
 
             case 'sessionList':
@@ -5699,5 +5911,6 @@ function parseToolCallText(text) {
         });
     }
 
+    showHermesLoading('Connecting to Hermes');
     vscode.postMessage({ type: 'ready' });
 })();

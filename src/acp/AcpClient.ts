@@ -38,7 +38,16 @@ import {
 } from './vscodeMcpBridge';
 import { EditorToolsMcpServer } from './editorToolsMcpServer';
 
-export type AcpStatus = 'idle' | 'connecting' | 'ready' | 'prompting' | 'error';
+export type AcpStatus = 'idle' | 'connecting' | 'connected' | 'ready' | 'prompting' | 'error';
+
+/** Summary info for a Hermes session returned by session/list. */
+export interface HermesSessionSummary {
+    sessionId: string;
+    cwd: string;
+    title?: string | null;
+    updatedAt?: string | null;
+    _meta?: Record<string, unknown>;
+}
 export type { ModelListState } from './modelConfig';
 export type ModelsChangedHandler = (models: ModelListState | null) => void;
 
@@ -172,7 +181,8 @@ export class AcpClient {
 
     private static readonly VALID: Record<AcpStatus, AcpStatus[]> = {
         idle:        ['connecting'],
-        connecting:  ['ready', 'error'],
+        connecting:  ['connected', 'error'],
+        connected:   ['ready', 'error', 'idle'],
         ready:       ['prompting', 'error', 'idle'],
         prompting:   ['ready', 'error', 'idle'],
         error:       ['connecting', 'idle'],
@@ -470,23 +480,11 @@ export class AcpClient {
             this._editorToolsMcpServer = new EditorToolsMcpServer();
             await this._editorToolsMcpServer.start();
             this._onLog(`Editor tools MCP server listening on ${this._editorToolsMcpServer.url}`);
-            // Note: `as any` is needed because ClientContext.request() type
-            // doesn't include the fs/terminal capability fields in its schema type.
-            // When ACP SDK schema updates, this cast can be removed.
 
-            const request = this._buildNewSessionRequest(cwd);
-            logToFile(`[Hermes ACP] session/new request: ${JSON.stringify(request)}`);
-            const builder = this._conn.agent.buildSession(request);
-            logToFile('[Hermes ACP] Calling builder.start() to create session...');
-            this._session = await builder.start();
-            logToFile('[Hermes ACP] Session created successfully');
-            this._syncSessionModels(this._session.newSessionResponse);
-            logToFile(`[Hermes ACP] Session ID: ${(this._session as any)?.sessionId ?? (this._session.newSessionResponse as any)?.sessionId ?? 'unknown'}`);
-            // Log the full newSessionResponse for debugging
-            const nsr = this._session.newSessionResponse;
-            logToFile(`[Hermes ACP] newSessionResponse keys: ${nsr ? Object.keys(nsr as object).join(', ') : 'null'}`);
-            logToFile(`[Hermes ACP] newSessionResponse: ${JSON.stringify(nsr ?? {})}`);
-            this._transitionTo('ready');
+            // NOTE: We do NOT create a session here anymore. The caller must
+            // explicitly call createNewSession() for a fresh session, or
+            // loadSession() to resume an existing one.
+            this._transitionTo('connected');
 
         } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
@@ -498,6 +496,124 @@ export class AcpClient {
         }
     }
 
+    /**
+     * Returns true when a session is active (ready for prompting).
+     */
+    hasSession(): boolean {
+        return this._session !== null && this._status === 'ready';
+    }
+
+    /** Returns the current session ID, or null if no session is active. */
+    getSessionId(): string | null {
+        return this._session?.sessionId ?? null;
+    }
+
+    /**
+     * List available Hermes sessions via session/list.
+     */
+    async listSessions(): Promise<HermesSessionSummary[]> {
+        if (!this._conn) {
+            throw new Error('Not connected');
+        }
+        try {
+            const response = await this._conn.agent.request('session/list', {}) as any;
+            return (response?.sessions ?? []) as HermesSessionSummary[];
+        } catch (err) {
+            this._onLog(`listSessions failed: ${err instanceof Error ? err.message : String(err)}`);
+            return [];
+        }
+    }
+
+    /**
+     * Load an existing Hermes session by ID and create an ActiveSession wrapper.
+     * After this call, the session is ready for prompting.
+     */
+    async loadSession(sessionId: string, cwd: string): Promise<void> {
+        if (!this._conn) {
+            throw new Error('Not connected');
+        }
+        if (this._session) {
+            this._session.dispose();
+            this._session = null;
+        }
+        this._responseBuffer = '';
+        this._thoughtBuffer = '';
+        this._toolCallTracker.clear();
+
+        const request = this._buildNewSessionRequest(cwd);
+        try {
+            await this._conn.agent.request('session/load', {
+                sessionId,
+                cwd: request.cwd,
+                mcpServers: request.mcpServers,
+            } as any);
+
+            // Construct a minimal NewSessionResponse-like object so the
+            // SDK's ActiveSession wrapper has the right sessionId for
+            // subsequent session/prompt calls.
+            const fakeResponse: any = {
+                sessionId,
+                _meta: {},
+                modes: null,
+                configOptions: [],
+            };
+            this._session = (this._conn.agent as any).attachSession(fakeResponse);
+            this._syncSessionModels(fakeResponse);
+            this._transitionTo('ready');
+            logToFile(`[Hermes ACP] Session loaded: ${sessionId}`);
+        } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            logToFile(`[Hermes ACP] Session load failed: ${msg}`);
+            this._transitionTo('error', `Failed to load session: ${msg}`);
+            throw err;
+        }
+    }
+
+    /**
+     * Create a new Hermes session. After this call, the session is ready for prompting.
+     */
+    async createNewSession(cwd: string): Promise<void> {
+        if (!this._conn) {
+            await this.start(cwd);
+            return;
+        }
+        if (this._sessionStarting) {
+            logToFile('[Hermes ACP] createNewSession() called while session already starting — waiting');
+            while (this._sessionStarting) {
+                await new Promise(resolve => setTimeout(resolve, 50));
+            }
+            if (this._session && this._status === 'ready') {
+                logToFile('[Hermes ACP] createNewSession() returning after wait — session already ready');
+                return;
+            }
+        }
+        this._sessionStarting = true;
+        if (this._status === 'prompting') {
+            await this.cancel();
+        }
+        try {
+            this._session?.dispose();
+            this._responseBuffer = '';
+            this._thoughtBuffer = '';
+            this._toolCallTracker.clear();
+            const request = this._buildNewSessionRequest(cwd);
+            logToFile(`[Hermes ACP] session/new request: ${JSON.stringify(request)}`);
+            const builder = this._conn.agent.buildSession(request);
+            logToFile('[Hermes ACP] Calling builder.start() to create session...');
+            this._session = await builder.start();
+            this._syncSessionModels(this._session.newSessionResponse);
+            this._transitionTo('ready');
+            logToFile(`[Hermes ACP] Session created successfully`);
+            logToFile(`[Hermes ACP] Session ID: ${(this._session as any)?.sessionId ?? 'unknown'}`);
+        } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            logToFile(`[Hermes ACP] New session failed: ${msg}`);
+            this._transitionTo('error', `New session failed: ${msg}`);
+            this._onConnectionLost();
+        } finally {
+            this._sessionStarting = false;
+        }
+    }
     async sendMessage(text: string): Promise<void> {
         if (this._status !== 'ready') {
             this._onMessage('assistant', 'Please wait for connection...');
@@ -704,43 +820,7 @@ export class AcpClient {
     }
 
     async newSession(cwd: string): Promise<void> {
-        if (!this._conn) {
-            await this.start(cwd);
-            return;
-        }
-        if (this._sessionStarting) {
-            logToFile('[Hermes ACP] newSession() called while session already starting — waiting');
-            while (this._sessionStarting) {
-                await new Promise(resolve => setTimeout(resolve, 50));
-            }
-            if (this._session && this._status === 'ready') {
-                logToFile('[Hermes ACP] newSession() returning after wait — session already ready');
-                return;
-            }
-        }
-        this._sessionStarting = true;
-        logToFile(`[Hermes ACP] Creating new session (current status: ${this._status})`);
-        if (this._status === 'prompting') {
-            await this.cancel();
-        }
-        try {
-            this._session?.dispose();
-            this._responseBuffer = '';
-            this._thoughtBuffer = '';
-            this._toolCallTracker.clear();
-            const builder = this._conn.agent.buildSession(this._buildNewSessionRequest(cwd));
-            this._session = await builder.start();
-            this._syncSessionModels(this._session.newSessionResponse);
-            this._transitionTo('ready');
-            logToFile(`[Hermes ACP] New session created successfully`);
-        } catch (err) {
-            const msg = err instanceof Error ? err.message : String(err);
-            logToFile(`[Hermes ACP] New session failed: ${msg}`);
-            this._transitionTo('error', `New session failed: ${msg}`);
-            this._onConnectionLost();
-        } finally {
-            this._sessionStarting = false;
-        }
+        return this.createNewSession(cwd);
     }
 
     stop(): void {

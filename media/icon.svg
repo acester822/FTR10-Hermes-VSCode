@@ -1,15 +1,11 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
-  <defs>
-    <linearGradient id="g" x1="0" y1="0" x2="256" y2="256" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#6366f1"/>
-      <stop offset="100%" stop-color="#a855f7"/>
-    </linearGradient>
-  </defs>
-  <rect width="256" height="256" rx="48" fill="url(#g)"/>
-
-  <!-- Chat bubble -->
-  <rect x="48" y="64" width="160" height="120" rx="20" fill="#fff"/>
-
-  <!-- Lightning bolt inside bubble -->
-  <polygon points="140,78 84,136 116,136 100,178 164,114 128,114 140,78" fill="#6366f1"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#c586c0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <!-- stylized H for Hermes -->
+  <path d="M6 4v16"/>
+  <path d="M18 4v16"/>
+  <path d="M6 12h12"/>
+  <!-- wing -->
+  <path d="M3 8l3-4"/>
+  <path d="M21 8l-3-4"/>
+  <path d="M3 16l3 4"/>
+  <path d="M21 16l-3 4"/>
 </svg>
