@@ -53,6 +53,14 @@
     --tool-success: var(--success);
     --tool-error: var(--error);
 
+    /* Cognitive State Colors — drive tool call pulse colors */
+    --state-analyzing: var(--accent-2);  /* amber */
+    --state-searching: #4fc3f7;          /* cyan */
+    --state-reading: #81c784;            /* green */
+    --state-writing: #4db6ac;            /* teal */
+    --state-executing: #ce93d8;          /* purple */
+    --state-error: var(--error);         /* red */
+
     /* Reasoning Colors */
     --reasoning-bg: color-mix(in srgb, var(--primary) 8%, var(--text-block));
     --reasoning-border: color-mix(in srgb, var(--primary) 25%, var(--border));
@@ -1439,37 +1447,33 @@ body {
     transition: all var(--transition-base);
     position: relative;
     width: 100%;
-}
-
-.tool-call-card::before {
-    content: '';
-    position: absolute;
-    left: 0;
-    top: 0;
-    bottom: 0;
-    width: 3px;
-    background: var(--tool-accent);
-    transition: background var(--transition-base);
-}
-
-.tool-call-card.is-complete::before {
-    background: var(--tool-success);
-}
-
-.tool-call-card.is-failed::before {
-    background: var(--tool-error);
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
 }
 
 .tool-call-card.is-live {
+    outline: none;
     animation: toolCardPulse 2s ease-in-out infinite;
+}
+
+.tool-call-card.is-complete .tool-call-header {
+    background: color-mix(in srgb, var(--tool-success) 8%, transparent);
+}
+
+.tool-call-card.is-failed .tool-call-header {
+    background: color-mix(in srgb, var(--tool-error) 8%, transparent);
+}
+
+.tool-call-card.is-live .tool-call-header {
+    background: color-mix(in srgb, var(--tool-accent) 8%, transparent);
 }
 
 @keyframes toolCardPulse {
     0%, 100% {
-        box-shadow: 0 0 0 0 color-mix(in srgb, var(--tool-accent) 20%, transparent);
+        outline: 1px solid color-mix(in srgb, var(--tool-accent) 15%, transparent);
     }
     50% {
-        box-shadow: 0 0 0 3px color-mix(in srgb, var(--tool-accent) 10%, transparent);
+        outline: 2px solid color-mix(in srgb, var(--tool-accent) 30%, transparent);
     }
 }
 
@@ -1689,20 +1693,15 @@ body {
     /* max-width: 85%; */
 }
 
-/* .message.user,
-.message.assistant {
-     max-width: 85%;
-} */
-
 .message.user {
+    max-width: 75%;
+    width: fit-content;
     background: var(--ftr10-accent-1-70);
-    /* color: var(
-    --primary-fg); */
-    border-bottom-right-radius: var(
-    --radius-xs);
+    border-bottom-right-radius: var(--radius-xs);
 }
 
 .message.assistant {
+    max-width: 85%;
     background: var(--text-block);
     color: var(--fg);
     border: 1px solid var(--border);
@@ -3632,37 +3631,33 @@ mark.search-mark-active {
     transition: all var(--transition-base);
     position: relative;
     width: 100%;
-}
-
-.tool-call-card::before {
-    content: '';
-    position: absolute;
-    left: 0;
-    top: 0;
-    bottom: 0;
-    width: 3px;
-    background: var(--tool-accent);
-    transition: background var(--transition-base);
-}
-
-.tool-call-card.is-complete::before {
-    border: var(--tool-success);
-}
-
-.tool-call-card.is-failed::before {
-    background: var(--tool-error);
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
 }
 
 .tool-call-card.is-live {
+    outline: none;
     animation: toolCardPulse 2s ease-in-out infinite;
+}
+
+.tool-call-card.is-complete .tool-call-header {
+    background: color-mix(in srgb, var(--tool-success) 8%, transparent);
+}
+
+.tool-call-card.is-failed .tool-call-header {
+    background: color-mix(in srgb, var(--tool-error) 8%, transparent);
+}
+
+.tool-call-card.is-live .tool-call-header {
+    background: color-mix(in srgb, var(--tool-accent) 8%, transparent);
 }
 
 @keyframes toolCardPulse {
     0%, 100% {
-        box-shadow: 0 0 0 0 color-mix(in srgb, var(--tool-accent) 20%, transparent);
+        outline: 1px solid color-mix(in srgb, var(--tool-accent) 15%, transparent);
     }
     50% {
-        box-shadow: 0 0 0 3px color-mix(in srgb, var(--tool-accent) 10%, transparent);
+        outline: 2px solid color-mix(in srgb, var(--tool-accent) 30%, transparent);
     }
 }
 
@@ -3681,6 +3676,34 @@ mark.search-mark-active {
 
 .tool-call-header:hover {
     background: color-mix(in srgb, var(--fg) 4%, transparent);
+}
+
+/* Cognitive state pulse colors — remap tool-accent so the pulse animation color changes */
+.tool-call-card.is-analyzing { --tool-accent: var(--state-analyzing); }
+.tool-call-card.is-searching { --tool-accent: var(--state-searching); }
+.tool-call-card.is-reading   { --tool-accent: var(--state-reading); }
+.tool-call-card.is-writing   { --tool-accent: var(--state-writing); }
+.tool-call-card.is-executing { --tool-accent: var(--state-executing); }
+.tool-call-card.is-error     { --tool-accent: var(--state-error); }
+
+/* State-specific header tints — override defaults from .tool-call-card.is-live .tool-call-header */
+.tool-call-card.is-live.is-analyzing .tool-call-header {
+    background: color-mix(in srgb, var(--state-analyzing) 8%, transparent);
+}
+.tool-call-card.is-live.is-searching .tool-call-header {
+    background: color-mix(in srgb, var(--state-searching) 8%, transparent);
+}
+.tool-call-card.is-live.is-reading .tool-call-header {
+    background: color-mix(in srgb, var(--state-reading) 8%, transparent);
+}
+.tool-call-card.is-live.is-writing .tool-call-header {
+    background: color-mix(in srgb, var(--state-writing) 8%, transparent);
+}
+.tool-call-card.is-live.is-executing .tool-call-header {
+    background: color-mix(in srgb, var(--state-executing) 8%, transparent);
+}
+.tool-call-card.is-live.is-error .tool-call-header {
+    background: color-mix(in srgb, var(--state-error) 8%, transparent);
 }
 
 .tool-call-icon {
@@ -4251,4 +4274,94 @@ mark.search-mark-active {
     .tool-call-section-content {
         font-size: 10px;
     }
+}
+
+/* ── Todo Panel ── */
+.todo-panel {
+    padding: var(--space-xs) var(--space-md);
+    background: color-mix(in srgb, var(--accent-2) 6%, var(--text-block));
+    border: 1px solid color-mix(in srgb, var(--accent-2) 25%, var(--border));
+    border-radius: var(--radius-md);
+    margin: var(--space-xs) var(--space-md);
+    position: sticky;
+    top: 0;
+    z-index: 15;
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+}
+
+.todo-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-sm);
+    margin-bottom: var(--space-xs);
+}
+
+.todo-panel-title {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    color: var(--accent-2);
+    opacity: 0.8;
+}
+
+.todo-panel-clear {
+    background: transparent;
+    border: none;
+    color: var(--dim);
+    cursor: pointer;
+    font-size: 11px;
+    padding: 1px 4px;
+    border-radius: 3px;
+    line-height: 1;
+}
+
+.todo-panel-clear:hover {
+    color: var(--fg);
+    background: color-mix(in srgb, var(--border) 50%, transparent);
+}
+
+.todo-panel-list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.todo-item {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-sm);
+    padding: 2px 0;
+    font-size: 12px;
+    line-height: 1.45;
+    color: var(--fg);
+}
+
+.todo-item.is-done {
+    opacity: 0.5;
+    text-decoration: line-through;
+}
+
+.todo-checkbox {
+    flex-shrink: 0;
+    width: 14px;
+    height: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    color: var(--accent-2);
+    margin-top: 2px;
+}
+
+.todo-item.is-done .todo-checkbox {
+    color: var(--success);
+}
+
+.todo-text {
+    flex: 1;
+    min-width: 0;
+    word-break: break-word;
 }
