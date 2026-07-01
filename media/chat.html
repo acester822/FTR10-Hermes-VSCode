@@ -35,7 +35,20 @@
     <div id="tabContextMenu" class="tab-context-menu" hidden></div>
 <div id="chat-body" class="chat-body">
 <div id="messages">
-    <div class="placeholder" id="placeholder"></div>
+    <div class="placeholder" id="placeholder">
+        <div class="hermes-loading" id="hermesLoading" hidden>
+            <svg class="hermes-loading-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M6 4v16"/>
+                <path d="M18 4v16"/>
+                <path d="M6 12h12"/>
+                <path d="M3 8l3-4"/>
+                <path d="M21 8l-3-4"/>
+                <path d="M3 16l3 4"/>
+                <path d="M21 16l-3 4"/>
+            </svg>
+            <div class="hermes-loading-text"></div>
+        </div>
+    </div>
 </div>
 <div id="status-bar" class="status-bar">
     <span class="status-dot" id="statusDot"></span>
@@ -323,6 +336,24 @@
         <button type="button" class="context-attach-preview-close" id="contextAttachPreviewClose" aria-label="✕">✕</button>
     </div>
     <ul class="context-attach-preview-list" id="contextAttachPreviewList"></ul>
+</div>
+
+<!-- Hermes Session Picker overlay -->
+<div id="sessionPickerModal" class="session-picker-modal modal-overlay" hidden>
+    <div class="session-picker-panel">
+        <div class="session-picker-header">
+            <span class="session-picker-title" id="sessionPickerTitle"></span>
+            <span class="session-picker-subtitle" id="sessionPickerSubtitle"></span>
+        </div>
+        <div class="session-picker-body" id="sessionPickerBody">
+            <div class="session-picker-empty" id="sessionPickerEmpty" hidden></div>
+            <div class="session-picker-list" id="sessionPickerList"></div>
+        </div>
+        <div class="session-picker-footer">
+            <button type="button" class="toolbar-btn" id="sessionPickerRefreshBtn"></button>
+            <button type="button" class="toolbar-btn primary" id="sessionPickerNewBtn"></button>
+        </div>
+    </div>
 </div>
 
 <script>

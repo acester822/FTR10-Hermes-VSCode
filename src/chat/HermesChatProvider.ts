@@ -159,6 +159,8 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
     private _connectPromise: Promise<void> | undefined;
     /** When true, suppress forwarding ACP `ready` until post-connect setup completes. */
     private _deferReadyUntilSessionSetup = false;
+    /** Resolves with picked sessionId or null when user picks from the session picker. */
+    private _pendingSessionPick: ((sessionId: string | null) => void) | null = null;
     /** Bumped on cancel to abort a pending send before it reaches Hermes. */
     private _sendEpoch = 0;
     /** Fires when a prompt produces no output for a while (Hermes plugin init). */
@@ -294,7 +296,10 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
                     this._postProfileList();
                     this._postConfig();
                     this._postTokenUsage();
-                    this._restoreMessages();
+                    // Don't call _restoreMessages() here — it would show stale
+                    // messages before the session picker is resolved. Instead,
+                    // the connect flow will restore messages after the user
+                    // picks a session.
                     this._connect();
                     break;
                 case 'getSessions':
@@ -390,6 +395,15 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
                     break;
                 case 'deleteMessages':
                     this._handleDeleteMessages(message.indices);
+                    break;
+                case 'pickSession':
+                    this._handlePickSession(message.sessionId, message.action);
+                    break;
+                case 'refreshSessions':
+                    void this._handleRefreshSessions();
+                    break;
+                case 'loadMoreHistory':
+                    this._handleLoadMoreHistory(message.loadedCount);
                     break;
             }
         });
@@ -578,13 +592,17 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
 
     private _restoreMessages(): void {
         if (this._sessionMessages.length === 0) return;
-        this._log(`Restoring ${this._sessionMessages.length} messages`);
+        this._log(`Restoring ${this._sessionMessages.length} messages (last 10)`);
+        const totalCount = this._sessionMessages.length;
+        const loadedCount = Math.min(10, totalCount);
+        const slice = this._sessionMessages.slice(-loadedCount);
         this._postMessage({
             type: 'restoreHistory',
-            messages: this._sessionMessages,
-            localHistoryOnly: true,
+            messages: slice,
+            totalCount,
+            loadedCount,
+            headerText: `Prior Session Loaded Successfully!`,
         });
-        this._offerContextAttach(this._sessionMessages);
     }
 
     private _offerContextAttach(messages: ChatMessage[]): void {
@@ -664,11 +682,9 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
 
     private _markSessionResetInWebview(): void {
         if (this._sessionMessages.length === 0) {
-            this._clearContextAttachOffer();
             return;
         }
         this._postMessage({ type: 'markSessionReset' });
-        this._offerContextAttach(this._sessionMessages);
     }
 
     private _saveMessage(role: string, text: string, toolCallId?: string): void {
@@ -1271,6 +1287,70 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
         try {
             await this._acp.start(cwd, resolvedPath, target.cliProfile);
 
+            // After ACP is connected but before creating a session, show the
+            // session picker so the user can resume an existing Hermes session
+            // or start a new one. This replaces the old auto-create approach.
+            let sessionReady = false;
+            let hermesSessions: import('../acp/AcpClient').HermesSessionSummary[] = [];
+            try {
+                hermesSessions = await this._acp.listSessions();
+                this._log(`Found ${hermesSessions.length} Hermes session(s)`);
+            } catch (listErr) {
+                this._log(`Session list failed: ${listErr instanceof Error ? listErr.message : String(listErr)}`);
+            }
+
+            if (hermesSessions.length > 0) {
+                // Clear the UI before showing the picker so no stale content
+                // is visible while the user makes their choice
+                this._postMessage({ type: 'newChat' });
+
+                // Show picker to user and wait for their choice
+                const pickerPromise = new Promise<string | null>((resolve) => {
+                    this._pendingSessionPick = resolve;
+                    // Safety timeout: if no selection within 2 minutes,
+                    // auto-create a new session to avoid hanging indefinitely
+                    setTimeout(() => {
+                        if (this._pendingSessionPick === resolve) {
+                            this._log('Session picker timed out — creating new session');
+                            this._pendingSessionPick = null;
+                            resolve(null);
+                        }
+                    }, 120_000);
+                });
+
+                this._postMessage({
+                    type: 'showSessionPicker',
+                    sessions: hermesSessions.map(s => ({
+                        sessionId: s.sessionId,
+                        title: s.title || undefined,
+                        cwd: s.cwd,
+                        updatedAt: s.updatedAt || undefined,
+                    })),
+                });
+
+                const pickedId = await pickerPromise;
+                this._pendingSessionPick = null;
+
+                if (pickedId) {
+                    this._log(`User picked Hermes session: ${pickedId.slice(0, 8)}...`);
+                    await this._acp.loadSession(pickedId, cwd);
+                    sessionReady = true;
+                } else {
+                    this._log('User chose to start a new session');
+                }
+            } else {
+                this._log('No existing Hermes sessions found — creating new one');
+            }
+
+            if (!sessionReady) {
+                await this._acp.createNewSession(cwd);
+            }
+
+            // Restore any locally cached messages now that the active
+            // session has been settled. On first load with the picker,
+            // this will be empty — the user just chose a session.
+            this._restoreMessages();
+
             // Discover all provider models from the Hermes runtime cache file
             // (~/.hermes/provider_models_cache.json). This is written by Hermes
             // during sessions and contains the live model list for every provider
@@ -1396,6 +1476,57 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
         this._tokenUsage = null;
         this._postTokenUsage();
         await this._connect(this._activeSelectionId || undefined);
+    }
+
+    /** Handle user picking a Hermes session from the webview picker. */
+    private _handlePickSession(sessionId?: string, action?: string): void {
+        if (this._pendingSessionPick) {
+            if (action === 'new') {
+                this._log('User requested new Hermes session');
+                this._pendingSessionPick(null);
+            } else if (sessionId) {
+                this._log(`User picked Hermes session: ${sessionId.slice(0, 8)}...`);
+                this._pendingSessionPick(sessionId);
+            }
+        }
+    }
+
+    /** Handle user requesting session list refresh. */
+    private async _handleRefreshSessions(): Promise<void> {
+        this._log('Session list refresh requested');
+        if (!this._acp) return;
+        try {
+            const sessions = await this._acp.listSessions();
+            this._postMessage({
+                type: 'showSessionPicker',
+                sessions: sessions.map(s => ({
+                    sessionId: s.sessionId,
+                    title: s.title || undefined,
+                    cwd: s.cwd,
+                    updatedAt: s.updatedAt || undefined,
+                })),
+            });
+        } catch (err) {
+            this._log(`Refresh failed: ${err instanceof Error ? err.message : String(err)}`);
+        }
+    }
+
+    /** Handle user scrolling to top to load more history. */
+    private _handleLoadMoreHistory(loadedCount: number): void {
+        const totalCount = this._sessionMessages.length;
+        if (loadedCount >= totalCount) {
+            this._log(`No more history to load (${loadedCount}/${totalCount})`);
+            return;
+        }
+        const nextBatch = Math.min(loadedCount + 10, totalCount);
+        const slice = this._sessionMessages.slice(-nextBatch, -loadedCount);
+        this._log(`Loading more history: ${nextBatch - loadedCount} messages (${nextBatch}/${totalCount})`);
+        this._postMessage({
+            type: 'prependHistory',
+            messages: slice,
+            totalCount,
+            loadedCount: nextBatch,
+        });
     }
 
     private _resetViewTitleToDefault(): void {
@@ -2057,8 +2188,33 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
         if (!this._acp || !valueId) {
             return;
         }
+
+        // First, try to apply the model on the existing session via setModel.
+        // If the session already has a model set, this will switch it in-place
+        // WITHOUT creating a new session.
+        if (this._acp.hasSession()) {
+            const state = this._modelState ?? this._acp.getModelListState();
+            const effectiveConfigId = configId || state?.configId || '';
+            if (state && isRuntimeModelSource(effectiveConfigId)) {
+                this._log(`Model change on existing session: ${valueId}`);
+                try {
+                    await this._acp.setModel(effectiveConfigId, valueId);
+                    const runtimeId = this._acp.getRuntimeModelId();
+                    if (runtimeId !== valueId) {
+                        this._log(`Model apply incomplete: runtime=${runtimeId || '(none)'} expected=${valueId}`);
+                    }
+                    await this._syncModelState();
+                    return;
+                } catch (err) {
+                    this._log(`Model change failed on existing session, creating new: ${err instanceof Error ? err.message : String(err)}`);
+                    // Fall through to create new session
+                }
+            }
+        }
+
+        // Fallback: create a new session with the desired model
         const cwd = this._resolveCwd();
-        await this._acp.newSession(cwd);
+        await this._acp.createNewSession(cwd);
         const state = this._modelState ?? this._acp.getModelListState();
         const effectiveConfigId = configId || state?.configId || '';
         if (!state || !isRuntimeModelSource(effectiveConfigId)) {
@@ -2354,7 +2510,7 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
 
         const cwd = this._resolveCwd();
         if (this._acp) {
-            await this._acp.newSession(cwd);
+            await this._acp.createNewSession(cwd);
             await this._applySessionModelPreference();
             await this._syncModelState();
             this._acpBoundSessionId = this._sessionId;
@@ -2367,7 +2523,6 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
 
     private async _handleNewChat(): Promise<void> {
         this._log('New Chat');
-        this._clearContextAttachOffer();
         this._saveCurrentSession();
         this._sessionMessages = [];
         this._sessionId = Date.now().toString(36);
@@ -2447,7 +2602,7 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
         this._ensureSessionRegistered();
         this._snapshotSessionModelFromProfile();
         const cwd = this._resolveCwd();
-        await this._acp?.newSession(cwd);
+        await this._acp?.createNewSession(cwd);
         await this._applySessionModelPreference();
         await this._syncModelState();
         this._acpBoundSessionId = this._sessionId;
@@ -2565,7 +2720,7 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
             this._ensureSessionRegistered();
             this._snapshotSessionModelFromProfile();
             const cwd = this._resolveCwd();
-            await this._acp?.newSession(cwd);
+            await this._acp?.createNewSession(cwd);
             await this._applySessionModelPreference();
             await this._syncModelState();
             this._acpBoundSessionId = this._sessionId;
