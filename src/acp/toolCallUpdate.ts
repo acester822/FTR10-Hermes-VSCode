@@ -2,6 +2,9 @@ import { extractTextFromContentBlock } from './contentText';
 
 export type ToolCallStatus = 'pending' | 'in_progress' | 'completed' | 'failed' | 'cancelled';
 
+/** Cognitive state for live tool calls — drives pulse color differentiation. */
+export type ToolCallState = 'analyzing' | 'searching' | 'reading' | 'writing' | 'executing' | 'error';
+
 export type ToolCallUpdateView = {
     toolCallId: string;
     status: ToolCallStatus;
@@ -9,6 +12,7 @@ export type ToolCallUpdateView = {
     body?: string;
     kind?: string;
     toolType?: string;
+    state?: ToolCallState;
 };
 
 export type ToolCallUpdateHandler = (update: ToolCallUpdateView) => void;
@@ -98,6 +102,28 @@ export function getToolTypeIcon(toolType: string): string {
     return TOOL_TYPE_ICONS[toolType] || TOOL_TYPE_ICONS.default;
 }
 
+/** Map tool type/title to a cognitive state for pulse color differentiation. */
+export function detectToolState(toolType: string | undefined, title: string | undefined): ToolCallState {
+    const text = `${title || ''} ${toolType || ''}`.toLowerCase();
+
+    if (text.includes('search') || text.includes('find') || text.includes('grep') || text.includes('web') || text.includes('browser') || text.includes('fetch')) {
+        return 'searching';
+    }
+    if (text.includes('read_file') || text.includes('read') || text.includes('file_read') || text.includes('view') || text.includes('list')) {
+        return 'reading';
+    }
+    if (text.includes('write') || text.includes('edit') || text.includes('file_write') || text.includes('file_edit') || text.includes('create') || text.includes('patch')) {
+        return 'writing';
+    }
+    if (text.includes('terminal') || text.includes('shell') || text.includes('execute') || text.includes('bash') || text.includes('command') || text.includes('run') || text.includes('python') || text.includes('code') || text.includes('npm') || text.includes('pip') || text.includes('install') || text.includes('git') || text.includes('github')) {
+        return 'executing';
+    }
+    if (text.includes('think') || text.includes('reason') || text.includes('plan')) {
+        return 'analyzing';
+    }
+    return 'analyzing';
+}
+
 export function formatToolTitle(title: string | undefined, toolType: string): string {
     if (!title) return toolType.replace(/_/g, ' ');
     
@@ -171,12 +197,13 @@ function formatToolCallRawValue(value: unknown): string | undefined {
     }
 }
 
-export function formatToolCallSummary(status: ToolCallStatus, title: string | undefined): string {
-    return `${TOOL_CALL_ICONS[status]} ${title || 'Tool'}`;
+export function formatToolCallSummary(status: ToolCallStatus, title: string | undefined, state?: ToolCallState): string {
+    const stateTag = state ? ` [${state}]` : '';
+    return `${TOOL_CALL_ICONS[status]}${stateTag} ${title || 'Tool'}`;
 }
 
 export function formatToolCallDisplay(view: ToolCallUpdateView): string {
-    const summary = formatToolCallSummary(view.status, view.title);
+    const summary = formatToolCallSummary(view.status, view.title, view.state);
     const body = view.body?.trim();
     if (!body) {
         return summary;
@@ -199,16 +226,19 @@ export function parseToolCallSessionUpdate(
     const kindValue = update.kind;
     
     // Detect tool type
-    const toolType = detectToolType(title, typeof kindValue === 'string' ? kindValue : undefined);
+        const toolType = detectToolType(title, typeof kindValue === 'string' ? kindValue : undefined);
+        // Detect cognitive state for pulse color
+        const state = detectToolState(toolType, title);
 
-    return {
-        toolCallId,
-        status,
-        title,
-        body: body || undefined,
-        kind: typeof kindValue === 'string' ? kindValue : undefined,
-        toolType,
-    };
+        return {
+            toolCallId,
+            status,
+            title,
+            body: body || undefined,
+            kind: typeof kindValue === 'string' ? kindValue : undefined,
+            toolType,
+            state,
+        };
 }
 
 function mergeToolCallBodies(prev?: string, incoming?: string): string | undefined {
@@ -242,6 +272,7 @@ export class ToolCallTracker {
             kind: incoming.kind ?? prev?.kind,
             body: mergeToolCallBodies(prev?.body, incoming.body),
             toolType: incoming.toolType ?? prev?.toolType ?? detectToolType(incoming.title || prev?.title, incoming.kind ?? prev?.kind),
+            state: incoming.state ?? prev?.state ?? detectToolState(incoming.toolType ?? prev?.toolType, incoming.title ?? prev?.title),
         };
 
         if (TERMINAL_STATUSES.has(merged.status)) {

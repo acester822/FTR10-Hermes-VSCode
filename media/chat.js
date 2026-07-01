@@ -37,6 +37,10 @@
     const multiSelectExitBtn = document.getElementById('multiSelectExitBtn');
     const statusDot = document.getElementById('statusDot');
     const statusText = document.getElementById('statusText');
+    const todoPanel = document.getElementById('todoPanel');
+    const todoPanelList = document.getElementById('todoPanelList');
+    const todoPanelClear = document.getElementById('todoPanelClear');
+    let activeTodos = [];
     let placeholder = document.getElementById('placeholder');
     let lastSessions = [];
     let lastActiveSessionId = '';
@@ -1955,6 +1959,107 @@
         }];
     }
 
+    /* ── Todo Panel ── */
+
+    function isTodoContent(text) {
+        return /todo|task|step|\[ \]|\[\s*x\s*\]|checklist/i.test(text);
+    }
+
+    function parseTodoItems(text) {
+        const items = [];
+        const lines = text.split('\n');
+        var inTodoBlock = false;
+        for (var i = 0; i < lines.length; i++) {
+            var line = lines[i].trim();
+            // Detect todo/task header lines
+            if (/^(# |## |### |### |#### )?\s*(todo|task|checklist|steps?):?\s*$/i.test(line) && !line.match(/\[/)) {
+                inTodoBlock = true;
+                continue;
+            }
+            // Parse checkbox items: [ ] or [x]
+            var checkMatch = line.match(/^[-*]?\s*\[(\s|x)\]\s*(.+)/i);
+            if (checkMatch) {
+                inTodoBlock = true;
+                items.push({
+                    text: checkMatch[2].trim(),
+                    done: checkMatch[1].toLowerCase() === 'x',
+                });
+                continue;
+            }
+            // Numbered items (1. 2. 3.) inside a todo block
+            var numMatch = inTodoBlock ? line.match(/^\d+[.)]\s+(.+)/) : null;
+            if (numMatch) {
+                items.push({
+                    text: numMatch[1].trim(),
+                    done: false,
+                });
+                continue;
+            }
+            // Stop at the first non-todo line after the block
+            if (inTodoBlock && line === '') {
+                continue;
+            }
+            if (inTodoBlock && !line.match(/^[-*]\s/) && !line.match(/^\[\^/)) {
+                break;
+            }
+        }
+        return items;
+    }
+
+    function renderTodos(items, toolCallId) {
+        if (!todoPanel || items.length === 0) return;
+        // Merge with existing todos, keyed by text to avoid duplicates
+        for (var i = 0; i < items.length; i++) {
+            var exists = false;
+            for (var j = 0; j < activeTodos.length; j++) {
+                if (activeTodos[j].text === items[i].text) {
+                    exists = true;
+                    break;
+                }
+            }
+            if (!exists) {
+                items[i].toolCallId = toolCallId;
+                activeTodos.push(items[i]);
+            }
+        }
+        rebuildTodoPanel();
+    }
+
+    function rebuildTodoPanel() {
+        if (!todoPanel || !todoPanelList) return;
+        if (activeTodos.length === 0) {
+            todoPanel.hidden = true;
+            return;
+        }
+        todoPanel.hidden = false;
+        todoPanelList.innerHTML = '';
+        for (var i = 0; i < activeTodos.length; i++) {
+            var item = activeTodos[i];
+            var el = document.createElement('div');
+            el.className = 'todo-item' + (item.done ? ' is-done' : '');
+            el.innerHTML = '<span class="todo-checkbox">' + (item.done ? '✓' : '○') + '</span>'
+                + '<span class="todo-text">' + escapeHtml(item.text) + '</span>';
+            todoPanelList.appendChild(el);
+        }
+    }
+
+    function escapeHtml(str) {
+        var div = document.createElement('div');
+        div.appendChild(document.createTextNode(str));
+        return div.innerHTML;
+    }
+
+    function clearTodos() {
+        activeTodos = [];
+        if (todoPanel) todoPanel.hidden = true;
+        if (todoPanelList) todoPanelList.innerHTML = '';
+    }
+
+    // Wire up todo clear button
+    if (todoPanelClear) {
+        todoPanelClear.addEventListener('click', clearTodos);
+    }
+
     function splitToolText(text) {
         const summaryText = text || '';
         const sepIdx = summaryText.indexOf('\n\n');
@@ -1986,13 +2091,17 @@
                         cd.statusEl.classList.add('is-failed');
                         cd.statusEl.textContent = 'Failed';
                     }
-                    cd.card.classList.remove('is-live', 'is-complete', 'is-failed');
+                    cd.card.classList.remove('is-live', 'is-complete', 'is-failed', 'is-analyzing', 'is-searching', 'is-reading', 'is-writing', 'is-executing', 'is-error');
                     if (toolInfo.status === 'completed') {
                         cd.card.classList.add('is-complete');
                     } else if (toolInfo.status === 'failed') {
                         cd.card.classList.add('is-failed');
                     } else {
                         cd.card.classList.add('is-live');
+                        // Apply cognitive state class for pulse color differentiation
+                        if (toolInfo.state) {
+                            cd.card.classList.add('is-' + toolInfo.state);
+                        }
                     }
                 }
 
@@ -2007,6 +2116,11 @@
                         rebuildAggregateToolContent(group);
                     } else {
                         setAuxiliaryContent(group, bodyPart);
+                    }
+                    // Check for todo content in the body
+                    if (isTodoContent(bodyPart)) {
+                        var todoItems = parseTodoItems(bodyPart);
+                        renderTodos(todoItems, toolCallId);
                     }
                 }
                 setAuxMessageLive(group, true);
@@ -2034,11 +2148,21 @@
         const id = addMessage('tool', text);
         toolCallMap[toolCallId] = id;
         toolAggregateGroupId = id;
+
+        // Check for todo content in the full text on initial creation
+        var bodySep = text.indexOf('\n\n');
+        var initialBody = bodySep >= 0 ? text.slice(bodySep + 2).trim() : '';
+        if (initialBody && isTodoContent(initialBody)) {
+            var todoItems = parseTodoItems(initialBody);
+            renderTodos(todoItems, toolCallId);
+        }
     }
 
     function setAuxiliaryContent(group, text) {
         const state = group._auxState;
         if (!state) return;
+        // Skip rendering partial/empty text to avoid garbled display during initialization
+        if (!text || text.trim().length < 3) return;
         state.rawText = text || '';
         state.contentEl.innerHTML = renderMarkdown(state.rawText);
         setupContentBlocks(state.contentEl);
@@ -2051,6 +2175,7 @@ function parseToolCallText(text) {
             icon: '🔧',
             title: 'Tool',
             status: 'in_progress',
+            state: 'analyzing',
             toolType: 'default',
             args: '',
             output: ''
@@ -2077,6 +2202,13 @@ function parseToolCallText(text) {
 
         // Remove any remaining status emoji from text
         text = text.replace(/[✅❌⚙️⏹🔧]/g, '').trim();
+
+        // Extract state tag: [analyzing], [searching], [reading], [writing], [executing]
+        const stateMatch = text.match(/^\[(analyzing|searching|reading|writing|executing|error)\]\s*/);
+        if (stateMatch) {
+            result.state = stateMatch[1];
+            text = text.slice(stateMatch[0].length).trim();
+        }
 
         // Detect tool type from title
         const lowerText = text.toLowerCase();
@@ -2295,6 +2427,9 @@ function parseToolCallText(text) {
                 card.classList.add('is-failed');
             } else {
                 card.classList.add('is-live');
+                if (toolInfo.state) {
+                    card.classList.add('is-' + toolInfo.state);
+                }
             }
 
             const header = document.createElement('div');
@@ -4233,6 +4368,7 @@ function parseToolCallText(text) {
         exitMultiSelectMode();
         removeLocalHistoryDivider();
         forceHideContextAttachPicker();
+        clearTodos();
         messagesEl.innerHTML = '<div class="placeholder" id="placeholder">' + escapeHtml(locale.readyPlaceholder) + '</div>';
         placeholder = document.getElementById('placeholder');
         streamingMessageId = null;
