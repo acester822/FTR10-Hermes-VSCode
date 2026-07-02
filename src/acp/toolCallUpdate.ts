@@ -24,47 +24,47 @@ const TERMINAL_STATUSES: ReadonlySet<ToolCallStatus> = new Set([
 ]);
 
 const TOOL_CALL_ICONS: Record<ToolCallStatus, string> = {
-    pending: '🔧',
-    in_progress: '⚙️',
-    completed: '✅',
-    failed: '❌',
-    cancelled: '⏹',
+    pending: '⧗',
+    in_progress: '↻',
+    completed: '✓',
+    failed: '✗',
+    cancelled: '⊝',
 };
 
-// Tool type icons mapping
+// Tool type icons mapping (Monochrome / Outline style)
 const TOOL_TYPE_ICONS: Record<string, string> = {
-    search: '🔍',
-    find: '🔍',
-    grep: '🔍',
-    terminal: '💻',
-    shell: '💻',
-    command: '💻',
-    bash: '💻',
-    execute: '💻',
-    file_read: '📄',
-    read_file: '📄',
-    file_write: '✏️',
-    write_file: '✏️',
-    file_edit: '✏️',
-    edit_file: '✏️',
-    file: '📁',
-    directory: '📁',
-    list: '📋',
+    search: '⌕',
+    find: '⌕',
+    grep: '⌕',
+    terminal: '⌨',
+    shell: '⌨',
+    command: '⌨',
+    bash: '⌨',
+    execute: '⌨',
+    file_read: '🗎',
+    read_file: '🗎',
+    file_write: '🗎',
+    write_file: '🗎',
+    file_edit: '✎',
+    edit_file: '✎',
+    file: '🗎',
+    directory: '🗁',
+    list: '☰',
     web: '🌐',
     browser: '🌐',
     fetch: '🌐',
     http: '🌐',
-    think: '🧠',
-    reasoning: '🧠',
+    think: '💡',
+    reasoning: '💡',
     python: '🐍',
-    code: '🐍',
-    git: '🔀',
-    github: '🐙',
+    code: '❮❯',
+    git: '⑂',
+    github: '⎇',
     test: '🧪',
     install: '📦',
     npm: '📦',
     pip: '📦',
-    default: '🔧'
+    default: '🛠'
 };
 
 export function detectToolType(title: string | undefined, kind: string | undefined): string {
@@ -144,9 +144,17 @@ export function normalizeToolCallStatus(
     status: unknown,
     kind: 'tool_call' | 'tool_call_update'
 ): ToolCallStatus {
-    if (status === 'pending' || status === 'in_progress' || status === 'completed' || status === 'failed') {
-        return status;
+    if (typeof status !== 'string') {
+        return kind === 'tool_call' ? 'pending' : 'in_progress';
     }
+
+    const s = status.toLowerCase().trim();
+    if (s === 'pending') return 'pending';
+    if (s === 'in_progress' || s === 'running' || s === 'progress' || s === 'active' || s === 'started') return 'in_progress';
+    if (s === 'completed' || s === 'done' || s === 'success' || s === 'successful' || s === 'finished') return 'completed';
+    if (s === 'failed' || s === 'error' || s === 'exception' || s === 'crashed') return 'failed';
+    if (s === 'cancelled' || s === 'canceled' || s === 'aborted' || s === 'stopped' || s === 'timeout' || s === 'timed_out') return 'cancelled';
+
     return kind === 'tool_call' ? 'pending' : 'in_progress';
 }
 
@@ -265,9 +273,10 @@ export class ToolCallTracker {
 
     apply(incoming: ToolCallUpdateView): ToolCallUpdateView {
         const prev = this._active.get(incoming.toolCallId);
+        const normalizedStatus = normalizeToolCallStatus(incoming.status, 'tool_call_update');
         const merged: ToolCallUpdateView = {
             toolCallId: incoming.toolCallId,
-            status: incoming.status,
+            status: normalizedStatus,
             title: incoming.title || prev?.title || 'Tool',
             kind: incoming.kind ?? prev?.kind,
             body: mergeToolCallBodies(prev?.body, incoming.body),

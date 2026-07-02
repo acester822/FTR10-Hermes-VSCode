@@ -5067,6 +5067,28 @@ function parseToolCallText(text) {
     });
     modelDropdown.addEventListener('click', function(e) { e.stopPropagation(); });
 
+    // Model search
+    const modelSearchInput = document.createElement('input');
+    modelSearchInput.type = 'search';
+    modelSearchInput.placeholder = locale.modelSearchPlaceholder || 'Search models...';
+    modelSearchInput.setAttribute('aria-label', locale.modelSearchPlaceholder || 'Search models...');
+    modelSearchInput.className = 'model-search-input';
+    const modelDropdownHeader = document.getElementById('modelsHeader');
+    if (modelDropdownHeader) {
+        modelDropdownHeader.appendChild(modelSearchInput);
+    }
+    let modelSearchTimeout = null;
+    modelSearchInput.addEventListener('input', function(e) {
+        const query = e.target.value.trim();
+        clearTimeout(modelSearchTimeout);
+        modelSearchTimeout = setTimeout(() => {
+            vscode.postMessage({
+                type: 'filterModels',
+                query: query
+            });
+        }, 150);
+    });
+
     if (contextAttachBtn && contextAttachDropdown) {
         contextAttachBtn.addEventListener('click', function(e) {
             e.stopPropagation();
@@ -5293,7 +5315,7 @@ function parseToolCallText(text) {
                 const items = group.models.map(function(m) {
                     const active = m.valueId === payload.currentValueId;
                     return '<div class="dropdown-item' + (active ? ' active' : '') + '" data-value="' + escapeHtml(m.valueId) + '">' +
-                        escapeHtml(m.name) + (active ? ' ✓' : '') + '</div>';
+                        escapeHtml(m.name) + (active ? ' ✓' : '') + (m.inputCost !== undefined ? ' <span class="model-cost">' + formatModelCost(m.inputCost, m.outputCost) + '</span>' : '') + '</div>';
                 }).join('');
                 return header + items;
             }).join('');
@@ -5301,7 +5323,7 @@ function parseToolCallText(text) {
             list.innerHTML = models.map(function(m) {
                 const active = m.valueId === payload.currentValueId;
                 return '<div class="dropdown-item' + (active ? ' active' : '') + '" data-value="' + escapeHtml(m.valueId) + '">' +
-                    escapeHtml(m.name) + (active ? ' ✓' : '') + '</div>';
+                    escapeHtml(m.name) + (active ? ' ✓' : '') + (m.inputCost !== undefined ? ' <span class="model-cost">' + formatModelCost(m.inputCost, m.outputCost) + '</span>' : '') + '</div>';
             }).join('');
         }
         list.querySelectorAll('.dropdown-item[data-value]').forEach(function(item) {
@@ -5314,6 +5336,14 @@ function parseToolCallText(text) {
                 closeAllDropdowns();
             });
         });
+    }
+
+    function formatModelCost(inputCost, outputCost) {
+        if (inputCost === undefined && outputCost === undefined) return '';
+        var inStr = inputCost !== undefined ? '$' + Number(inputCost).toFixed(2).replace(/\.?0+$/, '') + '/M' : '';
+        var outStr = outputCost !== undefined ? '$' + Number(outputCost).toFixed(2).replace(/\.?0+$/, '') + '/M' : '';
+        if (inStr && outStr) return inStr + ' / ' + outStr;
+        return inStr || outStr || '';
     }
 
     function escapeHtml(s) {

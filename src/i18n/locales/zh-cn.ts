@@ -287,6 +287,7 @@ hermes --profile &lt;name&gt; acp</code></pre>
     configureAgents: '请在 Settings 中配置 hermes.agents',
     noModels: '无可用模型 — 请检查 Hermes profile 或 hermes.models',
     modelFromAgent: '来自 Hermes profile 的模型',
+    modelSearchPlaceholder: '搜索模型...',
     modelLocalPreference: '本地模型偏好（Settings 回退）',
     tokenUsageLabel: '输入 TOKEN: {0} / {1} ({2}%)',
     copied: '已复制',

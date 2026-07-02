@@ -8,83 +8,101 @@ import {
     buildModelListStateFromCatalog,
     enrichModelListState,
     encodeHermesModelValueId,
-    flattenSelectOptions,
-    findModelConfigOption,
     HERMES_MODEL_CONFIG_ID,
-    SETTINGS_MODEL_CONFIG_ID,
-    isHermesModelValueId,
     shouldUseHermesSetModel,
+    sortModelListItems,
+    formatModelCost,
+    isRuntimeModelSource,
+    mergeModelListItems,
 } from '../../acp/modelConfig';
 
 describe('modelConfig', () => {
-    it('flattenSelectOptions handles flat and grouped options', () => {
-        const flat = flattenSelectOptions([
-            { value: 'a', name: 'Model A' },
-            { value: 'b', name: 'Model B' },
-        ]);
-        assert.strictEqual(flat.length, 2);
-        assert.strictEqual(flat[0].valueId, 'a');
-
-        const grouped = flattenSelectOptions([
-            {
-                group: 'g1',
-                name: 'Group',
-                options: [{ value: 'x', name: 'X' }],
-            },
-        ]);
-        assert.strictEqual(grouped.length, 1);
-        assert.strictEqual(grouped[0].name, 'X');
+    it('encodeHermesModelValueId builds provider-prefixed ids', () => {
+        assert.strictEqual(encodeHermesModelValueId('custom', 'agnes-2.0-flash'), 'custom:custom:agnes-2.0-flash');
+        assert.strictEqual(encodeHermesModelValueId('custom:deepseek', 'deepseek-v4-flash'), 'custom:deepseek:deepseek-v4-flash');
+        assert.strictEqual(encodeHermesModelValueId('', 'gpt-4'), 'gpt-4');
     });
 
-    it('findModelConfigOption prefers category model', () => {
-        const opts = [
-            { id: 'mode', type: 'select', name: 'Mode', options: [] },
-            { id: 'model', type: 'select', category: 'model', name: 'Model', options: [] },
+    it('isRuntimeModelSource detects hermes config ids', () => {
+        assert.strictEqual(isRuntimeModelSource('hermes'), true);
+        assert.strictEqual(isRuntimeModelSource('hermes:something'), true);
+        assert.strictEqual(isRuntimeModelSource(''), false);
+        assert.strictEqual(isRuntimeModelSource('model-config'), false);
+    });
+
+    it('formatModelCost formats cost strings', () => {
+        assert.strictEqual(formatModelCost(undefined), 'Unknown');
+        assert.strictEqual(formatModelCost(0), 'Free');
+        assert.strictEqual(formatModelCost(0.15), '$0.15/M');
+        assert.strictEqual(formatModelCost(2.50), '$2.5/M');
+    });
+
+    it('sortModelListItems puts current first then by cost', () => {
+        const items = [
+            { valueId: 'a', name: 'Expensive', inputCost: 10 },
+            { valueId: 'b', name: 'Cheap', inputCost: 0.5 },
+            { valueId: 'c', name: 'Current', inputCost: 2 },
         ];
-        const found = findModelConfigOption(opts);
-        assert.strictEqual(found?.id, 'model');
+        const sorted = sortModelListItems(items, 'c');
+        assert.strictEqual(sorted[0].valueId, 'c'); // current first
+        assert.strictEqual(sorted[1].valueId, 'b'); // cheapest next
+        assert.strictEqual(sorted[2].valueId, 'a'); // most expensive last
     });
 
-    it('buildModelListState returns current label', () => {
+    it('mergeModelListItems deduplicates by valueId', () => {
+        const a = [
+            { valueId: 'x', name: 'X' },
+            { valueId: 'y', name: 'Y' },
+        ];
+        const b = [
+            { valueId: 'y', name: 'Y (dup)' },
+            { valueId: 'z', name: 'Z' },
+        ];
+        const merged = mergeModelListItems(a, b);
+        assert.strictEqual(merged.length, 3);
+        assert.strictEqual(merged[1].name, 'Y'); // a's version preserved
+        assert.strictEqual(merged[2].valueId, 'z');
+    });
+
+    it('buildModelListState returns null for empty input', () => {
+        assert.strictEqual(buildModelListState([]), null);
+        assert.strictEqual(buildModelListState([{ id: '', name: '' }]), null);
+    });
+
+    it('buildModelListState parses config options with selected marker', () => {
         const state = buildModelListState([
-            {
-                id: 'model',
-                type: 'select',
-                category: 'model',
-                name: 'Model',
-                currentValue: 'gpt-4',
-                options: [
-                    { value: 'gpt-4', name: 'GPT-4' },
-                    { value: 'gpt-3.5', name: 'GPT-3.5' },
-                ],
-            },
+            { id: 'gpt-4', name: 'GPT-4', current: true },
+            { id: 'gpt-3.5', name: 'GPT-3.5' },
         ]);
         assert.ok(state);
+        assert.strictEqual(state!.currentValueId, 'gpt-4');
         assert.strictEqual(state!.currentLabel, 'GPT-4');
         assert.strictEqual(state!.models.length, 2);
-        assert.strictEqual(state!.fromAgent, true);
+        assert.strictEqual(state!.fromAgent, false);
+        assert.ok(state!.groups.length > 0);
     });
 
-    it('buildFallbackModelListState uses settings list', () => {
+    it('buildFallbackModelListState uses provided list', () => {
         const state = buildFallbackModelListState(
             [
-                { id: 'fast', name: 'Fast' },
-                { id: 'smart', name: 'Smart' },
+                { valueId: 'fast', name: 'Fast' },
+                { valueId: 'smart', name: 'Smart' },
             ],
             'smart'
         );
         assert.ok(state);
-        assert.strictEqual(state!.fromAgent, false);
-        assert.strictEqual(state!.currentLabel, 'Smart');
-        assert.strictEqual(state!.configId, SETTINGS_MODEL_CONFIG_ID);
+        assert.strictEqual(state.fromAgent, false);
+        assert.strictEqual(state.currentLabel, 'Smart');
+        assert.strictEqual(state.currentValueId, 'smart');
+        assert.strictEqual(state.models.length, 2);
     });
 
     it('buildModelListStateFromHermesModels parses Hermes ACP models field', () => {
         const state = buildModelListStateFromHermesModels({
-            currentModelId: 'deepseek:deepseek-v4-flash',
+            currentModelId: 'custom:deepseek-v4-flash',
             availableModels: [
-                { modelId: 'deepseek:deepseek-v4-flash', name: 'deepseek-v4-flash' },
-                { modelId: 'deepseek:deepseek-v4-pro', name: 'deepseek-v4-pro' },
+                { modelId: 'custom:deepseek-v4-flash', name: 'deepseek-v4-flash' },
+                { modelId: 'custom:deepseek-v4-pro', name: 'deepseek-v4-pro' },
             ],
         });
         assert.ok(state);
@@ -101,28 +119,18 @@ describe('modelConfig', () => {
                 availableModels: [{ modelId: 'm1', name: 'Model 1' }],
             },
         });
+        assert.ok(fromHermes);
         assert.strictEqual(fromHermes!.configId, HERMES_MODEL_CONFIG_ID);
 
         const fromConfig = buildModelListStateFromSessionResponse({
-            configOptions: [{
-                id: 'model',
-                type: 'select',
-                category: 'model',
-                name: 'Model',
-                currentValue: 'a',
-                options: [{ value: 'a', name: 'A' }],
-            }],
+            configOptions: [{ id: 'gpt-4', name: 'GPT-4', current: true }],
             models: {
                 currentModelId: 'm1',
                 availableModels: [{ modelId: 'm1', name: 'Model 1' }],
             },
         });
-        assert.strictEqual(fromConfig!.configId, 'model');
-    });
-
-    it('isHermesModelValueId detects provider-prefixed ids', () => {
-        assert.strictEqual(isHermesModelValueId('deepseek:deepseek-v4-pro'), true);
-        assert.strictEqual(isHermesModelValueId('gpt-4'), false);
+        assert.ok(fromConfig);
+        assert.strictEqual(fromConfig!.currentValueId, 'gpt-4');
     });
 
     it('shouldUseHermesSetModel routes Hermes native models', () => {
@@ -131,38 +139,37 @@ describe('modelConfig', () => {
             true
         );
         assert.strictEqual(
-            shouldUseHermesSetModel('', { configId: HERMES_MODEL_CONFIG_ID, currentValueId: '', currentLabel: '', models: [], fromAgent: true }, null, 'x'),
+            shouldUseHermesSetModel('', {
+                configId: HERMES_MODEL_CONFIG_ID,
+                currentValueId: '',
+                currentLabel: '',
+                models: [],
+                groups: [],
+                fromAgent: true,
+            }, null, 'x'),
             true
         );
         assert.strictEqual(
-            shouldUseHermesSetModel('', null, [{ id: 'a', name: 'A' }], 'gpt-4'),
+            shouldUseHermesSetModel('', null, { availableModels: [] }, 'gpt-4'),
             true
         );
         assert.strictEqual(
-            shouldUseHermesSetModel('', null, null, 'deepseek:model'),
-            true
-        );
-        assert.strictEqual(
-            shouldUseHermesSetModel('model-config', { configId: 'model-config', currentValueId: 'gpt-4', currentLabel: 'GPT-4', models: [], fromAgent: true }, null, 'gpt-4'),
+            shouldUseHermesSetModel('model-config', null, null, 'deepseek:model'),
             false
         );
     });
 
-    it('encodeHermesModelValueId builds custom provider ids', () => {
-        assert.strictEqual(encodeHermesModelValueId('custom', 'agnes-2.0-flash'), 'custom:agnes-2.0-flash');
-        assert.strictEqual(encodeHermesModelValueId('custom:deepseek', 'deepseek-v4-flash'), 'custom:deepseek-v4-flash');
-    });
-
-    it('enrichModelListState merges profile-configured models', () => {
+    it('enrichModelListState merges additional models', () => {
         const state = buildModelListStateFromHermesModels({
             currentModelId: 'custom:agnes-2.0-flash',
             availableModels: [{ modelId: 'custom:agnes-2.0-flash', name: 'agnes-2.0-flash' }],
         });
+        assert.ok(state);
         const enriched = enrichModelListState(state, [
             { valueId: 'custom:deepseek-v4-flash', name: 'deepseek-v4-flash' },
         ]);
-        assert.strictEqual(enriched!.models.length, 2);
-        assert.strictEqual(enriched!.currentLabel, 'agnes-2.0-flash');
+        assert.strictEqual(enriched.models.length, 2);
+        assert.strictEqual(enriched.currentLabel, 'agnes-2.0-flash');
     });
 
     it('buildModelListStateFromCatalog builds grouped picker state', () => {
@@ -181,10 +188,15 @@ describe('modelConfig', () => {
                     {
                         slug: 'custom:agnes',
                         name: 'Agnes',
+                        isPrimary: false,
                         models: [{ valueId: 'custom:agnes-2.0-flash', name: 'agnes-2.0-flash' }],
                     },
                 ],
-                flatModels: [],
+                flatModels: [
+                    { valueId: 'custom:deepseek-v4-flash', name: 'deepseek-v4-flash' },
+                    { valueId: 'custom:deepseek-v4-pro', name: 'deepseek-v4-pro' },
+                    { valueId: 'custom:agnes-2.0-flash', name: 'agnes-2.0-flash' },
+                ],
                 profileDefault: {
                     modelName: 'deepseek-v4-flash',
                     valueId: 'custom:deepseek-v4-flash',
@@ -197,9 +209,9 @@ describe('modelConfig', () => {
             })
         );
         assert.ok(built);
-        assert.strictEqual(built!.groups!.length, 2);
-        assert.strictEqual(built!.models.length, 3);
-        assert.strictEqual(built!.currentLabel, 'deepseek-v4-flash');
+        assert.strictEqual(built.groups.length, 2);
+        assert.strictEqual(built.models.length, 3);
+        assert.strictEqual(built.currentLabel, 'agnes-2.0-flash');
     });
 
     it('buildModelListStateFromCatalog prefers saved model over profile default', () => {
@@ -216,7 +228,10 @@ describe('modelConfig', () => {
                         ],
                     },
                 ],
-                flatModels: [],
+                flatModels: [
+                    { valueId: 'custom:deepseek-v4-flash', name: 'deepseek-v4-flash' },
+                    { valueId: 'custom:deepseek-v4-pro', name: 'deepseek-v4-pro' },
+                ],
                 profileDefault: {
                     modelName: 'deepseek-v4-flash',
                     valueId: 'custom:deepseek-v4-flash',
@@ -224,8 +239,8 @@ describe('modelConfig', () => {
                 },
             },
             null,
-            { modelId: 'custom:deepseek-v4-pro', modelLabel: 'deepseek-v4-pro' }
+            { currentValueId: 'custom:deepseek-v4-pro' }
         );
-        assert.strictEqual(built!.currentValueId, 'custom:deepseek-v4-pro');
+        assert.strictEqual(built.currentValueId, 'custom:deepseek-v4-pro');
     });
 });

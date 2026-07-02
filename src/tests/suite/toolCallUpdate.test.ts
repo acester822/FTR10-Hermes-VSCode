@@ -59,7 +59,7 @@ describe('toolCallUpdate', () => {
     });
 
     it('formatToolCallSummary adds status icon', () => {
-        assert.strictEqual(formatToolCallSummary('failed', 'Deploy'), '❌ Deploy');
+        assert.strictEqual(formatToolCallSummary('failed', 'Deploy'), '✗ Deploy');
     });
 
     it('extractToolCallBody stringifies rawOutput objects', () => {
@@ -83,7 +83,7 @@ describe('toolCallUpdate', () => {
             title: 'Read file',
             body: 'path: README.md',
         });
-        assert.strictEqual(text, '⚙️ Read file\n\npath: README.md');
+        assert.strictEqual(text, '↻ [reading] Read file\n\npath: README.md');
     });
 
     it('formatToolCallDisplay uses title only when no body', () => {
@@ -92,7 +92,7 @@ describe('toolCallUpdate', () => {
             status: 'pending',
             title: 'Tool running',
         });
-        assert.strictEqual(text, '🔧 Tool running');
+        assert.strictEqual(text, '⧗ Tool running');
     });
 });
 

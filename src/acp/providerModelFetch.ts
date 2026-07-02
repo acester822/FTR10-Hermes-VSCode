@@ -1,9 +1,21 @@
 /** Fetch model ids from an OpenAI-compatible ``/v1/models`` endpoint. */
+export interface OpenAiModelMetadata {
+    id: string;
+    inputCost?: number;   // cost per 1M tokens in USD
+    outputCost?: number;  // cost per 1M tokens in USD
+    provider?: string;
+}
+
+export interface ProviderCatalogEntry {
+    provider?: string;
+    models: OpenAiModelMetadata[];
+}
+
 export async function fetchOpenAiCompatibleModels(
-    apiKey: string,
+    apiKey: string | null | undefined,
     baseUrl: string,
     timeoutMs = 8000
-): Promise<string[] | null> {
+): Promise<OpenAiModelMetadata[] | null> {
     const normalized = baseUrl.trim().replace(/\/+$/, '');
     if (!normalized) {
         return null;
@@ -28,16 +40,63 @@ export async function fetchOpenAiCompatibleModels(
             if (!resp.ok) {
                 continue;
             }
-            const data = (await resp.json()) as { data?: Array<{ id?: string }> };
-            const ids = (data.data ?? [])
-                .map(m => (m.id ?? '').trim())
-                .filter(Boolean);
-            if (ids.length) {
-                return ids;
+            const data = (await resp.json()) as { data?: Array<{ id?: string; pricing?: { input?: string; output?: string } }> };
+            const models = (data.data ?? [])
+                .map(m => {
+                    const id = (m.id ?? '').trim();
+                    if (!id) {
+                        return null;
+                    }
+                    let inputCost: number | undefined;
+                    let outputCost: number | undefined;
+                    if (m.pricing) {
+                        if (m.pricing.input) {
+                            // Convert to cost per 1M tokens (assuming input is per token)
+                            inputCost = parseFloat(m.pricing.input) * 1000000;
+                        }
+                        if (m.pricing.output) {
+                            // Convert to cost per 1M tokens (assuming output is per token)
+                            outputCost = parseFloat(m.pricing.output) * 1000000;
+                        }
+                    }
+                    return { 
+                                            id, 
+                                            inputCost, 
+                                            outputCost,
+                                            provider: normalizeProviderFromBaseUrl(base) 
+                                        } as OpenAiModelMetadata;
+                                    })
+                                    .filter(m => m !== null);
+            if (models.length) {
+                return models;
             }
         } catch {
             // try next candidate
         }
     }
     return null;
+}
+
+export function normalizeProviderFromBaseUrl(baseUrl: string): string {
+    try {
+        const host = new URL(baseUrl).hostname.toLowerCase();
+        const map: Record<string, string> = {
+            'openai.com': 'OpenAI',
+            'generativelanguage.googleapis.com': 'Gemini',
+            'deepseek.com': 'DeepSeek',
+            'api.anthropic.com': 'Anthropic',
+        };
+        const exact = Object.entries(map).find(([key]) => host === key || host.endsWith('.' + key));
+        if (exact) {
+            return exact[1];
+        }
+        for (const [key, value] of Object.entries(map)) {
+            if (host.includes(key)) {
+                return value;
+            }
+        }
+        return new URL(baseUrl).hostname;
+    } catch {
+        return 'Custom';
+    }
 }

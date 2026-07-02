@@ -44,6 +44,12 @@ export async function discoverProfileConfigModels(
     return catalog.flatModels;
 }
 
+interface ModelNameInfo {
+    name: string;
+    inputCost?: number;
+    outputCost?: number;
+}
+
 export async function buildProfileModelCatalog(
     content: string,
     options: { probeLive?: boolean } = {}
@@ -53,22 +59,24 @@ export async function buildProfileModelCatalog(
     const resolved = await Promise.all(
         drafts.map(async draft => ({
             draft,
-            modelNames: await resolveProviderModelNames(draft, options.probeLive),
+            modelInfos: await resolveProviderModelInfos(draft, options.probeLive),
         }))
     );
 
     const groups: ModelProviderGroup[] = resolved
-        .filter(entry => entry.modelNames.length > 0)
-        .map(({ draft, modelNames }) => ({
+        .filter(entry => entry.modelInfos.length > 0)
+        .map(({ draft, modelInfos }) => ({
             slug: draft.slug,
             name: draft.name,
             isPrimary: draft.isPrimary,
-            models: modelNames.map(name => ({
+            models: modelInfos.map(info => ({
                 valueId: encodeHermesModelValueId(
                     draft.slug.startsWith('custom:') ? draft.slug : `custom:${draft.slug}`,
-                    name
+                    info.name
                 ),
-                name,
+                name: info.name,
+                inputCost: info.inputCost,
+                outputCost: info.outputCost,
             })),
         }));
 
@@ -82,12 +90,12 @@ export async function buildProfileModelCatalog(
     };
 }
 
-async function resolveProviderModelNames(
+async function resolveProviderModelInfos(
     draft: ProviderDraft,
     probeLive?: boolean
-): Promise<string[]> {
-    let modelNames = [...draft.modelNames];
-    const explicitModels = modelNames.length > 0;
+): Promise<ModelNameInfo[]> {
+    let modelInfos: ModelNameInfo[] = draft.modelNames.map(name => ({ name }));
+    const explicitModels = modelInfos.length > 0;
     const shouldProbe =
         draft.discoverModels &&
         Boolean(draft.baseUrl) &&
@@ -96,7 +104,25 @@ async function resolveProviderModelNames(
     if (probeLive && shouldProbe) {
         const live = await fetchOpenAiCompatibleModels(draft.apiKey, draft.baseUrl);
         if (live?.length) {
-            modelNames = draft.apiKey ? live : mergeModelNames(modelNames, live);
+            if (draft.apiKey) {
+                modelInfos = live.map(m => ({
+                    name: m.id,
+                    inputCost: m.inputCost,
+                    outputCost: m.outputCost,
+                }));
+            } else {
+                // Merge: add live models not already in explicit list
+                const existingNames = new Set(modelInfos.map(m => m.name.toLowerCase()));
+                for (const m of live) {
+                    if (!existingNames.has(m.id.toLowerCase())) {
+                        modelInfos.push({
+                            name: m.id,
+                            inputCost: m.inputCost,
+                            outputCost: m.outputCost,
+                        });
+                    }
+                }
+            }
         }
     }
 
@@ -106,11 +132,11 @@ async function resolveProviderModelNames(
     if (probeLive && !draft.baseUrl && draft.slug.endsWith('openrouter')) {
         const live = await _fetchOpenRouterModels();
         if (live?.length) {
-            modelNames = live;
+            modelInfos = live.map(name => ({ name }));
         }
     }
 
-    return modelNames;
+    return modelInfos;
 }
 
 /** Fetch model IDs from the OpenRouter live /v1/models endpoint. */

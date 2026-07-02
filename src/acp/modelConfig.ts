@@ -1,21 +1,25 @@
 /**
- * Helpers for ACP session model selection (configOptions + Hermes native models).
+ * Model configuration types and utilities.
+ *
+ * This module provides the shared type definitions and helpers for model
+ * catalog management across the extension.  The real model-state assembly
+ * lives in acpModelCatalog.ts and profileModels.ts; this file owns the
+ * interfaces, simple formatting utilities, and thin builder functions.
  */
 
-/** Hermes ACP exposes models via NewSessionResponse.models + session/set_model */
-export const HERMES_MODEL_CONFIG_ID = '__hermes__';
-/** VS Code settings fallback when agent exposes no model list */
-export const SETTINGS_MODEL_CONFIG_ID = '__settings__';
+// ── Shared types ──────────────────────────────────────────────────────────────
 
 export interface ModelListItem {
     valueId: string;
     name: string;
+    inputCost?: number;
+    outputCost?: number;
 }
 
 export interface ModelProviderGroup {
     slug: string;
     name: string;
-    isPrimary?: boolean;
+    isPrimary: boolean;
     models: ModelListItem[];
 }
 
@@ -28,407 +32,328 @@ export interface ProfileDefaultModel {
 export interface ProfileModelCatalog {
     groups: ModelProviderGroup[];
     flatModels: ModelListItem[];
-    /** Profile ``model.default`` resolved against the fetched provider catalog. */
     profileDefault?: ProfileDefaultModel;
 }
 
 export interface ModelListState {
-    /** ACP config option id (session/set_config_option) */
     configId: string;
     currentValueId: string;
     currentLabel: string;
     models: ModelListItem[];
-    groups?: ModelProviderGroup[];
-    /** true when options come from agent configOptions; false for settings fallback */
+    groups: ModelProviderGroup[];
     fromAgent: boolean;
 }
 
-export interface FallbackModel {
-    id: string;
-    name: string;
+// ── Constants ─────────────────────────────────────────────────────────────────
+
+/** Config id that marks "use Hermes native set_model". */
+export const HERMES_MODEL_CONFIG_ID = 'hermes';
+
+// ── Value-id helpers ──────────────────────────────────────────────────────────
+
+/**
+ * Build a ``provider:model-id`` value string from a provider slug and
+ * model name.  If provider is already a ``custom:…`` prefix it is kept as-is.
+ */
+export function encodeHermesModelValueId(provider: string, modelName: string): string {
+    const p = provider.trim();
+    const m = modelName.trim();
+    if (!p) return m;
+    if (p.startsWith('custom:')) return `${p}:${m}`;
+    return `custom:${p}:${m}`;
 }
 
-/** Flatten select options (supports grouped options). */
-export function flattenSelectOptions(options: unknown): ModelListItem[] {
-    if (!Array.isArray(options)) {
-        return [];
-    }
-    const result: ModelListItem[] = [];
-    for (const item of options) {
-        if (!item || typeof item !== 'object') {
-            continue;
-        }
-        const o = item as Record<string, unknown>;
-        if (typeof o.value === 'string' && typeof o.name === 'string') {
-            result.push({ valueId: o.value, name: o.name });
-            continue;
-        }
-        if (Array.isArray(o.options)) {
-            for (const nested of o.options) {
-                if (
-                    nested &&
-                    typeof nested === 'object' &&
-                    typeof (nested as Record<string, unknown>).value === 'string' &&
-                    typeof (nested as Record<string, unknown>).name === 'string'
-                ) {
-                    const n = nested as Record<string, string>;
-                    result.push({ valueId: n.value, name: n.name });
-                }
-            }
-        }
-    }
-    return result;
+// ── Runtime-source guard ──────────────────────────────────────────────────────
+
+/**
+ * True when the given configId represents a runtime model source
+ * (i.e. the agent supports live model switching).
+ */
+export function isRuntimeModelSource(configId: string): boolean {
+    return configId === HERMES_MODEL_CONFIG_ID || configId.startsWith('hermes');
 }
 
-/** Pick the best config option to use as the model selector. */
-export function findModelConfigOption(configOptions: unknown): Record<string, unknown> | null {
-    if (!Array.isArray(configOptions) || configOptions.length === 0) {
-        return null;
-    }
-    const opts = configOptions.filter(
-        (o): o is Record<string, unknown> => !!o && typeof o === 'object' && (o as Record<string, unknown>).type === 'select'
-    );
-    if (opts.length === 0) {
-        return null;
-    }
-    const byCategory = opts.find(o => o.category === 'model');
-    if (byCategory) {
-        return byCategory;
-    }
-    const byName = opts.find(o => /model/i.test(String(o.name ?? o.id ?? '')));
-    if (byName) {
-        return byName;
-    }
-    return opts[0];
-}
+// ── Fallback / simple builders ────────────────────────────────────────────────
 
-export function buildModelListState(configOptions: unknown): ModelListState | null {
-    const option = findModelConfigOption(configOptions);
-    if (!option) {
-        return null;
+/**
+ * Build a fallback ModelListState from an array of config-option objects.
+ * Each config option is expected to have ``id`` and ``name`` string fields.
+ */
+export function buildModelListState(configOptions: unknown[]): ModelListState | null {
+    if (!Array.isArray(configOptions) || configOptions.length === 0) return null;
+
+    const items: ModelListItem[] = [];
+    let currentValueId = '';
+    let currentLabel = '';
+
+    for (const opt of configOptions) {
+        if (!opt || typeof opt !== 'object') continue;
+        const o = opt as Record<string, unknown>;
+        const id = String(o.id ?? '').trim();
+        const name = String(o.name ?? id).trim();
+        if (!id) continue;
+        items.push({ valueId: id, name });
+        if ((o as any).selected || (o as any).current) {
+            currentValueId = id;
+            currentLabel = name;
+        }
     }
-    const models = flattenSelectOptions(option.options);
-    if (models.length === 0) {
-        return null;
-    }
-    const configId = String(option.id ?? '');
-    const currentValueId = String(option.currentValue ?? '');
-    const currentLabel =
-        models.find(m => m.valueId === currentValueId)?.name ||
-        currentValueId ||
-        models[0].name;
 
     return {
-        configId,
+        configId: '',
         currentValueId,
-        currentLabel,
-        models,
-        fromAgent: true,
-    };
-}
-
-export function buildFallbackModelListState(
-    models: FallbackModel[],
-    currentValueId: string
-): ModelListState | null {
-    if (!models.length) {
-        return null;
-    }
-    const currentValue =
-        currentValueId && models.some(m => m.id === currentValueId)
-            ? currentValueId
-            : models[0].id;
-    const currentLabel = models.find(m => m.id === currentValue)?.name ?? currentValue;
-
-    return {
-        configId: SETTINGS_MODEL_CONFIG_ID,
-        currentValueId: currentValue,
-        currentLabel,
-        models: models.map(m => ({ valueId: m.id, name: m.name })),
+        currentLabel: currentLabel || (items[0]?.name ?? ''),
+        models: items,
+        groups: [{ slug: 'config', name: 'Config', isPrimary: true, models: [...items] }],
         fromAgent: false,
     };
 }
 
-/** Parse Hermes ACP SessionModelState (availableModels / currentModelId). */
+/**
+ * Build a ModelListState from the raw ``models`` payload received from an
+ * ACP session/update notification.  The payload is expected to contain
+ * ``configOptions`` (array of {id, name}) and optional ``currentModelId`` /
+ * ``currentModelName`` fields.
+ */
+export function buildModelListStateFromSessionResponse(source: unknown): ModelListState | null {
+    if (!source || typeof source !== 'object') return null;
+    const s = source as Record<string, unknown>;
+
+    // Try configOptions first
+    const configOptions = s.configOptions ?? s.config_options;
+    if (Array.isArray(configOptions) && configOptions.length > 0) {
+        return buildModelListState(configOptions);
+    }
+
+    // Fall back to availableModels
+    const available = s.availableModels ?? s.available_models;
+    if (Array.isArray(available) && available.length > 0) {
+        const items: ModelListItem[] = [];
+        for (const item of available) {
+            if (!item || typeof item !== 'object') continue;
+            const m = item as Record<string, unknown>;
+            const id = String(m.modelId ?? m.model_id ?? '').trim();
+            const name = String(m.name ?? id).trim();
+            if (!id) continue;
+            items.push({ valueId: id, name });
+        }
+        const currentId = String(s.currentModelId ?? s.current_model_id ?? '').trim();
+        const currentName = String(s.currentModelName ?? s.current_model_name ?? '').trim();
+        return {
+            configId: HERMES_MODEL_CONFIG_ID,
+            currentValueId: currentId || (items[0]?.valueId ?? ''),
+            currentLabel: currentName || currentId || (items[0]?.name ?? ''),
+            models: items,
+            groups: [{ slug: 'hermes', name: 'Hermes', isPrimary: true, models: [...items] }],
+            fromAgent: true,
+        };
+    }
+
+    return null;
+}
+
+/**
+ * Build a ModelListState from the Hermes ``models`` field obtained via
+ * ACP config-option sync (the ``_hermesModelsRaw`` blob).  This is called
+ * when the full model.options response is not available.
+ */
 export function buildModelListStateFromHermesModels(raw: unknown): ModelListState | null {
-    if (!raw || typeof raw !== 'object') {
-        return null;
-    }
-    const o = raw as Record<string, unknown>;
-    const available = o.availableModels ?? o.available_models;
-    if (!Array.isArray(available) || available.length === 0) {
-        return null;
-    }
+    if (!raw || typeof raw !== 'object') return null;
+    const r = raw as Record<string, unknown>;
 
-    const models: ModelListItem[] = [];
+    const available = r.availableModels ?? r.available_models;
+    if (!Array.isArray(available) || available.length === 0) return null;
+
+    const items: ModelListItem[] = [];
     for (const item of available) {
-        if (!item || typeof item !== 'object') {
-            continue;
-        }
+        if (!item || typeof item !== 'object') continue;
         const m = item as Record<string, unknown>;
-        const valueId = String(m.modelId ?? m.model_id ?? '').trim();
-        const name = String(m.name ?? valueId).trim();
-        if (valueId) {
-            models.push({ valueId, name });
-        }
+        const id = String(m.modelId ?? m.model_id ?? '').trim();
+        const name = String(m.name ?? id).trim();
+        if (!id) continue;
+        items.push({ valueId: id, name });
     }
-    if (models.length === 0) {
-        return null;
-    }
+    if (!items.length) return null;
 
-    const currentValueId = String(
-        o.currentModelId ?? o.current_model_id ?? models[0].valueId
-    );
-    const currentLabel =
-        models.find(m => m.valueId === currentValueId)?.name ?? currentValueId;
+    const currentId = String(r.currentModelId ?? r.current_model_id ?? '').trim();
+    const currentName = String(r.currentModelName ?? r.current_model_name ?? '').trim();
 
     return {
         configId: HERMES_MODEL_CONFIG_ID,
-        currentValueId,
-        currentLabel,
-        models,
+        currentValueId: currentId || (items[0]?.valueId ?? ''),
+        currentLabel: currentName || currentId || (items[0]?.name ?? ''),
+        models: items,
+        groups: [{ slug: 'hermes', name: 'Hermes', isPrimary: true, models: [...items] }],
         fromAgent: true,
     };
 }
 
-/** Prefer standard configOptions; fall back to Hermes native models field. */
-export function buildModelListStateFromSessionResponse(response: unknown): ModelListState | null {
-    if (!response || typeof response !== 'object') {
-        return null;
-    }
-    const r = response as Record<string, unknown>;
-    return buildModelListState(r.configOptions) ?? buildModelListStateFromHermesModels(r.models);
+/**
+ * Build a fallback ModelListState entirely from a flat list of
+ * ModelListItem (e.g. profile config models) and an optional current id.
+ */
+export function buildFallbackModelListState(
+    items: ModelListItem[],
+    currentId?: string,
+): ModelListState {
+    const match = currentId ? items.find(m => m.valueId === currentId) : undefined;
+    return {
+        configId: '',
+        currentValueId: match?.valueId ?? (items[0]?.valueId ?? ''),
+        currentLabel: match?.name ?? (items[0]?.name ?? ''),
+        models: items,
+        groups: [{ slug: 'fallback', name: 'Models', isPrimary: true, models: [...items] }],
+        fromAgent: false,
+    };
 }
 
-export function isRuntimeModelSource(configId: string): boolean {
-    return configId !== SETTINGS_MODEL_CONFIG_ID;
-}
-
-/** Hermes encodes choices as ``provider:model-id``. */
-export function isHermesModelValueId(valueId: string): boolean {
-    return /^[\w.-]+:[\w./-]+$/i.test(valueId.trim());
-}
-
-/** Build a Hermes ``session/set_model`` id from config provider + model name. */
-export function encodeHermesModelValueId(provider: string | undefined, modelName: string): string {
-    const model = modelName.trim();
-    const rawProvider = (provider ?? '').trim().toLowerCase();
-    if (!rawProvider || rawProvider === 'custom' || rawProvider.startsWith('custom:')) {
-        return `custom:${model}`;
-    }
-    return `${rawProvider}:${model}`;
-}
-
-/** Merge supplemental models; dedupe by valueId only. */
-export function mergeModelListItems(
-    primary: ModelListItem[],
-    supplemental: ModelListItem[]
-): ModelListItem[] {
-    if (supplemental.length === 0) {
-        return primary;
-    }
-    const merged = [...primary];
-    const seenIds = new Set(primary.map(m => m.valueId));
-
-    for (const item of supplemental) {
-        if (seenIds.has(item.valueId)) {
-            continue;
-        }
-        merged.push(item);
-        seenIds.add(item.valueId);
-    }
-    return merged;
-}
-
-function findModelInGroups(
-    groups: ModelProviderGroup[],
-    valueId: string
-): ModelListItem | undefined {
-    for (const group of groups) {
-        const found = group.models.find(m => m.valueId === valueId);
-        if (found) {
-            return found;
-        }
-    }
-    return undefined;
-}
-
-function upsertModelInGroups(
-    groups: ModelProviderGroup[],
-    groupName: string,
-    item: ModelListItem
-): ModelProviderGroup[] {
-    const next = groups.map(g => ({ ...g, models: [...g.models] }));
-    for (const group of next) {
-        if (group.models.some(m => m.valueId === item.valueId)) {
-            return next;
-        }
-    }
-    let target = next.find(g => g.name === groupName);
-    if (!target) {
-        target = { slug: 'other', name: groupName, models: [] };
-        next.push(target);
-    }
-    target.models.push(item);
-    return next;
-}
-
-/** Build grouped picker state: full provider catalog first, then align current model. */
+/**
+ * Build a ModelListState from a ProfileModelCatalog and optional agent state.
+ */
 export function buildModelListStateFromCatalog(
     catalog: ProfileModelCatalog,
     agentState: ModelListState | null,
-    options: {
-        modelId?: string;
-        modelLabel?: string;
-        settingsModels?: Array<{ id: string; name: string }>;
-    } = {}
-): ModelListState | null {
-    let groups = catalog.groups.map(g => ({
-        ...g,
-        models: g.models.map(m => ({ ...m })),
-    }));
-
-    for (const setting of options.settingsModels ?? []) {
-        groups = upsertModelInGroups(groups, 'Other', {
-            valueId: setting.id,
-            name: setting.name,
-        });
-    }
-
-    const savedId = options.modelId?.trim() || '';
-    if (savedId && !findModelInGroups(groups, savedId)) {
-        groups = upsertModelInGroups(groups, 'Other', {
-            valueId: savedId,
-            name: options.modelLabel || savedId,
-        });
-    }
-
-    const flatModels = flattenGroupedModels(groups);
-    if (!flatModels.length) {
-        return agentState;
-    }
-
-    const current = resolveCurrentModelSelection(flatModels, groups, {
-        savedModelId: savedId,
-        profileDefault: catalog.profileDefault,
-        agentCurrentId: agentState?.currentValueId,
-    });
-
-    return {
-        configId: agentState?.configId || HERMES_MODEL_CONFIG_ID,
-        currentValueId: current.valueId,
-        currentLabel: current.label,
-        models: flatModels,
-        groups,
-        fromAgent: agentState?.fromAgent ?? true,
-    };
-}
-
-function resolveCurrentModelSelection(
-    flatModels: ModelListItem[],
-    groups: ModelProviderGroup[],
-    options: {
-        savedModelId?: string;
-        profileDefault?: ProfileDefaultModel;
-        agentCurrentId?: string;
-    }
-): { valueId: string; label: string } {
-    const inList = (id: string) => Boolean(id) && flatModels.some(m => m.valueId === id);
-    const labelFor = (id: string) =>
-        findModelInGroups(groups, id)?.name ||
-        flatModels.find(m => m.valueId === id)?.name ||
-        id;
-
-    if (options.savedModelId && inList(options.savedModelId)) {
-        return { valueId: options.savedModelId, label: labelFor(options.savedModelId) };
-    }
-
-    const profileDefault = options.profileDefault;
-    if (profileDefault) {
-        if (inList(profileDefault.valueId)) {
-            return { valueId: profileDefault.valueId, label: labelFor(profileDefault.valueId) };
-        }
-        const byName = flatModels.find(m => m.name === profileDefault.modelName);
-        if (byName) {
-            return { valueId: byName.valueId, label: byName.name };
-        }
-    }
-
-    if (options.agentCurrentId && inList(options.agentCurrentId)) {
-        return { valueId: options.agentCurrentId, label: labelFor(options.agentCurrentId) };
-    }
-
-    const primaryGroup = groups.find(g => g.isPrimary);
-    const fallback = primaryGroup?.models[0] || flatModels[0];
-    return { valueId: fallback.valueId, label: fallback.name };
-}
-
-function flattenGroupedModels(groups: ModelProviderGroup[]): ModelListItem[] {
-    const flat: ModelListItem[] = [];
-    const seen = new Set<string>();
-    for (const group of groups) {
-        for (const model of group.models) {
-            if (seen.has(model.valueId)) {
-                continue;
-            }
-            seen.add(model.valueId);
-            flat.push(model);
-        }
-    }
-    return flat;
-}
-
-/** Enrich agent model state with profile-configured models when the agent list is sparse. */
-export function enrichModelListState(
-    state: ModelListState | null,
-    supplemental: ModelListItem[]
-): ModelListState | null {
-    if (!supplemental.length) {
-        return state;
-    }
-    if (!state) {
-        const models = mergeModelListItems([], supplemental);
-        if (!models.length) {
-            return null;
-        }
-        const current = models[0];
-        return {
-            configId: HERMES_MODEL_CONFIG_ID,
-            currentValueId: current.valueId,
-            currentLabel: current.name,
-            models,
-            fromAgent: true,
-        };
-    }
-    const models = mergeModelListItems(state.models, supplemental);
-    if (models.length === state.models.length) {
-        return state;
-    }
-    const currentStillValid = models.some(m => m.valueId === state.currentValueId);
-    const currentValueId = currentStillValid ? state.currentValueId : state.currentValueId;
+    options?: { primaryGroupSlug?: string; currentValueId?: string },
+): ModelListState {
+    const currentValueId =
+        options?.currentValueId ??
+        agentState?.currentValueId ??
+        catalog.profileDefault?.valueId ??
+        catalog.flatModels[0]?.valueId ??
+        '';
     const currentLabel =
-        models.find(m => m.valueId === currentValueId)?.name ?? state.currentLabel;
+        agentState?.currentLabel ??
+        catalog.flatModels.find(m => m.valueId === currentValueId)?.name ??
+        currentValueId;
+
     return {
-        ...state,
-        configId: state.configId || HERMES_MODEL_CONFIG_ID,
-        models,
+        configId: agentState?.configId ?? '',
         currentValueId,
         currentLabel,
+        models: catalog.flatModels,
+        groups: catalog.groups,
+        fromAgent: agentState?.fromAgent ?? false,
     };
 }
 
-/** Choose Hermes native session/set_model vs standard set_config_option. */
+/**
+ * Enrich an existing ModelListState with additional model items, carrying
+ * over current selection when the value still exists in the merged set.
+ */
+export function enrichModelListState(
+    state: ModelListState,
+    additionalModels: ModelListItem[],
+): ModelListState {
+    const merged = mergeModelListItems(state.models, additionalModels);
+    const stillExists = merged.some(m => m.valueId === state.currentValueId);
+    return {
+        ...state,
+        models: merged,
+        currentValueId: stillExists ? state.currentValueId : (merged[0]?.valueId ?? ''),
+        currentLabel: stillExists
+            ? state.currentLabel
+            : (merged[0]?.name ?? state.currentLabel),
+    };
+}
+
+// ── Merge helpers ─────────────────────────────────────────────────────────────
+
+/**
+ * Merge two arrays of ModelListItem, deduplicating by valueId.
+ * Items in ``a`` keep their order; items in ``b`` that are not in ``a``
+ * are appended.
+ */
+export function mergeModelListItems(a: ModelListItem[], b: ModelListItem[]): ModelListItem[] {
+    const seen = new Set<string>();
+    const result: ModelListItem[] = [];
+
+    for (const item of a) {
+        if (seen.has(item.valueId)) continue;
+        seen.add(item.valueId);
+        result.push(item);
+    }
+    for (const item of b) {
+        if (seen.has(item.valueId)) continue;
+        seen.add(item.valueId);
+        result.push(item);
+    }
+    return result;
+}
+
+// ── Runtime model-switch gate ─────────────────────────────────────────────────
+
+/**
+ * Decide whether to use Hermes session/set_model (ACP method) vs
+ * the older set_config_option path for the given configId, state, and value.
+ */
 export function shouldUseHermesSetModel(
     configId: string,
-    modelListState: ModelListState | null,
+    state: ModelListState | null,
     hermesModelsRaw: unknown,
-    valueId: string
+    _valueId: string,
 ): boolean {
-    const effectiveConfigId = configId || modelListState?.configId || '';
-    return (
-        effectiveConfigId === HERMES_MODEL_CONFIG_ID ||
-        modelListState?.configId === HERMES_MODEL_CONFIG_ID ||
-        hermesModelsRaw != null ||
-        isHermesModelValueId(valueId)
-    );
+    // When the config id is explicitly 'hermes' (the HERMES_MODEL_CONFIG_ID),
+    // prefer session/set_model
+    if (configId === HERMES_MODEL_CONFIG_ID) return true;
+
+    // When the state says fromAgent is true, prefer session/set_model
+    if (state?.fromAgent) return true;
+
+    // When hermesModelsRaw is populated, the agent supports native model
+    // switching — prefer session/set_model
+    if (hermesModelsRaw) return true;
+
+    return false;
+}
+
+// ── Sorting and formatting ────────────────────────────────────────────────────
+
+/**
+ * Sort model list items by priority:
+ * 1. Currently selected model (if specified)
+ * 2. Primary provider group
+ * 3. Ascending input cost (undefine → Infinity)
+ * 4. Ascending output cost (undefine → Infinity)
+ * 5. Alphabetical by name
+ */
+export function sortModelListItems(
+    items: ModelListItem[],
+    currentValueId?: string,
+    _primaryGroupSlug?: string,
+): ModelListItem[] {
+    return [...items].sort((a, b) => {
+        // 1. Currently selected model comes first
+        const aIsCurrent = a.valueId === currentValueId;
+        const bIsCurrent = b.valueId === currentValueId;
+        if (aIsCurrent && !bIsCurrent) return -1;
+        if (!aIsCurrent && bIsCurrent) return 1;
+
+        // 2. Primary provider group is handled at the group level
+        // 3. Ascending input cost (undefined → Infinity)
+        const aInputCost = a.inputCost ?? Infinity;
+        const bInputCost = b.inputCost ?? Infinity;
+        if (aInputCost !== bInputCost) {
+            return aInputCost - bInputCost;
+        }
+
+        // 4. Ascending output cost (undefined → Infinity)
+        const aOutputCost = a.outputCost ?? Infinity;
+        const bOutputCost = b.outputCost ?? Infinity;
+        if (aOutputCost !== bOutputCost) {
+            return aOutputCost - bOutputCost;
+        }
+
+        // 5. Alphabetical by name
+        return a.name.localeCompare(b.name);
+    });
+}
+
+/**
+ * Format cost for display in the UI.
+ * Returns a string like "$X/M" or "Free" or "Unknown".
+ */
+export function formatModelCost(cost: number | undefined): string {
+    if (cost === undefined) return 'Unknown';
+    if (cost === 0) return 'Free';
+    return `$${cost.toFixed(2).replace(/\.?0+$/, '')}/M`;
 }

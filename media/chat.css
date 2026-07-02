@@ -469,6 +469,24 @@ body {
     position: sticky;
     top: 0;
     background: var(--bg);
+    z-index: 1;
+}
+.model-search-input {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 4px 6px;
+    font-size: 12px;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    background: var(--input-bg, var(--bg));
+    color: var(--fg);
+    outline: none;
+    margin-top: 4px;
+}
+.model-search-input:focus {
+    border-color: var(--primary);
+}
 }
 .dropdown.menu-dropdown {
     right: 0;
@@ -669,6 +687,12 @@ body {
 .dropdown-item .meta {
     font-size: 10px;
     color: var(--dim);
+    white-space: nowrap;
+}
+.model-cost {
+    font-size: 10px;
+    color: var(--dim);
+    margin-left: 6px;
     white-space: nowrap;
 }
 .dropdown-item.disabled {

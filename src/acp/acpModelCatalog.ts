@@ -151,10 +151,11 @@ function resolveProfileDefaultFromOptions(
         groups.find(g => g.models.some(m => m.name === modelName));
 
     const matched = primaryGroup?.models.find(m => m.name === modelName);
-    return {
-        modelName,
-        valueId: matched?.valueId ?? encodeHermesModelValueId(providerSlug || primaryGroup?.slug, modelName),
-        groupSlug: primaryGroup?.slug,
+        const provider = providerSlug || primaryGroup?.slug || '';
+        return {
+            modelName,
+            valueId: matched?.valueId ?? encodeHermesModelValueId(provider, modelName),
+            groupSlug: primaryGroup?.slug,
     };
 }
 

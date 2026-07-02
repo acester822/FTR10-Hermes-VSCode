@@ -119,6 +119,7 @@ export interface LocaleStrings {
     model: string;
     models: string;
     modelPlaceholder: string;
+    modelSearchPlaceholder: string;
     newChatBtn: string;
     moreOptions: string;
     menuAbout: string;
