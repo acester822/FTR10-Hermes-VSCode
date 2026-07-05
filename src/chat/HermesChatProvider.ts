@@ -2,12 +2,11 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import { AcpClient, AcpStatus, ModelListState, PermissionRequest, TokenUsage } from '../acp/AcpClient';
-import { buildFallbackModelListState, buildModelListStateFromCatalog, enrichModelListState, isRuntimeModelSource, mergeModelListItems, encodeHermesModelValueId, type ModelListItem } from '../acp/modelConfig';
+import { buildModelListStateFromCatalog, isRuntimeModelSource, encodeHermesModelValueId } from '../acp/modelConfig';
 import { resolveModelCatalog } from '../acp/acpModelCatalog';
 import { resolveMcpServersForSession } from '../acp/mcpConfig';
 import { normalizeHermesCliProfile, scopeKeyForCliProfile } from '../acp/hermesProfile';
 import { discoverHermesProfiles, detectHermesEnvironment, tryResolveHermesQuick } from '../acp/profileDiscovery';
-import { loadProviderModelsCache } from '../acp/profileModels';
 import type {
     HermesDetectProgressEvent,
     HermesDetectSource,
@@ -139,14 +138,11 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
     private _lastAssistantText: string = '';
     private _lastThoughtText: string = '';
     private _modelState: ModelListState | null = null;
-    private _modelFallbackShown: boolean = false;
     private _activeAgentName: string = '';
     /** Agent name or CLI profile id used for reconnect / switch. */
     private _activeSelectionId: string = '';
     private _discoveredProfiles: string[] | null = null;
     private _profileDiscoveryPromise: Promise<void> | undefined;
-    /** Models from additional Hermes config providers (beyond the ACP session provider). */
-    private _hermesConfigModels: ModelListItem[] = [];
     private _modelSwitchInFlight: Promise<void> | undefined;
     private _tokenUsage: TokenUsage | null = null;
     private _webviewLocale?: SupportedLocale;
@@ -1039,12 +1035,11 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
 
     private async _syncModelState(options?: { skipModelOptions?: boolean }): Promise<void> {
         if (!this._acp) {
-            this._modelState = this._buildFallbackModelList();
+            this._modelState = null;
             this._postModelList();
             return;
         }
 
-        const agentState = this._acp.getModelListState();
         const hermesModelsRaw = this._acp.getHermesModelsRaw();
         let modelOptions = options?.skipModelOptions
             ? null
@@ -1052,36 +1047,21 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
         if (!modelOptions?.providers?.length) {
             modelOptions = this._acp.getCachedModelOptions();
         }
+
         const catalog = resolveModelCatalog(modelOptions, hermesModelsRaw);
+        if (!catalog?.groups.length) {
+            this._modelState = null;
+            this._postModelList();
+            return;
+        }
+
         const profileState = loadProfileState(this._historyDir, this._scopeKey);
         const session = this._sessions.find(s => s.id === this._sessionId);
-        const config = vscode.workspace.getConfiguration('hermes');
-        const settingsModels = config.get<Array<{ id: string; name: string }>>('models') || [];
 
-        // Merge VS Code hermes.models with models discovered from Hermes config
-        // (custom_providers, fallback_providers) so additional providers appear
-        // alongside the ACP session's single-provider model list.
-        const combinedSettings: Array<{ id: string; name: string }> = [
-            ...settingsModels,
-            ...this._hermesConfigModels.map(m => ({ id: m.valueId, name: m.name })),
-        ];
-        const combinedDeduped = mergeModelListItems(
-            combinedSettings.map(m => ({ valueId: m.id, name: m.name })),
-            []
-        );
-
-        if (catalog?.groups.length) {
-            this._modelState = buildModelListStateFromCatalog(catalog, agentState, {
-                modelId: session?.modelId || profileState.modelId,
-                modelLabel: session?.modelLabel || profileState.modelLabel,
-                settingsModels: combinedDeduped.map(m => ({ id: m.valueId, name: m.name })),
-            });
-        } else if (agentState) {
-            this._modelState = enrichModelListState(agentState, combinedDeduped);
-        } else {
-            const allModels = combinedDeduped.map(m => ({ id: m.valueId, name: m.name }));
-            this._modelState = this._buildFallbackModelList(allModels);
-        }
+        this._modelState = buildModelListStateFromCatalog(catalog, null, {
+            modelId: session?.modelId || profileState.modelId,
+            modelLabel: session?.modelLabel || profileState.modelLabel,
+        });
         this._postModelList();
     }
 
@@ -1350,27 +1330,6 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
             // session has been settled. On first load with the picker,
             // this will be empty — the user just chose a session.
             this._restoreMessages();
-
-            // Discover all provider models from the Hermes runtime cache file
-            // (~/.hermes/provider_models_cache.json). This is written by Hermes
-            // during sessions and contains the live model list for every provider
-            // it has queried — not just the current ACP session's provider.
-            try {
-                const cache = await loadProviderModelsCache();
-                const cacheProviders = Object.keys(cache).length;
-                const cacheModels = Object.values(cache).reduce((sum, m) => sum + m.length, 0);
-                for (const [provider, models] of Object.entries(cache)) {
-                    for (const modelId of models) {
-                        this._hermesConfigModels.push({
-                            valueId: encodeHermesModelValueId(provider, modelId),
-                            name: modelId,
-                        });
-                    }
-                }
-                this._log(`Provider cache: ${cacheProviders} providers, ${cacheModels} models`);
-            } catch (err) {
-                this._log(`Provider cache load failed: ${err instanceof Error ? err.message : String(err)}`);
-            }
 
             await this._syncModelState({ skipModelOptions: true });
             await this._applySessionModelPreference();
@@ -2123,22 +2082,6 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
         }
     }
 
-    private _buildFallbackModelList(extraModels?: Array<{ id: string; name: string }>): ModelListState | null {
-        const config = vscode.workspace.getConfiguration('hermes');
-        const models = config.get<Array<{ id: string; name: string }>>('models') || [];
-        const allModels = extraModels?.length
-            ? mergeModelListItems(
-                  [...models, ...extraModels].map(m => ({ valueId: m.id, name: m.name })),
-                  []
-              ).map(m => ({ id: m.valueId, name: m.name }))
-            : models;
-        const defaultModel = config.get<string>('defaultModel') || '';
-        const session = this._sessions.find(s => s.id === this._sessionId);
-        const profileState = loadProfileState(this._historyDir, this._scopeKey);
-        const currentId = session?.modelId || profileState.modelId || defaultModel;
-        return buildFallbackModelListState(allModels, currentId);
-    }
-
     private _postProfileList(): void {
         void this._ensureDiscoveredProfiles().then(() => {
             this._postMessage({ type: 'profileList', profiles: this._getProfileEntries() });
@@ -2146,7 +2089,7 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
     }
 
     private _postModelList(): void {
-        const state = this._modelState ?? this._buildFallbackModelList();
+        const state = this._modelState;
         if (state) {
             this._postMessage({
                 type: 'modelList',
@@ -2272,7 +2215,7 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
     }
 
     private async _switchModel(configId: string, valueId: string): Promise<void> {
-        const state = this._modelState ?? this._buildFallbackModelList();
+        const state = this._modelState;
         const effectiveConfigId = configId || state?.configId || '';
         const picked = state?.models.find(m => m.valueId === valueId);
         const label = picked?.name ?? valueId;
@@ -2299,19 +2242,6 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
                 vscode.window.showErrorMessage(t('failedSwitchModel', msg));
                 return;
             }
-        }
-
-        if (!state || !isRuntimeModelSource(effectiveConfigId)) {
-            this._persistModelChoice(valueId, label);
-            if (state) {
-                this._modelState = { ...state, currentValueId: valueId, currentLabel: label };
-            }
-            this._postModelList();
-            if (!this._modelFallbackShown) {
-                this._modelFallbackShown = true;
-                vscode.window.showInformationMessage(t('modelPreferenceSaved'));
-            }
-            return;
         }
 
         vscode.window.showWarningMessage(t('hermesNotConnected'));
@@ -3157,12 +3087,6 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
         }
         if (e.affectsConfiguration('hermes.contextAttachVisibility')) {
             this._applyContextAttachVisibility();
-        }
-        if (e.affectsConfiguration('hermes.models') || e.affectsConfiguration('hermes.defaultModel')) {
-            if (!this._modelState || !isRuntimeModelSource(this._modelState.configId)) {
-                this._modelState = null;
-            }
-            void this._syncModelState();
         }
         if (e.affectsConfiguration('hermes.agents')) {
             this._discoveredProfiles = null;

@@ -5266,9 +5266,7 @@ function parseToolCallText(text) {
         }
         modelLabelEl.textContent = payload.currentLabel || payload.currentValueId || '';
         modelBtn.classList.remove('is-placeholder');
-        modelBtn.title = payload.fromAgent
-            ? locale.modelFromAgent
-            : locale.modelLocalPreference;
+        modelBtn.title = locale.modelFromAgent;
     }
 
     function renderModelList(payload) {
@@ -5284,36 +5282,117 @@ function parseToolCallText(text) {
 
         if (!models.length) {
             list.innerHTML = '<div class="dropdown-item disabled">' + escapeHtml(locale.noModels) + '</div>';
+            document.getElementById('modelSearchWrap').hidden = true;
             return;
         }
 
-        if (groups.length > 1) {
-            list.innerHTML = groups.map(function(group) {
-                const header = '<div class="dropdown-group-label">' + escapeHtml(group.name || group.slug || '') + '</div>';
-                const items = group.models.map(function(m) {
-                    const active = m.valueId === payload.currentValueId;
-                    return '<div class="dropdown-item' + (active ? ' active' : '') + '" data-value="' + escapeHtml(m.valueId) + '">' +
-                        escapeHtml(m.name) + (active ? ' ✓' : '') + '</div>';
-                }).join('');
-                return header + items;
-            }).join('');
+        // Show search when there are enough items
+        var searchWrap = document.getElementById('modelSearchWrap');
+        var searchInput = document.getElementById('modelSearchInput');
+        if (models.length >= 8) {
+            searchWrap.hidden = false;
+            searchInput.placeholder = locale.searchModels || 'Filter models...';
         } else {
-            list.innerHTML = models.map(function(m) {
-                const active = m.valueId === payload.currentValueId;
-                return '<div class="dropdown-item' + (active ? ' active' : '') + '" data-value="' + escapeHtml(m.valueId) + '">' +
-                    escapeHtml(m.name) + (active ? ' ✓' : '') + '</div>';
-            }).join('');
+            searchWrap.hidden = true;
         }
-        list.querySelectorAll('.dropdown-item[data-value]').forEach(function(item) {
-            item.addEventListener('click', function() {
-                vscode.postMessage({
-                    type: 'switchModel',
-                    configId: modelConfigId,
-                    valueId: this.dataset.value
+
+        function renderFiltered(filterText) {
+            var q = (filterText || '').toLowerCase().trim();
+            var hasFilter = q.length > 0;
+
+            if (hasFilter && groups.length > 1) {
+                // Filter models within each group
+                var filteredGroups = groups.map(function(g) {
+                    var filteredModels = g.models.filter(function(m) {
+                        return (m.name || '').toLowerCase().indexOf(q) !== -1
+                            || (m.valueId || '').toLowerCase().indexOf(q) !== -1
+                            || (g.name || g.slug || '').toLowerCase().indexOf(q) !== -1;
+                    });
+                    return { group: g, models: filteredModels };
+                }).filter(function(entry) {
+                    return entry.models.length > 0;
                 });
-                closeAllDropdowns();
+
+                if (!filteredGroups.length) {
+                    list.innerHTML = '<div class="dropdown-item disabled">' + escapeHtml(locale.noModels) + '</div>';
+                    return;
+                }
+
+                list.innerHTML = filteredGroups.map(function(entry) {
+                    var header = '<div class="dropdown-group-label">' + escapeHtml(entry.group.name || entry.group.slug || '') + '</div>';
+                    var items = entry.models.map(renderModelItem).join('');
+                    return header + items;
+                }).join('');
+            } else if (hasFilter) {
+                // Single group or flat list — filter flat
+                var flatFiltered = models.filter(function(m) {
+                    var groupName = '';
+                    if (groups.length === 1) {
+                        groupName = groups[0].name || groups[0].slug || '';
+                    }
+                    return (m.name || '').toLowerCase().indexOf(q) !== -1
+                        || (m.valueId || '').toLowerCase().indexOf(q) !== -1
+                        || groupName.toLowerCase().indexOf(q) !== -1;
+                });
+                if (!flatFiltered.length) {
+                    list.innerHTML = '<div class="dropdown-item disabled">' + escapeHtml(locale.noModels) + '</div>';
+                    return;
+                }
+                list.innerHTML = flatFiltered.map(renderModelItem).join('');
+            } else if (groups.length > 1) {
+                // No filter, multiple groups
+                list.innerHTML = groups.map(function(group) {
+                    var header = '<div class="dropdown-group-label">' + escapeHtml(group.name || group.slug || '') + '</div>';
+                    var items = group.models.map(renderModelItem).join('');
+                    return header + items;
+                }).join('');
+            } else {
+                // No filter, single group or flat
+                list.innerHTML = models.map(renderModelItem).join('');
+            }
+
+            list.querySelectorAll('.dropdown-item[data-value]').forEach(function(item) {
+                item.addEventListener('click', function() {
+                    vscode.postMessage({
+                        type: 'switchModel',
+                        configId: modelConfigId,
+                        valueId: this.dataset.value
+                    });
+                    closeAllDropdowns();
+                });
             });
-        });
+        }
+
+        function renderModelItem(m) {
+            var active = m.valueId === payload.currentValueId;
+            var costHtml = '';
+            if (m.inputCost !== undefined && m.inputCost !== null) {
+                costHtml = '<span class="model-cost">' + formatCost(m.inputCost) + '</span>';
+            }
+            return '<div class="dropdown-item' + (active ? ' active' : '') + '" data-value="' + escapeHtml(m.valueId) + '">' +
+                '<span class="model-name">' + escapeHtml(m.name) + '</span>' +
+                costHtml +
+                (active ? '<span class="model-check">✓</span>' : '') +
+                '</div>';
+        }
+
+        // Initial render
+        renderFiltered('');
+
+        // Bind search input
+        searchInput.oninput = function() {
+            renderFiltered(this.value);
+        };
+    }
+
+    function formatCost(costPer1M) {
+        if (costPer1M === undefined || costPer1M === null) return '';
+        if (costPer1M === 0) return '<span class="model-cost-free">Free</span>';
+        if (costPer1M < 0.001) return '<span class="model-cost-free">≈Free</span>';
+        if (costPer1M >= 1000) return '$' + (costPer1M / 1000).toFixed(1) + 'K/M';
+        if (costPer1M >= 1) return '$' + Math.round(costPer1M) + '/M';
+        // Sub-dollar: show cents
+        return '$' + (costPer1M).toFixed(2) + '/M';
     }
 
     function escapeHtml(s) {

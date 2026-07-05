@@ -10,6 +10,12 @@ export const SETTINGS_MODEL_CONFIG_ID = '__settings__';
 export interface ModelListItem {
     valueId: string;
     name: string;
+    /** Input cost in dollars per 1M tokens (undefined = unknown). */
+    inputCost?: number;
+    /** Output cost in dollars per 1M tokens (undefined = unknown). */
+    outputCost?: number;
+    /** Whether this model is known-unavailable. */
+    unavailable?: boolean;
 }
 
 export interface ModelProviderGroup {

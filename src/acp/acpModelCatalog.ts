@@ -6,10 +6,23 @@ import {
     encodeHermesModelValueId,
 } from './modelConfig';
 
+export interface ModelPricing {
+    /** Input cost in dollars per 1M tokens. */
+    input?: number;
+    /** Output cost in dollars per 1M tokens. */
+    output?: number;
+}
+
 export interface AcpModelOptionsProvider {
     slug: string;
     name: string;
     models?: string[];
+    /** Per-model pricing keyed by model name/id. */
+    pricing?: Record<string, ModelPricing>;
+    /** Capability flags (e.g. { vision: true, tools: true }). */
+    capabilities?: Record<string, boolean>;
+    /** Model IDs that are known-unavailable despite being listed. */
+    unavailable_models?: string[];
     is_current?: boolean;
 }
 
@@ -29,29 +42,33 @@ export function buildCatalogFromModelOptions(payload: AcpModelOptionsResponse): 
             continue;
         }
         const slug = (row.slug || 'custom').trim();
+        const unavailable = new Set(row.unavailable_models ?? []);
+
+        const models: ModelListItem[] = modelNames.map(name => {
+            const pricing = row.pricing?.[name];
+            return {
+                valueId: encodeHermesModelValueId(slug, name),
+                name,
+                inputCost: pricing?.input ?? undefined,
+                outputCost: pricing?.output ?? undefined,
+                unavailable: unavailable.has(name),
+            };
+        });
+
         groups.push({
             slug,
             name: (row.name || slug).trim(),
             isPrimary: Boolean(row.is_current),
-            models: modelNames.map(name => ({
-                valueId: encodeHermesModelValueId(slug, name),
-                name,
-            })),
+            models: sortModelsWithinGroup(models),
         });
     }
 
-    groups.sort((a, b) => {
-        if (a.isPrimary !== b.isPrimary) {
-            return a.isPrimary ? -1 : 1;
-        }
-        return a.name.localeCompare(b.name);
-    });
-
     const profileDefault = resolveProfileDefaultFromOptions(payload, groups);
+    const sortedGroups = sortProviderGroups(groups, profileDefault);
 
     return {
-        groups,
-        flatModels: flattenGroupModels(groups),
+        groups: sortedGroups,
+        flatModels: flattenGroupModels(sortedGroups),
         profileDefault,
     };
 }
@@ -92,7 +109,13 @@ export function buildCatalogFromHermesModelsRaw(raw: unknown): ProfileModelCatal
             groupMap.set(providerName, group);
         }
         if (!group.models.some(x => x.valueId === valueId)) {
-            group.models.push({ valueId, name });
+            group.models.push({
+                valueId,
+                name,
+                inputCost: undefined,
+                outputCost: undefined,
+                unavailable: false,
+            });
         }
     }
 
@@ -111,6 +134,10 @@ export function buildCatalogFromHermesModelsRaw(raw: unknown): ProfileModelCatal
     }
     if (!groups.some(g => g.isPrimary)) {
         groups[0].isPrimary = true;
+    }
+
+    for (const group of groups) {
+        sortModelsWithinGroup(group.models);
     }
 
     groups.sort((a, b) => {
@@ -186,6 +213,68 @@ export function resolveModelCatalog(
         }
     }
     return buildCatalogFromHermesModelsRaw(hermesModelsRaw);
+}
+
+/**
+ * Compute the average input cost for a provider group.
+ * Models with no defined cost are treated as free (0).
+ */
+export function avgProviderCost(groups: ModelProviderGroup[]): Record<string, number> {
+    const result: Record<string, number> = {};
+    for (const group of groups) {
+        const costs = group.models
+            .map(m => m.inputCost)
+            .filter((c): c is number => c !== undefined && c !== null);
+        if (costs.length === 0) {
+            result[group.slug] = 0;
+        } else {
+            result[group.slug] = costs.reduce((a, b) => a + b, 0) / costs.length;
+        }
+    }
+    return result;
+}
+
+/**
+ * Sort provider groups: primary first → average cost ascending → alphabetical name.
+ */
+export function sortProviderGroups(
+    groups: ModelProviderGroup[],
+    profileDefault?: ProfileDefaultModel
+): ModelProviderGroup[] {
+    const avgCosts = avgProviderCost(groups);
+    return [...groups]
+        .map(group => ({
+            ...group,
+            isPrimary: profileDefault?.groupSlug
+                ? group.slug === profileDefault.groupSlug
+                : group.isPrimary,
+        }))
+        .sort((a, b) => {
+            if (a.isPrimary !== b.isPrimary) {
+                return a.isPrimary ? -1 : 1;
+            }
+            const costDiff = (avgCosts[a.slug] ?? Infinity) - (avgCosts[b.slug] ?? Infinity);
+            if (costDiff !== 0) {
+                return costDiff;
+            }
+            return a.name.localeCompare(b.name);
+        });
+}
+
+/**
+ * Sort models within a group: currently selected (isPrimary group marker) → ascending cost → alphabetical.
+ * Callers should set the current model's ``inputCost`` to -1 or use a separate mechanism.
+ * We sort by: undefined cost last → ascending cost → alphabetical name.
+ */
+export function sortModelsWithinGroup(models: ModelListItem[]): ModelListItem[] {
+    return [...models].sort((a, b) => {
+        const costA = a.inputCost ?? Infinity;
+        const costB = b.inputCost ?? Infinity;
+        if (costA !== costB) {
+            return costA - costB;
+        }
+        return a.name.localeCompare(b.name);
+    });
 }
 
 function flattenGroupModels(groups: ModelProviderGroup[]): ModelListItem[] {

@@ -224,7 +224,7 @@ export class AcpClient {
     set onLog(handler: LogHandler) { this._onLog = handler; }
 
     getModelListState(): ModelListState | null {
-        return this._modelListState ?? buildModelListState(this._configOptions);
+        return this._modelListState;
     }
 
     getRuntimeModelId(): string {
@@ -542,20 +542,21 @@ export class AcpClient {
 
         const request = this._buildNewSessionRequest(cwd);
         try {
-            await this._conn.agent.request('session/load', {
+            const loadResponse = await this._conn.agent.request('session/load', {
                 sessionId,
                 cwd: request.cwd,
                 mcpServers: request.mcpServers,
             } as any);
 
-            // Construct a minimal NewSessionResponse-like object so the
-            // SDK's ActiveSession wrapper has the right sessionId for
-            // subsequent session/prompt calls.
+            const sessionData = (loadResponse && typeof loadResponse === 'object')
+                ? (loadResponse as Record<string, unknown>)
+                : {};
             const fakeResponse: any = {
                 sessionId,
                 _meta: {},
                 modes: null,
-                configOptions: [],
+                configOptions: Array.isArray(sessionData.configOptions) ? sessionData.configOptions : [],
+                models: sessionData.models ?? null,
             };
             this._session = (this._conn.agent as any).attachSession(fakeResponse);
             this._syncSessionModels(fakeResponse);

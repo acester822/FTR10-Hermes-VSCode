@@ -202,7 +202,7 @@ export interface LocaleStrings {
     configureAgents: string;
     noModels: string;
     modelFromAgent: string;
-    modelLocalPreference: string;
+    searchModels: string;
     tokenUsageLabel: string;
     copied: string;
     clickToInsert: string;
