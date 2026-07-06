@@ -2133,7 +2133,7 @@
 
         if (toolAggregateGroupId) {
             const group = document.getElementById(toolAggregateGroupId);
-            if (group && group._auxState && canAggregateToolTexts(group._auxState.rawText || '', text)) {
+            if (group && group._auxState && false) {
                 ensureAggregateEntries(group);
                 group._auxState.aggregatedTools.push({ toolCallId: toolCallId, text: text });
                 rebuildAggregateToolContent(group);
@@ -2420,7 +2420,7 @@ function parseToolCallText(text) {
             toolInfo.title = formatToolName(toolInfo.title);
 
             const card = document.createElement('div');
-            card.className = 'tool-call-card is-expanded';
+            card.className = 'tool-call-card';
             if (toolInfo.status === 'completed') {
                 card.classList.add('is-complete');
             } else if (toolInfo.status === 'failed') {
@@ -3938,7 +3938,25 @@ function parseToolCallText(text) {
         Object.keys(toolCallMap).forEach(function(key) {
             const group = document.getElementById(toolCallMap[key]);
             const msg = group && group.querySelector('.message.tool');
-            if (msg) msg.classList.remove('is-live');
+            if (msg) {
+                msg.classList.remove('is-live');
+                // Also clean up the tool-call-card state so it doesn't
+                // stay stuck in is-live/is-writing/etc. after completion
+                if (msg._cardData && msg._cardData.card) {
+                    const card = msg._cardData.card;
+                    card.classList.remove('is-live', 'is-analyzing', 'is-searching', 'is-reading', 'is-writing', 'is-executing', 'is-error');
+                    // If not already marked as complete/failed, mark it complete
+                    if (!card.classList.contains('is-complete') && !card.classList.contains('is-failed')) {
+                        card.classList.add('is-complete');
+                    }
+                    // Also update the status label
+                    const statusEl = msg._cardData.statusEl;
+                    if (statusEl) {
+                        statusEl.className = 'tool-call-status is-complete';
+                        statusEl.innerHTML = '<span class="status-dot"></span> Done';
+                    }
+                }
+            }
         });
     }
 
@@ -5366,8 +5384,8 @@ function parseToolCallText(text) {
         function renderModelItem(m) {
             var active = m.valueId === payload.currentValueId;
             var costHtml = '';
-            if (m.inputCost !== undefined && m.inputCost !== null) {
-                costHtml = '<span class="model-cost">' + formatCost(m.inputCost) + '</span>';
+            if (m.outputCost !== undefined && m.outputCost !== null) {
+                costHtml = '<span class="model-cost">' + formatCost(m.outputCost) + '</span>';
             }
             return '<div class="dropdown-item' + (active ? ' active' : '') + '" data-value="' + escapeHtml(m.valueId) + '">' +
                 '<span class="model-name">' + escapeHtml(m.name) + '</span>' +

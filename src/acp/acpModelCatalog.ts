@@ -49,8 +49,8 @@ export function buildCatalogFromModelOptions(payload: AcpModelOptionsResponse): 
             return {
                 valueId: encodeHermesModelValueId(slug, name),
                 name,
-                inputCost: pricing?.input ?? undefined,
-                outputCost: pricing?.output ?? undefined,
+                inputCost: parsePricingValue(pricing?.input),
+                                outputCost: parsePricingValue(pricing?.output),
                 unavailable: unavailable.has(name),
             };
         });
@@ -163,6 +163,24 @@ export function buildCatalogFromHermesModelsRaw(raw: unknown): ProfileModelCatal
     };
 }
 
+/**
+ * Parse a TUI gateway pricing string (e.g. "$0.09", "free") to a number
+ * representing dollars per 1M tokens.
+ */
+export function parsePricingValue(value: unknown): number | undefined {
+    if (value === undefined || value === null) {
+        return undefined;
+    }
+    const s = String(value).trim();
+    if (!s || s.toLowerCase() === 'free' || s === '\u2014' || s === '-') {
+        return 0;
+    }
+    // Strip $, commas, and whitespace
+    const cleaned = s.replace(/[$,\s]/g, '');
+    const n = parseFloat(cleaned);
+    return isNaN(n) ? undefined : n;
+}
+
 function resolveProfileDefaultFromOptions(
     payload: AcpModelOptionsResponse,
     groups: ModelProviderGroup[]
@@ -223,7 +241,7 @@ export function avgProviderCost(groups: ModelProviderGroup[]): Record<string, nu
     const result: Record<string, number> = {};
     for (const group of groups) {
         const costs = group.models
-            .map(m => m.inputCost)
+            .map(m => m.outputCost)
             .filter((c): c is number => c !== undefined && c !== null);
         if (costs.length === 0) {
             result[group.slug] = 0;
@@ -268,8 +286,8 @@ export function sortProviderGroups(
  */
 export function sortModelsWithinGroup(models: ModelListItem[]): ModelListItem[] {
     return [...models].sort((a, b) => {
-        const costA = a.inputCost ?? Infinity;
-        const costB = b.inputCost ?? Infinity;
+        const costA = a.outputCost ?? Infinity;
+        const costB = b.outputCost ?? Infinity;
         if (costA !== costB) {
             return costA - costB;
         }

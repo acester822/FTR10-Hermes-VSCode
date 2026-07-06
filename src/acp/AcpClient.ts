@@ -1,5 +1,7 @@
 import * as vscode from 'vscode';
 import { spawn, ChildProcess } from 'child_process';
+import * as fs from 'fs';
+import * as path from 'path';
 import {
     client,
     ndJsonStream,
@@ -37,6 +39,38 @@ import {
     handleMcpDisconnect,
 } from './vscodeMcpBridge';
 import { EditorToolsMcpServer } from './editorToolsMcpServer';
+
+
+/** Resolve the Hermes venv Python path from the hermes executable. */
+export async function resolveHermesVenvPython(): Promise<string | null> {
+    try {
+        const exePath = await findHermesExecutableOrThrow();
+        const content = await fs.promises.readFile(exePath, 'utf-8');
+        const match = content.match(/exec\s+"([^"]+)"/);
+        if (match) {
+            const target = match[1];
+            const dir = path.dirname(target);
+            const pythonCandidate = path.join(dir, 'python3');
+            try {
+                await fs.promises.access(pythonCandidate);
+                return pythonCandidate;
+            } catch {
+                // fallback: try python alongside the original exe
+            }
+        }
+        // Fallback: look for python3 in the same dir as the exe
+        const dir = path.dirname(exePath);
+        const pythonCandidate = path.join(dir, 'python3');
+        try {
+            await fs.promises.access(pythonCandidate);
+            return pythonCandidate;
+        } catch {
+            return null;
+        }
+    } catch {
+        return null;
+    }
+}
 
 export type AcpStatus = 'idle' | 'connecting' | 'connected' | 'ready' | 'prompting' | 'error';
 
@@ -241,7 +275,7 @@ export class AcpClient {
 
     /** Fetch grouped model catalog via Hermes ACP ``model.options`` (best-effort). */
     async fetchModelOptions(): Promise<AcpModelOptionsResponse | null> {
-        if (!this._conn || !this._session || this._modelOptionsKnownUnsupported) {
+        if (!this._conn || !this._session) {
             return null;
         }
         if (this._modelOptionsFetchPromise) {
@@ -256,29 +290,101 @@ export class AcpClient {
     }
 
     private async _fetchModelOptionsOnce(): Promise<AcpModelOptionsResponse | null> {
-        if (!this._conn || !this._session || this._modelOptionsKnownUnsupported) {
+        if (!this._conn || !this._session) {
             return null;
         }
+
+        // Try ACP model.options RPC first
+        if (!this._modelOptionsKnownUnsupported) {
+            try {
+                const response = await this._conn.agent.request('model.options', {
+                    sessionId: this._session.sessionId,
+                } as any);
+                if (response && typeof response === 'object') {
+                    const parsed = response as AcpModelOptionsResponse;
+                    if (parsed.providers?.length) {
+                        this._cachedModelOptions = parsed;
+                    }
+                    return parsed;
+                }
+            } catch (err) {
+                if (!this._isMethodNotFoundError(err)) {
+                    throw err;
+                }
+                this._modelOptionsKnownUnsupported = true;
+                this._onLog('model.options ACP method not available');
+            }
+        }
+
+        // Fallback: query TUI gateway directly via subprocess
+        this._onLog('Fetching model options via TUI gateway subprocess...');
         try {
-            const response = await this._conn.agent.request('model.options', {
-                sessionId: this._session.sessionId,
-            } as any);
-            if (!response || typeof response !== 'object') {
+            const pythonPath = await resolveHermesVenvPython();
+            if (!pythonPath) {
+                this._onLog('Could not resolve Hermes venv Python path');
                 return null;
             }
-            const parsed = response as AcpModelOptionsResponse;
-            if (parsed.providers?.length) {
-                this._cachedModelOptions = parsed;
+            const result = await this._fetchModelOptionsViaGateway(pythonPath);
+            if (result?.providers?.length) {
+                this._cachedModelOptions = result;
             }
-            return parsed;
+            return result;
         } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
-            if (this._isMethodNotFoundError(err)) {
-                this._modelOptionsKnownUnsupported = true;
-            }
-            this._onLog(`model.options unavailable: ${msg}`);
+            this._onLog(`TUI gateway model.options failed: ${msg}`);
             return null;
         }
+    }
+
+    /** Fallback: spawn TUI gateway subprocess to fetch model.options. */
+    private async _fetchModelOptionsViaGateway(pythonPath: string): Promise<AcpModelOptionsResponse | null> {
+        const requestJson = JSON.stringify({
+            jsonrpc: '2.0',
+            id: 1,
+            method: 'model.options',
+            params: { refresh: true },
+        });
+
+        return new Promise((resolve, reject) => {
+            const proc = spawn(pythonPath, ['-m', 'tui_gateway.entry'], {
+                stdio: ['pipe', 'pipe', 'pipe'],
+                timeout: 30_000,
+            });
+
+            let stdout = '';
+            let stderr = '';
+
+            proc.stdout?.on('data', (chunk: Buffer) => {
+                stdout += chunk.toString();
+            });
+            proc.stderr?.on('data', (chunk: Buffer) => {
+                stderr += chunk.toString();
+            });
+
+            proc.on('error', (err) => {
+                reject(err);
+            });
+
+            proc.on('exit', (code) => {
+                if (code !== 0 && !stdout.trim()) {
+                    reject(new Error(`tui_gateway.entry exited code ${code}: ${stderr.trim()}`));
+                    return;
+                }
+                // Parse NDJSON to find the result
+                for (const line of stdout.split('\n')) {
+                    try {
+                        const obj = JSON.parse(line);
+                        if (obj.id === 1 && obj.result?.providers) {
+                            resolve(obj.result as AcpModelOptionsResponse);
+                            return;
+                        }
+                    } catch { /* skip non-JSON lines */ }
+                }
+                reject(new Error('No model.options result in tui_gateway output'));
+            });
+
+            proc.stdin?.end(requestJson);
+        });
     }
 
     get status(): AcpStatus {

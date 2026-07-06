@@ -4,6 +4,7 @@ import * as path from 'path';
 import { AcpClient, AcpStatus, ModelListState, PermissionRequest, TokenUsage } from '../acp/AcpClient';
 import { buildModelListStateFromCatalog, isRuntimeModelSource, encodeHermesModelValueId } from '../acp/modelConfig';
 import { resolveModelCatalog } from '../acp/acpModelCatalog';
+import type { AcpModelOptionsResponse } from '../acp/acpModelCatalog';
 import { resolveMcpServersForSession } from '../acp/mcpConfig';
 import { normalizeHermesCliProfile, scopeKeyForCliProfile } from '../acp/hermesProfile';
 import { discoverHermesProfiles, detectHermesEnvironment, tryResolveHermesQuick } from '../acp/profileDiscovery';
@@ -1041,9 +1042,13 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
         }
 
         const hermesModelsRaw = this._acp.getHermesModelsRaw();
-        let modelOptions = options?.skipModelOptions
-            ? null
-            : await this._acp.fetchModelOptions();
+        let modelOptions: AcpModelOptionsResponse | null | undefined = undefined;
+        if (modelOptions === undefined && options?.skipModelOptions) {
+            modelOptions = await this._loadCachedModelOptions();
+        }
+        if (modelOptions === undefined) {
+            modelOptions = options?.skipModelOptions ? null : await this._acp.fetchModelOptions();
+        }
         if (!modelOptions?.providers?.length) {
             modelOptions = this._acp.getCachedModelOptions();
         }
@@ -1334,10 +1339,19 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
             await this._syncModelState({ skipModelOptions: true });
             await this._applySessionModelPreference();
 
-            // No need for a second _syncModelState: it was already called by
-            // the first sync above (no model reset), inside _resetAgentWithModel
-            // (when _applySessionModelPreference reset the model), or by the
-            // background probe completion handler above.
+            // Kick off background TUI gateway model fetch — when it
+            // completes, the cached model.options file is written and the
+            // model list refreshes with full providers + pricing.
+            this._acp.fetchModelOptions().then((fullCatalog) => {
+                if (fullCatalog?.providers?.length) {
+                    const cachePath = path.join(this._historyDir, 'model-cache.json');
+                    try {
+                        fs.writeFileSync(cachePath, JSON.stringify(fullCatalog, null, 2), 'utf-8');
+                    } catch { /* best-effort cache write */ }
+                    this._log(`TUI gateway: ${fullCatalog.providers.length} providers`);
+                    void this._syncModelState();
+                }
+            }).catch(() => {});
         } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
             this._log(`Connect failed: ${msg}`);
@@ -2125,6 +2139,20 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
             } catch { /* ignore */ }
         }
         saveProfileState(this._historyDir, this._scopeKey, { modelId: valueId, modelLabel: label });
+    }
+
+    /** Load cached TUI gateway model.options from disk (fast on reload). */
+    private async _loadCachedModelOptions(): Promise<AcpModelOptionsResponse | null> {
+        const cachePath = path.join(this._historyDir, 'model-cache.json');
+        try {
+            const raw = await fs.promises.readFile(cachePath, 'utf-8');
+            const parsed = JSON.parse(raw) as AcpModelOptionsResponse;
+            if (parsed?.providers?.length) {
+                this._log(`Model cache: ${parsed.providers.length} providers`);
+                return parsed;
+            }
+        } catch { /* no cache or invalid */ }
+        return null;
     }
 
     private async _resetAgentWithModel(valueId: string, configId?: string): Promise<void> {
