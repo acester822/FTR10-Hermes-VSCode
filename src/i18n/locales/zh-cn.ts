@@ -153,7 +153,7 @@ export const zhCn: LocaleStrings = {
     copy: '复制',
     clear: '清空',
     noLogs: '（暂无日志）',
-    aboutTitle: '关于 Rina Hermes ACP',
+    aboutTitle: '关于 FTR10 Hermes VSCode',
     helpTitle: '帮助 — 如何启动 ACP',
     faqTitle: '常见问题',
 
@@ -244,10 +244,10 @@ hermes --profile &lt;name&gt; acp</code></pre>
 
             <h3>5. 会持续更新吗？</h3>
             <p><strong>会。</strong> 本扩展通过 VS Code 扩展市场发布；顶部 <strong>「…」→ 检查更新</strong> 可触发市场检查并定位到本扩展。</p>
-            <p>Hermes Agent 与扩展<strong>独立演进</strong>：扩展跟进 ACP、模型选择、Profile 等；底层能力（模型、工具等）取决于 Hermes 本身。可关注 <a href="#" data-url="https://github.com/jove-rina/rina-hermes-acp">GitHub 仓库</a> 的 Release 与 Issue。</p>
+            <p>Hermes Agent 与扩展<strong>独立演进</strong>：扩展跟进 ACP、模型选择、Profile 等；底层能力（模型、工具等）取决于 Hermes 本身。可关注 <a href="#" data-url="https://github.com/acester822/FTR10-Hermes-VSCode">GitHub 仓库</a> 的 Release 与 Issue。</p>
 
             <h3>6. BUG 怎么反馈？</h3>
-            <p>请到 GitHub 提交 Issue：<br><a href="#" data-url="https://github.com/jove-rina/rina-hermes-acp/issues">github.com/jove-rina/rina-hermes-acp/issues</a></p>
+            <p>请到 GitHub 提交 Issue：<br><a href="#" data-url="https://github.com/acester822/FTR10-Hermes-VSCode/issues">github.com/acester822/FTR10-Hermes-VSCode/issues</a></p>
             <p><strong>建议包含：</strong></p>
             <ul>
                 <li>VS Code 版本（帮助 → 关于）</li>
@@ -258,7 +258,7 @@ hermes --profile &lt;name&gt; acp</code></pre>
             </ul>
 
             <h3>7. 期望的新功能怎么告诉我？</h3>
-            <p>同样通过 <a href="#" data-url="https://github.com/jove-rina/rina-hermes-acp/issues">GitHub Issues</a> 提交，标题标明 <code>[Feature Request]</code>。</p>
+            <p>同样通过 <a href="#" data-url="https://github.com/acester822/FTR10-Hermes-VSCode/issues">GitHub Issues</a> 提交，标题标明 <code>[Feature Request]</code>。</p>
             <p>请说明：<strong>使用场景</strong>、<strong>期望行为</strong>、是否接受替代方案。描述越具体，越便于排期。</p>`,
 
     roleYou: '你',

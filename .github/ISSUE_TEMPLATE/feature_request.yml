@@ -1,5 +1,5 @@
 name: "✨ Feature Request"
-description: Suggest an idea for rina-hermes-acp
+description: Suggest an idea for FTR10-Hermes-VSCode
 title: "[Feature]: "
 labels: ["enhancement"]
 body:
@@ -9,7 +9,7 @@ body:
         Thanks for suggesting a feature! We'd love to hear your ideas.
 
         **Before submitting**, please:
-        - [ ] Search [existing issues](https://github.com/jove-rina/rina-hermes-acp/issues) to see if this has been requested already
+        - [ ] Search [existing issues](https://github.com/acester822/FTR10-Hermes-VSCode/issues) to see if this has been requested already
 
   - type: textarea
     id: problem

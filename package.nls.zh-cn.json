@@ -1,5 +1,5 @@
 {
-  "extension.displayName": "Rina Hermes ACP",
+  "extension.displayName": "FTR10 Hermes VSCode",
   "extension.description": "在 VS Code 中直接与 Hermes Agent 对话",
   "viewsContainers.activitybar.title": "Hermes Agent",
   "views.hermesChat.name": "聊天",
@@ -20,7 +20,7 @@
   "submenus.hermes.envMenu.label": "环境",
   "submenus.hermes.reloadMenu.label": "重载",
   "submenus.hermes.moreMenu.label": "更多",
-  "configuration.title": "Rina Hermes ACP",
+  "configuration.title": "FTR10 Hermes VSCode",
   "configuration.hermes.path.description": "Hermes 可执行文件路径。留空则自动检测。",
   "configuration.hermes.cwd.description": "Hermes 会话的工作目录。默认为工作区根目录。",
   "configuration.hermes.profile.description": "Hermes profile 名称（对应 hermes --profile <name>）。留空使用默认。",

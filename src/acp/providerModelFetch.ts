@@ -19,7 +19,7 @@ export async function fetchOpenAiCompatibleModels(
         try {
             const controller = new AbortController();
             const timer = setTimeout(() => controller.abort(), timeoutMs);
-            const headers: Record<string, string> = { 'User-Agent': 'rina-hermes-acp' };
+            const headers: Record<string, string> = { 'User-Agent': 'FTR10-Hermes-VSCode' };
             if (apiKey) {
                 headers.Authorization = `Bearer ${apiKey}`;
             }

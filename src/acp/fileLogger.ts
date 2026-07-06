@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 
-const LOG_DIR = '/home/ftr/Apps/rina-hermes-acp/logs';
+const LOG_DIR = '/home/ftr/Apps/FTR10-Hermes-VSCode/logs';
 const LOG_FILE = path.join(LOG_DIR, 'hermes-acp.log');
 
 let _stream: fs.WriteStream | null = null;

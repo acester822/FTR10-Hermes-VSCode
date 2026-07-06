@@ -4803,7 +4803,7 @@ function parseToolCallText(text) {
     let pluginInfo = {};
 
     function renderAboutContent() {
-        const name = pluginInfo.displayName || 'Rina Hermes ACP';
+        const name = pluginInfo.displayName || 'FTR10 Hermes VSCode';
         const version = pluginInfo.version || '—';
         const publisher = pluginInfo.publisher || '';
         const repo = pluginInfo.repository || '';

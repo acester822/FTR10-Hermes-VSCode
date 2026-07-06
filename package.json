@@ -1,9 +1,9 @@
 {
-  "name": "rina-hermes-acp",
+  "name": "FTR10-Hermes-VSCode",
   "displayName": "%extension.displayName%",
   "description": "%extension.description%",
   "version": "0.3.2",
-  "publisher": "JoveRina",
+  "publisher": "FTR10",
   "icon": "media/icon.png",
   "license": "MIT",
   "engines": {
@@ -419,6 +419,6 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/jove-rina/rina-hermes-acp"
+    "url": "https://github.com/acester822/FTR10-Hermes-VSCode"
   }
 }

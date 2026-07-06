@@ -3011,7 +3011,7 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
         }
         this._postMessage({
             type: 'pluginInfo',
-            displayName: pkg?.displayName || 'Rina Hermes ACP',
+            displayName: pkg?.displayName || 'FTR10 Hermes VSCode',
             version: pkg?.version || '',
             publisher: pkg?.publisher || '',
             description: pkg?.description || '',

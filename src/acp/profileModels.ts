@@ -119,7 +119,7 @@ async function _fetchOpenRouterModels(timeoutMs = 8000): Promise<string[] | null
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(), timeoutMs);
         const resp = await fetch('https://openrouter.ai/api/v1/models', {
-            headers: { Accept: 'application/json', 'User-Agent': 'rina-hermes-acp' },
+            headers: { Accept: 'application/json', 'User-Agent': 'FTR10-Hermes-VSCode' },
             signal: controller.signal,
         });
         clearTimeout(timer);

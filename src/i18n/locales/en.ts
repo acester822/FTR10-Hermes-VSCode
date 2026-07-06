@@ -153,7 +153,7 @@ export const en: LocaleStrings = {
     copy: 'Copy',
     clear: 'Clear',
     noLogs: '(no logs yet)',
-    aboutTitle: 'About Rina Hermes ACP',
+    aboutTitle: 'About FTR10 Hermes VSCode',
     helpTitle: 'Help — How to start ACP',
     faqTitle: 'FAQ',
 
@@ -244,10 +244,10 @@ hermes --profile &lt;name&gt; acp</code></pre>
 
             <h3>5. Will this extension keep getting updates?</h3>
             <p><strong>Yes.</strong> Published on the VS Code Marketplace; use <strong>More → Check for Updates</strong> to check and jump to this extension.</p>
-            <p>Hermes Agent and this extension <strong>evolve independently</strong>: the extension tracks ACP, model selection, Profile support, etc.; underlying capabilities depend on Hermes itself. Watch <a href="#" data-url="https://github.com/jove-rina/rina-hermes-acp">Releases and Issues on GitHub</a>.</p>
+            <p>Hermes Agent and this extension <strong>evolve independently</strong>: the extension tracks ACP, model selection, Profile support, etc.; underlying capabilities depend on Hermes itself. Watch <a href="#" data-url="https://github.com/acester822/FTR10-Hermes-VSCode">Releases and Issues on GitHub</a>.</p>
 
             <h3>6. How do I report a bug?</h3>
-            <p>Open an Issue on GitHub:<br><a href="#" data-url="https://github.com/jove-rina/rina-hermes-acp/issues">github.com/jove-rina/rina-hermes-acp/issues</a></p>
+            <p>Open an Issue on GitHub:<br><a href="#" data-url="https://github.com/acester822/FTR10-Hermes-VSCode/issues">github.com/acester822/FTR10-Hermes-VSCode/issues</a></p>
             <p><strong>Please include:</strong></p>
             <ul>
                 <li>VS Code version (Help → About)</li>
@@ -258,7 +258,7 @@ hermes --profile &lt;name&gt; acp</code></pre>
             </ul>
 
             <h3>7. How do I suggest a new feature?</h3>
-            <p>Same channel: <a href="#" data-url="https://github.com/jove-rina/rina-hermes-acp/issues">GitHub Issues</a>, with <code>[Feature Request]</code> in the title.</p>
+            <p>Same channel: <a href="#" data-url="https://github.com/acester822/FTR10-Hermes-VSCode/issues">GitHub Issues</a>, with <code>[Feature Request]</code> in the title.</p>
             <p>Describe the <strong>use case</strong>, <strong>expected behavior</strong>, and whether alternatives are acceptable. The more specific, the easier to prioritize.</p>`,
 
     roleYou: 'You',

@@ -27,7 +27,7 @@ function bindChatCommand(
 
 export function activate(context: vscode.ExtensionContext) {
     initI18n();
-    logToFile('[Hermes ACP] Rina Hermes ACP activating...');
+    logToFile('[Hermes ACP] FTR10 Hermes VSCode activating...');
 
     // Register the chat webview provider
     chatProvider = new HermesChatProvider(context.extensionUri, context);
@@ -161,7 +161,7 @@ export function activate(context: vscode.ExtensionContext) {
         logToFile('[Hermes ACP] Failed to get tool manifest: ' + (err instanceof Error ? err.message : String(err)));
     }
 
-    logToFile('[Hermes ACP] Rina Hermes ACP activated');
+    logToFile('[Hermes ACP] FTR10 Hermes VSCode activated');
 }
 
 export function deactivate() {

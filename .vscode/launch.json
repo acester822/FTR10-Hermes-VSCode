@@ -7,13 +7,13 @@
             "request": "launch",
             "program": "${workspaceFolder}",
             "args": [
-                "--extensionDevelopmentPath=/home/ftr/Apps/rina-hermes-acp",
+                "--extensionDevelopmentPath=/home/ftr/Apps/FTR10-Hermes-VSCode",
                 "--disable-extensions",
                 "--no-cache"
             ],
-            "cwd": "/home/ftr/Apps/rina-hermes-acp",
+            "cwd": "/home/ftr/Apps/FTR10-Hermes-VSCode",
             "outFiles": [
-                "/home/ftr/Apps/rina-hermes-acp/out/**/*.js"
+                "/home/ftr/Apps/FTR10-Hermes-VSCode/out/**/*.js"
             ],
             "preLaunchTask": "${defaultBuildTask}"
         },
@@ -23,13 +23,13 @@
             "request": "launch",
             "program": "${workspaceFolder}",
             "args": [
-                "--extensionDevelopmentPath=/home/ftr/Apps/rina-hermes-acp",
+                "--extensionDevelopmentPath=/home/ftr/Apps/FTR10-Hermes-VSCode",
                 "--disable-extensions",
                 "--no-cache"
             ],
-            "cwd": "/home/ftr/Apps/rina-hermes-acp",
+            "cwd": "/home/ftr/Apps/FTR10-Hermes-VSCode",
             "outFiles": [
-                "/home/ftr/Apps/rina-hermes-acp/out/**/*.js"
+                "/home/ftr/Apps/FTR10-Hermes-VSCode/out/**/*.js"
             ],
             "preLaunchTask": "${defaultBuildTask}"
         }

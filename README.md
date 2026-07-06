@@ -1,12 +1,12 @@
 <div align="center">
 
-<img src="media/icon.png" alt="Rina Hermes ACP icon" width="128" />
+<img src="media/icon.png" alt="FTR10 Hermes VSCode icon" width="128" />
 
-# Rina Hermes ACP
+# FTR10 Hermes VSCode
 
 **Chat with [Hermes Agent](https://hermes-agent.nousresearch.com) directly inside VS Code or Cursor — no terminal switching required.**
 
-[中文文档](README.zh-CN.md) · [More capabilities](https://app.jove-rina.top)
+[中文文档](README.zh-CN.md) · [More capabilities](https://github.com/acester822/FTR10-Hermes-VSCode)
 
 </div>
 
@@ -14,7 +14,7 @@
 
 ## Overview
 
-Rina Hermes ACP is a VS Code / Cursor extension that brings your local Hermes Agent into the editor sidebar. Instead of juggling a separate terminal, you get a full chat experience right where you write code.
+FTR10 Hermes VSCode is a VS Code / Cursor extension that brings your local Hermes Agent into the editor sidebar. Instead of juggling a separate terminal, you get a full chat experience right where you write code.
 
 The extension connects to a local `hermes acp` subprocess over the [Agent Client Protocol (ACP)](https://agentclientprotocol.com), so you can ask questions, run tools, and iterate on code without leaving the IDE. Replies stream in real time with Markdown rendering; code blocks can be inserted into the editor with one click; file paths in messages open directly in VS Code.
 
@@ -59,23 +59,23 @@ The extension connects to a local `hermes acp` subprocess over the [Agent Client
 
 1. Open VS Code.
 2. Go to **Extensions** (`Ctrl+Shift+X` / `Cmd+Shift+X`).
-3. Search for **Rina Hermes ACP** or **JoveRina**.
+3. Search for **FTR10 Hermes VSCode** or **FTR10**.
 4. Click **Install**.
 
-Or install from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=JoveRina.rina-hermes-acp).
+Or install from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=FTR10.FTR10-Hermes-VSCode).
 
 ### Install in Cursor
 
 1. Open Cursor.
 2. Go to **Extensions** (`Ctrl+Shift+X` / `Cmd+Shift+X`).
-3. Search for **Rina Hermes ACP** or **JoveRina**.
+3. Search for **FTR10 Hermes VSCode** or **FTR10**.
 4. Click **Install**.
 
-Or install from [Open VSX](https://open-vsx.org/extension/JoveRina/rina-hermes-acp) (Cursor extension registry).
+Or install from [Open VSX](https://open-vsx.org/extension/FTR10/FTR10-Hermes-VSCode) (Cursor extension registry).
 
 ### More capabilities
 
-Visit [app.jove-rina.top](https://app.jove-rina.top) for guides, tips, and related tools.
+Visit FTR10-Hermes-VSCode on GitHub(https://github.com/acester822/FTR10-Hermes-VSCode) for guides, tips, and related tools.
 
 ### Verify installation
 
@@ -297,7 +297,7 @@ We welcome issues, feature requests, and pull requests.
 
 **Report a bug**
 
-1. Go to [GitHub Issues](https://github.com/jove-rina/rina-hermes-acp/issues)
+1. Go to [GitHub Issues](https://github.com/acester822/FTR10-Hermes-VSCode/issues)
 2. Click **New issue**
 3. Include:
    - VS Code version
@@ -309,15 +309,15 @@ We welcome issues, feature requests, and pull requests.
 
 **Before filing**
 
-- Search [existing issues](https://github.com/jove-rina/rina-hermes-acp/issues) to avoid duplicates
+- Search [existing issues](https://github.com/acester822/FTR10-Hermes-VSCode/issues) to avoid duplicates
 - Confirm Hermes works outside VS Code (e.g. `hermes acp` in a terminal)
 
 **Other links**
 
-- Repository: [github.com/jove-rina/rina-hermes-acp](https://github.com/jove-rina/rina-hermes-acp)
-- VS Code Marketplace: [marketplace.visualstudio.com/items?itemName=JoveRina.rina-hermes-acp](https://marketplace.visualstudio.com/items?itemName=JoveRina.rina-hermes-acp)
-- Cursor (Open VSX): [open-vsx.org/extension/JoveRina/rina-hermes-acp](https://open-vsx.org/extension/JoveRina/rina-hermes-acp)
-- More capabilities: [app.jove-rina.top](https://app.jove-rina.top)
+- Repository: [github.com/acester822/FTR10-Hermes-VSCode](https://github.com/acester822/FTR10-Hermes-VSCode)
+- VS Code Marketplace: [marketplace.visualstudio.com/items?itemName=FTR10.FTR10-Hermes-VSCode](https://marketplace.visualstudio.com/items?itemName=FTR10.FTR10-Hermes-VSCode)
+- Cursor (Open VSX): [open-vsx.org/extension/FTR10/FTR10-Hermes-VSCode](https://open-vsx.org/extension/FTR10/FTR10-Hermes-VSCode)
+- More capabilities: FTR10-Hermes-VSCode on GitHub(https://github.com/acester822/FTR10-Hermes-VSCode)
 - Hermes Agent docs: [hermes-agent.nousresearch.com](https://hermes-agent.nousresearch.com)
 
 ---

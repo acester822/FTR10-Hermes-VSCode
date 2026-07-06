@@ -1,11 +1,11 @@
 blank_issues_enabled: true
 contact_links:
   - name: 📦 VS Code Marketplace
-    url: https://marketplace.visualstudio.com/items?itemName=JoveRina.rina-hermes-acp
+    url: https://marketplace.visualstudio.com/items?itemName=FTR10.FTR10-Hermes-VSCode
     about: Install the latest version
   - name: 🖥️ Cursor (Open VSX)
-    url: https://open-vsx.org/extension/JoveRina/rina-hermes-acp
+    url: https://open-vsx.org/extension/FTR10/FTR10-Hermes-VSCode
     about: Install via Cursor extension registry
   - name: 🌐 Brand Site
-    url: https://app.jove-rina.top
+    url: https://github.com/acester822/FTR10-Hermes-VSCode
     about: Guides, tips, and related tools

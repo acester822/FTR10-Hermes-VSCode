@@ -1,5 +1,5 @@
 name: "🐛 Bug Report"
-description: Report a bug to help us improve rina-hermes-acp
+description: Report a bug to help us improve FTR10-Hermes-VSCode
 title: "[Bug]: "
 labels: ["bug"]
 body:
@@ -9,7 +9,7 @@ body:
         Thanks for reporting a bug! Please fill out the sections below.
 
         **Before submitting**, please:
-        - [ ] Search [existing issues](https://github.com/jove-rina/rina-hermes-acp/issues) to avoid duplicates
+        - [ ] Search [existing issues](https://github.com/acester822/FTR10-Hermes-VSCode/issues) to avoid duplicates
         - [ ] Try restarting VS Code / Cursor and the Hermes ACP connection
 
   - type: textarea
