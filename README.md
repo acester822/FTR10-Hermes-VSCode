@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="media/icon.svg" alt="FTR10 Hermes VSCode icon" width="128" />
+![FTR10 Hermes VSCode icon](media/icon.png)
 
 # FTR10 Hermes VSCode
 
