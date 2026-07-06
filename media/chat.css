@@ -529,7 +529,6 @@ body {
     display: grid;
     grid-template-rows: 0fr;
     opacity: 0;
-    overflow: hidden;
     transition: grid-template-rows var(--transition-spring),
                 opacity var(--transition-base);
 }
