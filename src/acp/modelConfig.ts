@@ -219,10 +219,13 @@ export function isHermesModelValueId(valueId: string): boolean {
 export function encodeHermesModelValueId(provider: string | undefined, modelName: string): string {
     const model = modelName.trim();
     const rawProvider = (provider ?? '').trim().toLowerCase();
-    if (!rawProvider || rawProvider === 'custom' || rawProvider.startsWith('custom:')) {
+    if (!rawProvider || rawProvider === 'custom') {
         return `custom:${model}`;
     }
-    return `${rawProvider}:${model}`;
+    // Strip the ``custom:`` prefix so the Hermes agent can parse the provider name correctly.
+    // The agent splits on the first colon and uses the first segment as the provider identifier.
+    const effectiveProvider = rawProvider.startsWith('custom:') ? rawProvider.slice('custom:'.length) : rawProvider;
+    return `${effectiveProvider}:${model}`;
 }
 
 /** Merge supplemental models; dedupe by valueId only. */

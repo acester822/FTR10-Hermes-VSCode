@@ -2117,13 +2117,17 @@
                     } else {
                         setAuxiliaryContent(group, bodyPart);
                     }
+                    // Auto-expand the card when result content arrives
                     // Check for todo content in the body
                     if (isTodoContent(bodyPart)) {
                         var todoItems = parseTodoItems(bodyPart);
                         renderTodos(todoItems, toolCallId);
                     }
                 }
-                setAuxMessageLive(group, true);
+                // Only set live if the tool is actually still in progress
+                if (toolInfo.status !== 'completed' && toolInfo.status !== 'failed') {
+                    setAuxMessageLive(group, true);
+                }
                 maybeScrollToBottom();
             }
             return;
@@ -2431,6 +2435,7 @@ function parseToolCallText(text) {
                     card.classList.add('is-' + toolInfo.state);
                 }
             }
+            // Auto-expand if body content is present on initial render
 
             const header = document.createElement('div');
             header.className = 'tool-call-header';
@@ -3935,29 +3940,25 @@ function parseToolCallText(text) {
     }
 
     function clearAllToolLive() {
-        Object.keys(toolCallMap).forEach(function(key) {
-            const group = document.getElementById(toolCallMap[key]);
-            const msg = group && group.querySelector('.message.tool');
-            if (msg) {
-                msg.classList.remove('is-live');
-                // Also clean up the tool-call-card state so it doesn't
-                // stay stuck in is-live/is-writing/etc. after completion
-                if (msg._cardData && msg._cardData.card) {
-                    const card = msg._cardData.card;
-                    card.classList.remove('is-live', 'is-analyzing', 'is-searching', 'is-reading', 'is-writing', 'is-executing', 'is-error');
-                    // If not already marked as complete/failed, mark it complete
-                    if (!card.classList.contains('is-complete') && !card.classList.contains('is-failed')) {
-                        card.classList.add('is-complete');
-                    }
-                    // Also update the status label
-                    const statusEl = msg._cardData.statusEl;
-                    if (statusEl) {
-                        statusEl.className = 'tool-call-status is-complete';
-                        statusEl.innerHTML = '<span class="status-dot"></span> Done';
+            Object.keys(toolCallMap).forEach(function(key) {
+                const group = document.getElementById(toolCallMap[key]);
+                const msg = group && group.querySelector('.message.tool');
+                if (msg) {
+                    msg.classList.remove('is-live');
+                    const card = (msg._cardData && msg._cardData.card) || msg.querySelector('.tool-call-card');
+                    if (card) {
+                        card.classList.remove('is-live', 'is-analyzing', 'is-searching', 'is-reading', 'is-writing', 'is-executing', 'is-error');
+                        if (!card.classList.contains('is-complete') && !card.classList.contains('is-failed')) {
+                            card.classList.add('is-complete');
+                        }
+                        const statusEl = msg._cardData ? msg._cardData.statusEl : card.querySelector('.tool-call-status');
+                        if (statusEl) {
+                            statusEl.className = 'tool-call-status is-complete';
+                            statusEl.innerHTML = '<span class="status-dot"></span> Done';
+                        }
                     }
                 }
-            }
-        });
+            });
     }
 
     function setAuxMessageLive(group, live) {

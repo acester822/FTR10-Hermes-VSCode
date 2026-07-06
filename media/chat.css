@@ -10,7 +10,7 @@
 .tool-call-card:hover:not(.is-live),
 .session-picker-card:hover {
     transform: translateY(-1px);
-    box-shadow: 0 4px 12px color-mix(in srgb, var(--fg) 8%, transparent);
+    box-shadow: var(--glass-shadow-sm);
 }
 
 :root {
@@ -82,6 +82,23 @@
     --reasoning-bg: color-mix(in srgb, var(--primary) 8%, var(--text-block));
     --reasoning-border: color-mix(in srgb, var(--primary) 25%, var(--border));
     --reasoning-accent: var(--primary);
+
+    /* --- Glass Design System (Hermes Desktop Inspired) --- */
+    /* Glass Surfaces: Translucent backgrounds that let the editor show through */
+    --glass-bg: transparent;
+    --glass-bg-elevated: color-mix(in srgb, var(--bg-solid, #0c0e13) 88%, transparent);
+    --glass-bg-hover: color-mix(in srgb, var(--fg, #cccccc) 6%, transparent);
+
+    /* Hairline Strokes: Replace hard 1px solid borders with faint, theme-adaptive hairlines */
+    --glass-stroke: color-mix(in srgb, var(--fg, #cccccc) 12%, transparent);
+    --glass-stroke-strong: color-mix(in srgb, var(--fg, #cccccc) 25%, transparent);
+
+    /* Soft Elevation: Layered shadows instead of hard borders for floating elements */
+    --glass-shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.15);
+    --glass-shadow-md: 0 8px 24px rgba(0, 0, 0, 0.25), 0 2px 8px rgba(0, 0, 0, 0.15);
+
+    /* The "Liquid Glass" Blur */
+    --glass-blur: blur(16px) saturate(1.2);
 }
 /* Unified transitions for interactive elements */
 .message-group,
@@ -359,10 +376,12 @@ body {
     transform: translateX(-50%);
     width: min(520px, calc(100vw - 24px));
     z-index: 150;
-    background: var(--bg);
-    border: 1px solid var(--border);
+    background: var(--glass-bg-elevated);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--glass-stroke);
+    box-shadow: var(--glass-shadow-md);
     border-radius: var(--radius-sm);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.35);
     max-height: 320px;
     overflow: hidden;
     display: grid;
@@ -498,13 +517,15 @@ body {
     top: calc(100% + 2px);
     left: 0;
     z-index: 100;
-    background: var(--ftr10-glass-bg-menu, var(--bg));
-    border: 1px solid var(--border);
+    background: var(--glass-bg-elevated);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--glass-stroke);
+    box-shadow: var(--glass-shadow-md);
     border-radius: var(--radius-md);
     min-width: 200px;
     max-height: 280px;
     overflow-y: auto;
-    box-shadow: var(--ftr10-shadow-popup, 0 4px 16px rgba(0,0,0,0.4));
     display: grid;
     grid-template-rows: 0fr;
     opacity: 0;
@@ -863,11 +884,13 @@ body {
     display: flex;
     align-items: stretch;
     gap: 0;
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid var(--glass-stroke);
     flex-shrink: 0;
     overflow: auto;
     overflow-y: hidden;
     scrollbar-width: thin;
+    scroll-behavior: smooth;
+    scroll-snap-type: x mandatory;
     min-height: 30px;
     background: transparent;
 }
@@ -1537,31 +1560,29 @@ body {
 
 .message {
     padding: var(--space-md) var(--space-lg);
-    /* border-radius: var(--radius-lg); */
-    /* word-break: break-word; */
     white-space: pre-wrap;
     min-width: 96px;
     position: relative;
     font-size: 13px;
     line-height: 1.65;
-    /* max-width: 85%; */
 }
 
 .message.user {
     max-width: 75%;
     width: fit-content;
-    background: var(--ftr10-accent-1-70);
-    border-bottom-right-radius: var(--radius-xs);
+    background: color-mix(in srgb, var(--primary) 10%, transparent);
+    border: 1px solid color-mix(in srgb, var(--primary) 20%, transparent);
+    border-radius: var(--radius-md);
+    border-bottom-right-radius: var(--radius-sm);
 }
 
 .message.assistant {
-    max-width: 85%;
-    background: var(--text-block);
-    color: var(--fg);
-    border: 1px solid var(--border);
-    border-left: 3px solid var(--primary);
-    border-radius: var(--radius-md);
+    background: transparent;
+    border: none;
+    border-left: 2px solid var(--primary);
     padding: var(--space-md) var(--space-lg);
+    border-radius: 0 var(--radius-md) var(--radius-md) 0;
+    color: var(--fg);
 }
 
 .message.assistant .content {
@@ -1589,10 +1610,11 @@ body {
     50% { opacity: 0.42; }
 }
 @media (prefers-reduced-motion: reduce) {
-    .message.assistant.streaming .label,
-    .message.thought.is-live .aux-label,
-    .message.tool.is-live .aux-label {
-        animation: none !important;
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
     }
 }
 
@@ -1978,10 +2000,12 @@ body {
     bottom: calc(100% - 4px);
     max-height: 180px;
     overflow-y: auto;
-    background: var(--ftr10-glass-bg-menu, var(--vscode-dropdown-background, var(--input-bg)));
-    border: 1px solid var(--border);
+    background: var(--glass-bg-elevated);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--glass-stroke);
+    box-shadow: var(--glass-shadow-md);
     border-radius: var(--radius-md);
-    box-shadow: var(--ftr10-shadow-popup, 0 -4px 12px rgba(0, 0, 0, 0.25));
     z-index: 30;
 }
 .file-picker.visible {
@@ -2409,9 +2433,11 @@ body {
     display: flex;
     flex-direction: column;
     border-radius: 6px;
-    background: var(--bg);
-    border: 1px solid color-mix(in srgb, var(--primary) 35%, var(--border));
-    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
+    background: var(--glass-bg-elevated);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--glass-stroke);
+    box-shadow: var(--glass-shadow-md);
     pointer-events: auto;
 }
 .context-attach-preview[hidden] {
@@ -2881,17 +2907,18 @@ body {
     display: flex;
     flex-direction: column;
     align-items: stretch;
-    background: var(--input-bg);
-    border: 1px solid var(--border);
-    border-radius: 4px;
+    background: var(--glass-bg-elevated);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--glass-stroke);
+    border-radius: 24px;
     overflow: hidden;
-    transition: border-color 0.15s, box-shadow 0.15s;
-    box-shadow: var(--glass-shadow);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    box-shadow: var(--glass-shadow-sm);
 }
 .input-composite:focus-within {
     border-color: var(--primary);
-    box-shadow: 0 0 0 1px color-mix(in srgb, var(--primary) 30%, transparent),
-                var(--glass-shadow);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 20%, transparent), var(--glass-shadow-sm);
 }
 .input-composite-bar {
     display: flex;
@@ -3366,8 +3393,11 @@ mark.search-mark-active {
     display: flex;
 }
 .modal-panel {
-    background: var(--ftr10-glass-bg-widget-strong, var(--bg));
-    border: 1px solid var(--border);
+    background: var(--glass-bg-elevated);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--glass-stroke);
+    box-shadow: var(--glass-shadow-md);
     border-radius: var(--radius-lg);
     width: 100%;
     max-width: min(600px, 100%);
@@ -3375,7 +3405,6 @@ mark.search-mark-active {
     display: flex;
     flex-direction: column;
     max-height: min(85vh, 100%);
-    box-shadow: var(--ftr10-shadow-dialog, 0 8px 32px rgba(0,0,0,0.4));
 }
 .modal-header {
     display: flex;
@@ -3496,11 +3525,11 @@ mark.search-mark-active {
 
 /* Tool Call Cards - Clean Hierarchical Design */
 .tool-call-card {
-    background: var(--tool-bg);
-    border: 1px solid var(--tool-border);
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-stroke);
     border-radius: var(--radius-md);
     overflow: hidden;
-    transition: all var(--transition-base);
+    transition: background 0.2s ease, border-color 0.2s ease;
     position: relative;
     width: 100%;
     text-rendering: optimizeLegibility;
@@ -3508,34 +3537,45 @@ mark.search-mark-active {
 }
 
 .tool-call-card.is-live {
-    outline: none;
-    animation: toolCardPulse 2s ease-in-out infinite;
-}
-
-.tool-call-card.is-complete .tool-call-header {
-    background: color-mix(in srgb, var(--tool-success) 8%, transparent);
-}
-
-.tool-call-card.is-failed .tool-call-header {
-    background: color-mix(in srgb, var(--tool-error) 8%, transparent);
-}
-
-.tool-call-card.is-live .tool-call-header {
     background: color-mix(in srgb, var(--tool-accent) 8%, transparent);
+    border-color: color-mix(in srgb, var(--tool-accent) 30%, transparent);
 }
 
-@keyframes toolCardPulse {
-    0%, 100% {
-        outline: 1px solid color-mix(in srgb, var(--tool-accent) 15%, transparent);
-    }
-    50% {
-        outline: 2px solid color-mix(in srgb, var(--tool-accent) 30%, transparent);
-    }
+.tool-call-card.is-live::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    z-index: 0;
+    background: linear-gradient(90deg, var(--tool-accent) 0%, transparent 100%);
+    opacity: 0.15;
+    animation: toolGlow 2s ease-in-out infinite;
+}
+
+@keyframes toolGlow {
+    0%, 100% { opacity: 0.1; }
+    50% { opacity: 0.25; }
+}
+
+.tool-call-card.is-complete {
+    /* completion state uses hairline accent only */
+}
+
+.tool-call-card.is-failed {
+    border-color: color-mix(in srgb, var(--tool-error) 40%, transparent);
+}
+
+.tool-call-card.is-complete .tool-call-header,
+.tool-call-card.is-failed .tool-call-header,
+.tool-call-card.is-live .tool-call-header {
+    background: transparent;
 }
 
 .tool-call-header {
     display: flex;
-    background: var(--border);
+    background: transparent;
+    border-bottom: 1px solid var(--glass-stroke);
     align-items: center;
     gap: var(--space-sm);
     padding: var(--space-sm) var(--space-md);
@@ -3547,7 +3587,7 @@ mark.search-mark-active {
 }
 
 .tool-call-header:hover {
-    background: color-mix(in srgb, var(--fg) 4%, transparent);
+    background: var(--glass-bg-hover);
 }
 
 /* Cognitive state pulse colors — remap tool-accent so the pulse animation color changes */
@@ -3649,19 +3689,26 @@ mark.search-mark-active {
     grid-template-rows: 0fr;
     opacity: 0;
     overflow: hidden;
-    padding: 0 var(--space-md);
+    padding: 0;
+    visibility: hidden;
     transition: grid-template-rows var(--transition-spring),
                 opacity var(--transition-base),
-                padding var(--transition-base);
+                padding var(--transition-base),
+                visibility 0s var(--transition-base);
 }
 
 .tool-call-card.is-expanded .tool-call-body {
     grid-template-rows: 1fr;
     opacity: 1;
     padding: var(--space-sm) var(--space-md);
+    visibility: visible;
+    transition: grid-template-rows var(--transition-spring),
+                opacity var(--transition-base),
+                padding var(--transition-base),
+                visibility 0s;
 }
 
-.tool-call-card.is-expanded .tool-call-body > * {
+.tool-call-body > * {
     min-height: 0;
 }
 

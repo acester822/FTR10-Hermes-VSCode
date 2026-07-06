@@ -150,7 +150,8 @@ describe('modelConfig', () => {
 
     it('encodeHermesModelValueId builds custom provider ids', () => {
         assert.strictEqual(encodeHermesModelValueId('custom', 'agnes-2.0-flash'), 'custom:agnes-2.0-flash');
-        assert.strictEqual(encodeHermesModelValueId('custom:deepseek', 'deepseek-v4-flash'), 'custom:deepseek-v4-flash');
+        // Strips ``custom:`` prefix so the Hermes agent parses the correct provider name.
+        assert.strictEqual(encodeHermesModelValueId('custom:deepseek', 'deepseek-v4-flash'), 'deepseek:deepseek-v4-flash');
     });
 
     it('enrichModelListState merges profile-configured models', () => {
