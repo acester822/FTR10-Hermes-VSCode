@@ -62,7 +62,7 @@
         {
           "id": "hermes-sidebar",
           "title": "%viewsContainers.activitybar.title%",
-          "icon": "media/activitybar.svg"
+          "icon": "media/icon.svg"
         }
       ]
     },
@@ -72,7 +72,7 @@
           "type": "webview",
           "id": "hermesChat",
           "name": "%views.hermesChat.name%",
-          "icon": "media/activitybar.svg"
+          "icon": "media/icon.svg"
         }
       ]
     },

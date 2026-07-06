@@ -3006,7 +3006,7 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
         let iconUri = '';
         if (this._view) {
             iconUri = this._view.webview.asWebviewUri(
-                vscode.Uri.joinPath(this._extensionUri, 'media', 'icon.png')
+                vscode.Uri.joinPath(this._extensionUri, 'media', 'icon.svg')
             ).toString();
         }
         this._postMessage({
