@@ -128,7 +128,7 @@ describe('profileModels', () => {
             );
             assert.strictEqual(deepseek!.isPrimary, true);
             assert.strictEqual(catalog.profileDefault?.modelName, 'deepseek-v4-flash');
-            assert.strictEqual(catalog.profileDefault?.valueId, 'custom:deepseek-v4-flash');
+            assert.strictEqual(catalog.profileDefault?.valueId, 'deepseek:deepseek-v4-flash');
         } finally {
             global.fetch = originalFetch;
             delete process.env.DEEPSEEK_API_KEY;

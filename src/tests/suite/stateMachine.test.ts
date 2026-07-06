@@ -13,8 +13,9 @@ describe('State Machine', () => {
     });
 
     it('connecting can go to ready or error', () => {
-        assert.strictEqual(canTransition('connecting', 'ready'), true);
+        assert.strictEqual(canTransition('connecting', 'connected'), true);
         assert.strictEqual(canTransition('connecting', 'error'), true);
+        assert.strictEqual(canTransition('connecting', 'ready'), false);
         assert.strictEqual(canTransition('connecting', 'idle'), false);
     });
 
@@ -40,13 +41,15 @@ describe('State Machine', () => {
 
     it('full lifecycle: idle → connecting → ready → prompting → ready', () => {
         assert.strictEqual(canTransition('idle', 'connecting'), true);
-        assert.strictEqual(canTransition('connecting', 'ready'), true);
+        assert.strictEqual(canTransition('connecting', 'connected'), true);
+        assert.strictEqual(canTransition('connected', 'ready'), true);
         assert.strictEqual(canTransition('ready', 'prompting'), true);
         assert.strictEqual(canTransition('prompting', 'ready'), true);
     });
 
     it('error recovery: error → connecting → ready', () => {
         assert.strictEqual(canTransition('error', 'connecting'), true);
-        assert.strictEqual(canTransition('connecting', 'ready'), true);
+        assert.strictEqual(canTransition('connecting', 'connected'), true);
+        assert.strictEqual(canTransition('connected', 'ready'), true);
     });
 });

@@ -29,7 +29,7 @@ describe('acpModelCatalog', () => {
 
         assert.strictEqual(catalog.groups.length, 2);
         assert.strictEqual(catalog.profileDefault?.modelName, 'deepseek-v4-flash');
-        assert.strictEqual(catalog.profileDefault?.valueId, 'custom:deepseek-v4-flash');
+        assert.strictEqual(catalog.profileDefault?.valueId, 'deepseek:deepseek-v4-flash');
         assert.strictEqual(catalog.groups[0].name, 'DeepSeek');
         assert.strictEqual(catalog.groups[0].models.length, 2);
     });

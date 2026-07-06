@@ -464,9 +464,7 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
         }
         session.modelId = profileState.modelId;
         session.modelLabel = profileState.modelLabel;
-        try {
-            fs.writeFileSync(this._sessionsPath, JSON.stringify(this._sessions.slice(0, 50), null, 2));
-        } catch { /* ignore */ }
+        this._saveSessions();
     }
 
     private async _syncModelStateForCurrentSession(): Promise<void> {
@@ -836,6 +834,12 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
         }
     }
 
+    private _saveSessions(limit = 50): void {
+        try {
+            fs.writeFileSync(this._sessionsPath, JSON.stringify(this._sessions.slice(0, limit), null, 2));
+        } catch { /* ignore */ }
+    }
+
     private _saveCurrentSession(): void {
         const firstUser = this._sessionMessages.find(m => m.role === 'user')?.text.slice(0, 40);
         const existing = this._sessions.find(s => s.id === this._sessionId);
@@ -855,7 +859,7 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
             });
         }
         try {
-            fs.writeFileSync(this._sessionsPath, JSON.stringify(this._sessions.slice(0, 50), null, 2));
+            this._saveSessions();
             this._saveActiveSession();
         } catch { /* non-critical */ }
         this._postSessionList();
@@ -874,7 +878,7 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
             messageCount: this._sessionMessages.length,
         });
         try {
-            fs.writeFileSync(this._sessionsPath, JSON.stringify(this._sessions.slice(0, 50), null, 2));
+            this._saveSessions();
         } catch { /* non-critical */ }
     }
 
@@ -932,7 +936,7 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
         session.agentEngaged = true;
         session.updatedAt = Date.now();
         try {
-            fs.writeFileSync(this._sessionsPath, JSON.stringify(this._sessions.slice(0, 50), null, 2));
+            this._saveSessions();
         } catch { /* non-critical */ }
         this._postSessionList();
     }
@@ -1034,7 +1038,7 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
         }));
     }
 
-    private async _syncModelState(options?: { skipModelOptions?: boolean }): Promise<void> {
+    private async _syncModelState(): Promise<void> {
         if (!this._acp) {
             this._modelState = null;
             this._postModelList();
@@ -1042,13 +1046,11 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
         }
 
         const hermesModelsRaw = this._acp.getHermesModelsRaw();
-        let modelOptions: AcpModelOptionsResponse | null | undefined = undefined;
-        if (modelOptions === undefined && options?.skipModelOptions) {
-            modelOptions = await this._loadCachedModelOptions();
-        }
-        if (modelOptions === undefined) {
-            modelOptions = options?.skipModelOptions ? null : await this._acp.fetchModelOptions();
-        }
+        // fetchModelOptions() caches the result in-memory on the AcpClient,
+        // so repeated calls are cheap. Fall back to that cache if the fetch
+        // yields nothing (e.g. ACP method unsupported / gateway unavailable).
+        let modelOptions: AcpModelOptionsResponse | null | undefined =
+            await this._acp.fetchModelOptions();
         if (!modelOptions?.providers?.length) {
             modelOptions = this._acp.getCachedModelOptions();
         }
@@ -1244,7 +1246,7 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
                 this._postTokenUsage();
             },
             () => {
-                void this._syncModelState({ skipModelOptions: true });
+                void this._syncModelState();
             },
             () => {
                 if (!this._isViewingPromptSession()) {
@@ -1336,18 +1338,14 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
             // this will be empty — the user just chose a session.
             this._restoreMessages();
 
-            await this._syncModelState({ skipModelOptions: true });
+            await this._syncModelState();
             await this._applySessionModelPreference();
 
-            // Kick off background TUI gateway model fetch — when it
-            // completes, the cached model.options file is written and the
-            // model list refreshes with full providers + pricing.
+            // Kick off a background TUI gateway model fetch for the full
+            // provider + pricing catalog, then refresh the picker when it
+            // returns (the result lives in the AcpClient's in-memory cache).
             this._acp.fetchModelOptions().then((fullCatalog) => {
                 if (fullCatalog?.providers?.length) {
-                    const cachePath = path.join(this._historyDir, 'model-cache.json');
-                    try {
-                        fs.writeFileSync(cachePath, JSON.stringify(fullCatalog, null, 2), 'utf-8');
-                    } catch { /* best-effort cache write */ }
                     this._log(`TUI gateway: ${fullCatalog.providers.length} providers`);
                     void this._syncModelState();
                 }
@@ -2115,13 +2113,12 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
                 fromAgent: state.fromAgent,
             });
         } else {
-            const session = this._sessions.find(s => s.id === this._sessionId);
-            const profileState = loadProfileState(this._historyDir, this._scopeKey);
+            const { modelId: currentValueId, modelLabel: currentLabel } = this._resolveSessionModelId();
             this._postMessage({
                 type: 'modelList',
                 configId: '',
-                currentValueId: session?.modelId || profileState.modelId || '',
-                currentLabel: session?.modelLabel || profileState.modelLabel || '—',
+                currentValueId: currentValueId || '',
+                currentLabel: currentLabel || '—',
                 models: [],
                 groups: [],
                 fromAgent: false,
@@ -2134,25 +2131,9 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
         if (session) {
             session.modelId = valueId;
             session.modelLabel = label;
-            try {
-                fs.writeFileSync(this._sessionsPath, JSON.stringify(this._sessions.slice(0, 50), null, 2));
-            } catch { /* ignore */ }
+            this._saveSessions();
         }
         saveProfileState(this._historyDir, this._scopeKey, { modelId: valueId, modelLabel: label });
-    }
-
-    /** Load cached TUI gateway model.options from disk (fast on reload). */
-    private async _loadCachedModelOptions(): Promise<AcpModelOptionsResponse | null> {
-        const cachePath = path.join(this._historyDir, 'model-cache.json');
-        try {
-            const raw = await fs.promises.readFile(cachePath, 'utf-8');
-            const parsed = JSON.parse(raw) as AcpModelOptionsResponse;
-            if (parsed?.providers?.length) {
-                this._log(`Model cache: ${parsed.providers.length} providers`);
-                return parsed;
-            }
-        } catch { /* no cache or invalid */ }
-        return null;
     }
 
     private async _resetAgentWithModel(valueId: string, configId?: string): Promise<void> {
@@ -2462,7 +2443,7 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
             session.title = t('newChat');
             session.titleManual = false;
             try {
-                fs.writeFileSync(this._sessionsPath, JSON.stringify(this._sessions.slice(0, 50), null, 2));
+                this._saveSessions();
             } catch { /* ignore */ }
         }
 
@@ -2539,7 +2520,7 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
         }
         this._sessions = this._sessions.filter(s => s.id !== sessionId);
         try {
-            fs.writeFileSync(this._sessionsPath, JSON.stringify(this._sessions, null, 2));
+            this._saveSessions();
             fs.unlinkSync(this._msgPath(sessionId));
         } catch { /* ignore */ }
 
@@ -2579,7 +2560,7 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
         session.updatedAt = Date.now();
         this._log(`Rename session ${sessionId}: ${trimmed}`);
         try {
-            fs.writeFileSync(this._sessionsPath, JSON.stringify(this._sessions.slice(0, 50), null, 2));
+            this._saveSessions();
         } catch { /* non-critical */ }
         this._postSessionList();
     }
@@ -2611,7 +2592,7 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
         this._sessions = [...pinned, ...unpinned];
         this._log(`Reorder sessions: ${this._sessions.map(s => s.id).join(', ')}`);
         try {
-            fs.writeFileSync(this._sessionsPath, JSON.stringify(this._sessions.slice(0, 50), null, 2));
+            this._saveSessions();
         } catch { /* non-critical */ }
         this._postSessionList();
     }
@@ -2669,7 +2650,7 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
             } catch { /* ignore */ }
         }
         try {
-            fs.writeFileSync(this._sessionsPath, JSON.stringify(this._sessions.slice(0, 50), null, 2));
+            this._saveSessions();
         } catch { /* ignore */ }
 
         if (this._sessions.length === 0) {
@@ -2727,7 +2708,7 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
         session.updatedAt = Date.now();
         this._log(`${session.pinned ? 'Pin' : 'Unpin'} session ${sessionId}`);
         try {
-            fs.writeFileSync(this._sessionsPath, JSON.stringify(this._sessions.slice(0, 50), null, 2));
+            this._saveSessions();
         } catch { /* non-critical */ }
         this._postSessionList();
     }

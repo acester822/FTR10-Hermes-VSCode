@@ -45,10 +45,16 @@ export function sanitizeWindowsPathEntry(entry: string): string {
 }
 
 export function normalizeWindowsUserPath(pathValue: string): string {
+    // Windows PATH values always use ';' as the separator, even when this
+    // code runs on a non-Windows host. Do NOT use the platform-aware
+    // splitPathEntries() here, or a Linux ':' would wrongly split 'C:\...'.
     const seen = new Set<string>();
     const entries: string[] = [];
-    for (const raw of splitPathEntries(pathValue)) {
-        const sanitized = sanitizeWindowsPathEntry(raw);
+    for (const raw of pathValue.split(';')) {
+        const sanitized = sanitizeWindowsPathEntry(raw.trim());
+        if (!sanitized) {
+            continue;
+        }
         const key = sanitized.toLowerCase();
         if (seen.has(key)) {
             continue;
