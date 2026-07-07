@@ -111,6 +111,11 @@
     transition: color var(--transition-spring), border-color var(--transition-spring), background var(--transition-spring), box-shadow var(--transition-spring);
 }
 
+/* Session tabs were replaced by the Hermes session picker; hide the bar. */
+#tab-bar {
+    display: none !important;
+}
+
 
 * {margin: 0;padding: 0;box-sizing: border-box;}
 body {

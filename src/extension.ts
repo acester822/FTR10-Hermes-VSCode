@@ -68,6 +68,13 @@ export function activate(context: vscode.ExtensionContext) {
         })
     );
 
+    // Session Menu: re-open the Hermes session picker from the view title bar.
+    context.subscriptions.push(
+        vscode.commands.registerCommand('hermes.openSessionMenu', () => {
+            void chatProvider?.openSessionMenu();
+        })
+    );
+
     // Secret Storage: set API key securely
     context.subscriptions.push(
         vscode.commands.registerCommand('hermes.setApiKey', async () => {

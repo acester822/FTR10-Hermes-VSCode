@@ -173,6 +173,11 @@
         "command": "hermes.openControlCenter",
         "title": "Open Control Center",
         "icon": "$(dashboard)"
+      },
+      {
+        "command": "hermes.openSessionMenu",
+        "title": "Open Session Menu",
+        "icon": "$(history)"
       }
     ],
     "submenus": [
@@ -203,6 +208,11 @@
           "command": "hermes.openControlCenter",
           "when": "view == hermesChat",
           "group": "navigation@1"
+        },
+        {
+          "command": "hermes.openSessionMenu",
+          "when": "view == hermesChat",
+          "group": "navigation@1.5"
         },
         {
           "command": "hermes.openSettings",

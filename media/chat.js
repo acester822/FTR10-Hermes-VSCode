@@ -4947,7 +4947,10 @@ function parseToolCallText(text) {
         hideHermesLoading();
         hermesSessionList = sessions || [];
         sessionPickerTitle.textContent = 'Welcome to Hermes';
-        sessionPickerSubtitle.textContent = 'Select a session to resume or start a new one';
+        const count = hermesSessionList.length;
+        sessionPickerSubtitle.textContent = count === 0
+            ? 'No previous sessions found — start a new one'
+            : count + (count === 1 ? ' session' : ' sessions') + ' available — select one to resume or start new';
 
         const list = sessionPickerList;
         list.textContent = '';
@@ -5637,9 +5640,17 @@ function parseToolCallText(text) {
     }
 
     function renderSessionTabs(sessions, activeId) {
+        // Session tabs were removed in favor of the Hermes session picker
+        // (opened via the view-bar "Open Session Menu" icon). Keep the
+        // bookkeeping fields current but never render the tab bar.
         activeSessionId = activeId || activeSessionId;
         lastSessions = sessions || [];
         lastActiveSessionId = activeSessionId;
+        if (tabBar) {
+            tabBar.innerHTML = '';
+        }
+        return;
+        // --- legacy tab rendering retained below but never reached ---
         if (editingSessionId) {
             return;
         }

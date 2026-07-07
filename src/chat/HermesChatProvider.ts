@@ -1038,7 +1038,7 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
         }));
     }
 
-    private async _syncModelState(): Promise<void> {
+    private async _syncModelState(options?: { preferRuntimeModel?: boolean }): Promise<void> {
         if (!this._acp) {
             this._modelState = null;
             this._postModelList();
@@ -1065,9 +1065,17 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
         const profileState = loadProfileState(this._historyDir, this._scopeKey);
         const session = this._sessions.find(s => s.id === this._sessionId);
 
+        // When resuming a remote Hermes session, the authoritative model is
+        // the one the ACP session is actually running (captured into the
+        // runtime model id during session/load) — not a local profile pref,
+        // which would otherwise clobber the resumed session's real model.
+        const runtimeModelId = options?.preferRuntimeModel ? this._acp.getRuntimeModelId() : '';
+        const seedModelId = runtimeModelId || session?.modelId || profileState.modelId;
+        const seedModelLabel = runtimeModelId ? undefined : (session?.modelLabel || profileState.modelLabel);
+
         this._modelState = buildModelListStateFromCatalog(catalog, null, {
-            modelId: session?.modelId || profileState.modelId,
-            modelLabel: session?.modelLabel || profileState.modelLabel,
+            modelId: seedModelId,
+            modelLabel: seedModelLabel,
         });
         this._postModelList();
     }
@@ -1276,70 +1284,39 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
 
             // After ACP is connected but before creating a session, show the
             // session picker so the user can resume an existing Hermes session
-            // or start a new one. This replaces the old auto-create approach.
+            // or start a new one. No session is auto-loaded: the picker waits
+            // for an explicit choice. The same picker is reused later via the
+            // "Open Session Menu" view-bar icon (openSessionMenu()).
             let sessionReady = false;
-            let hermesSessions: import('../acp/AcpClient').HermesSessionSummary[] = [];
-            try {
-                hermesSessions = await this._acp.listSessions();
-                this._log(`Found ${hermesSessions.length} Hermes session(s)`);
-            } catch (listErr) {
-                this._log(`Session list failed: ${listErr instanceof Error ? listErr.message : String(listErr)}`);
-            }
-
-            if (hermesSessions.length > 0) {
-                // Clear the UI before showing the picker so no stale content
-                // is visible while the user makes their choice
+            const pickedId = await this._openSessionMenu();
+            if (pickedId) {
+                this._log(`User picked Hermes session: ${pickedId.slice(0, 8)}...`);
+                await this._acp.loadSession(pickedId, cwd);
+                // Adopt the picked session id so history/model resolve against
+                // the resumed session, not a stale/empty local id.
+                this._sessionId = pickedId;
+                this._acpBoundSessionId = pickedId;
+                this._saveActiveSession();
+                this._sessionMessages = [];
+                this._loadHistory();
                 this._postMessage({ type: 'newChat' });
-
-                // Show picker to user and wait for their choice
-                const pickerPromise = new Promise<string | null>((resolve) => {
-                    this._pendingSessionPick = resolve;
-                    // Safety timeout: if no selection within 2 minutes,
-                    // auto-create a new session to avoid hanging indefinitely
-                    setTimeout(() => {
-                        if (this._pendingSessionPick === resolve) {
-                            this._log('Session picker timed out — creating new session');
-                            this._pendingSessionPick = null;
-                            resolve(null);
-                        }
-                    }, 120_000);
-                });
-
-                this._postMessage({
-                    type: 'showSessionPicker',
-                    sessions: hermesSessions.map(s => ({
-                        sessionId: s.sessionId,
-                        title: s.title || undefined,
-                        cwd: s.cwd,
-                        updatedAt: s.updatedAt || undefined,
-                    })),
-                });
-
-                const pickedId = await pickerPromise;
-                this._pendingSessionPick = null;
-
-                if (pickedId) {
-                    this._log(`User picked Hermes session: ${pickedId.slice(0, 8)}...`);
-                    await this._acp.loadSession(pickedId, cwd);
-                    sessionReady = true;
-                } else {
-                    this._log('User chose to start a new session');
-                }
+                this._restoreMessages();
+                sessionReady = true;
             } else {
-                this._log('No existing Hermes sessions found — creating new one');
+                this._log('No session chosen — creating a new one');
             }
 
             if (!sessionReady) {
                 await this._acp.createNewSession(cwd);
             }
 
-            // Restore any locally cached messages now that the active
-            // session has been settled. On first load with the picker,
-            // this will be empty — the user just chose a session.
-            this._restoreMessages();
-
-            await this._syncModelState();
-            await this._applySessionModelPreference();
+            // Sync model state from the (possibly resumed) ACP session's
+            // runtime model. For a resumed remote session we must trust the
+            // loaded session's actual model, not the local profile pref.
+            await this._syncModelState({ preferRuntimeModel: sessionReady && !!pickedId });
+            if (!pickedId) {
+                await this._applySessionModelPreference();
+            }
 
             // Kick off a background TUI gateway model fetch for the full
             // provider + pricing catalog, then refresh the picker when it
@@ -1363,6 +1340,86 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
             if (this._acp?.status === 'ready') {
                 this._postMessage({ type: 'status', status: 'ready' });
             }
+        }
+    }
+
+    /**
+     * Open the Hermes session picker (the "session menu"). Lists all remote
+     * Hermes sessions via ACP session/list and waits for the user to pick one
+     * or start a new session. Used both on initial connect and when the
+     * "Open Session Menu" view-bar icon is clicked. Resolves with the chosen
+     * session id, or null when the user opted to start a new session / the
+     * picker timed out.
+     */
+    private async _openSessionMenu(): Promise<string | null> {
+        if (!this._acp) {
+            return null;
+        }
+        let hermesSessions: import('../acp/AcpClient').HermesSessionSummary[] = [];
+        try {
+            hermesSessions = await this._acp.listSessions();
+            this._log(`Found ${hermesSessions.length} Hermes session(s)`);
+        } catch (listErr) {
+            this._log(`Session list failed: ${listErr instanceof Error ? listErr.message : String(listErr)}`);
+        }
+
+        // Clear the UI before showing the picker so no stale content is visible
+        // while the user makes their choice.
+        this._postMessage({ type: 'newChat' });
+
+        const pickPromise = new Promise<string | null>((resolve) => {
+            this._pendingSessionPick = resolve;
+            // Safety timeout: if no selection within 2 minutes, auto-create a
+            // new session to avoid hanging indefinitely.
+            setTimeout(() => {
+                if (this._pendingSessionPick === resolve) {
+                    this._log('Session picker timed out — creating new session');
+                    this._pendingSessionPick = null;
+                    resolve(null);
+                }
+            }, 120_000);
+        });
+
+        this._postMessage({
+            type: 'showSessionPicker',
+            sessions: hermesSessions.map(s => ({
+                sessionId: s.sessionId,
+                title: s.title || undefined,
+                cwd: s.cwd,
+                updatedAt: s.updatedAt || undefined,
+            })),
+        });
+
+        const pickedId = await pickPromise;
+        this._pendingSessionPick = null;
+        return pickedId;
+    }
+
+    /** Public entry for the "Open Session Menu" view-bar icon command. */
+    public async openSessionMenu(): Promise<void> {
+        if (!this._acp) {
+            this._log('Cannot open session menu — not connected');
+            return;
+        }
+        const pickedId = await this._openSessionMenu();
+        if (!pickedId) {
+            return;
+        }
+        try {
+            const cwd = this._resolveCwd();
+            this._log(`Switching to Hermes session: ${pickedId.slice(0, 8)}...`);
+            await this._acp.loadSession(pickedId, cwd);
+            this._sessionId = pickedId;
+            this._acpBoundSessionId = pickedId;
+            this._saveActiveSession();
+            this._sessionMessages = [];
+            this._loadHistory();
+            this._postMessage({ type: 'newChat' });
+            this._restoreMessages();
+            // Trust the resumed session's actual runtime model, not the local pref.
+            await this._syncModelState({ preferRuntimeModel: true });
+        } catch (err) {
+            this._log(`Load session failed: ${err instanceof Error ? err.message : String(err)}`);
         }
     }
 
