@@ -1307,7 +1307,7 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
             }
 
             if (!sessionReady) {
-                await this._acp.createNewSession(cwd);
+                await this._handleNewChat(true);
             }
 
             // Sync model state from the (possibly resumed) ACP session's
@@ -1402,11 +1402,13 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
             return;
         }
         const pickedId = await this._openSessionMenu();
+        const cwd = this._resolveCwd();
         if (!pickedId) {
+            this._log('No session chosen — creating a new one via ACP');
+            await this._handleNewChat();
             return;
         }
         try {
-            const cwd = this._resolveCwd();
             this._log(`Switching to Hermes session: ${pickedId.slice(0, 8)}...`);
             await this._acp.loadSession(pickedId, cwd);
             this._sessionId = pickedId;
@@ -2517,7 +2519,10 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
         this._postSessionList();
     }
 
-    private async _handleNewChat(): Promise<void> {
+    /** Unified handler: start a fresh ACP session and set up local state.
+     *  Used by "New Chat" (webview), "New Session" (picker), and initial connect.
+     *  @param silent — if true, skip posting 'newChat' to webview (connect flow manages it). */
+    private async _handleNewChat(silent: boolean = false): Promise<void> {
         this._log('New Chat');
         this._saveCurrentSession();
         this._sessionMessages = [];
@@ -2526,7 +2531,31 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
 
         this._ensureSessionRegistered();
         this._snapshotSessionModelFromProfile();
-        this._postMessage({ type: 'newChat' });
+        if (this._acp) {
+            const cwd = this._resolveCwd();
+            await this._acp.createNewSession(cwd);
+            // Adopt the ACP session ID so local persistence uses the same
+            // key as the remote session — otherwise resuming via the session
+            // picker (which lists Hermes UUIDs) won't find the saved messages.
+            const acpSessionId = this._acp.getSessionId();
+            if (acpSessionId) {
+                this._log(`Adopting ACP session ID: ${acpSessionId.slice(0, 8)}...`);
+                // Save the old msg file under the new ID so any persisted
+                // partial state is not lost.
+                try {
+                    const oldPath = this._msgPath(this._sessionId);
+                    if (fs.existsSync(oldPath)) {
+                        fs.renameSync(oldPath, this._msgPath(acpSessionId));
+                    }
+                } catch { /* non-critical */ }
+                this._sessionId = acpSessionId;
+                this._saveActiveSession();
+            }
+            await this._applySessionModelPreference();
+        }
+        if (!silent) {
+            this._postMessage({ type: 'newChat' });
+        }
         this._postSessionList();
         await this._syncModelStateForCurrentSession();
     }

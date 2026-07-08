@@ -6,11 +6,13 @@
     transition: outline-color 0.15s ease;
 }
 
-/* Subtle hover lift for cards */
-.tool-call-card:hover:not(.is-live),
+/* Subtle hover affordance — tool-call-card blends into the stream (no lift/shadow) */
 .session-picker-card:hover {
     transform: translateY(-1px);
     box-shadow: var(--glass-shadow-sm);
+}
+.tool-call-card:hover:not(.is-live) {
+    background: var(--glass-bg-hover);
 }
 
 :root {
@@ -1278,25 +1280,20 @@ body {
    MESSAGE GROUP LAYOUT - Consistent Alignment
     ============================================ */
 
+/* TUI-Style: All messages full-width, left-aligned */
 .message-group {
     display: flex;
-    gap: var(--space-md);
+    gap: var(--space-xs);
     width: 100%;
     max-width: 100%;
-    padding: var(--space-sm) 0;
+    padding: 3px 0;
     position: relative;
-    animation: messageSlideIn 0.2s ease;
+    animation: messageSlideIn 0.15s ease;
 }
 
 @keyframes messageSlideIn {
-    from {
-        opacity: 0;
-        transform: translateY(4px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
+    from { opacity: 0; transform: translateY(2px); }
+    to { opacity: 1; transform: translateY(0); }
 }
 
 .message-group-inner {
@@ -1307,13 +1304,9 @@ body {
     gap: var(--space-xs);
 }
 
-/* User messages - right aligned */
-.message-group.user {
-    flex-direction: row-reverse;
-}
-
+/* TUI-Style: All messages full-width, left-aligned */
 .message-group.user .message-group-inner {
-    align-items: flex-end;
+    align-items: flex-start;
 }
 
 .message-group.thought {
@@ -1321,32 +1314,34 @@ body {
 }
 
 .message-group.assistant .message-group-inner,
-.message-group.thought .message-group-inner {
-    max-width: 90%;
-}
-
-.message-group.tool {
-    margin: var(--space-xs) 0;
-}
-
+.message-group.thought .message-group-inner,
 .message-group.tool .message-group-inner {
-    max-width: 90%;
+    width: 100%;
 }
-
 .message-group.permission {
     align-self: stretch;
     max-width: 100%;
 }
 .message.permission {
-    background: color-mix(in srgb, var(--warning) 10%, var(--ftr10-glass-bg-widget, var(--text-block)));
-    border: 1px solid color-mix(in srgb, var(--warning) 45%, var(--border));
-    border-left: 3px solid var(--warning);
-    padding: 10px 12px;
+    background: transparent;
+    border: none;
+    border-left: 1px solid color-mix(in srgb, var(--warning) 50%, transparent);
+    padding: 4px 10px;
     white-space: normal;
-    border-radius: var(--radius-md);
+    border-radius: 0;
 }
+
+/* Collapsed (auto-approved / resolved-with-detail-hidden): hide everything
+   except the one-line status indicator — no empty card, no dead space */
+.message.permission.is-card-collapsed {
+    border-left-color: color-mix(in srgb, var(--success, #65bc4a) 35%, transparent);
+    padding-top: 2px;
+    padding-bottom: 2px;
+}
+.message.permission.is-card-collapsed .permission-header { display: none; }
+.message.permission.is-card-collapsed .permission-detail-wrap { display: none; }
 .message.permission .permission-label {
-    color: #f0ad4e;
+    color: var(--warning, #f0ad4e);
     font-weight: 600;
     margin-bottom: 0;
     flex: 1;
@@ -1355,12 +1350,11 @@ body {
     display: flex;
     align-items: center;
     gap: 6px;
-    margin-bottom: 6px;
+    margin-bottom: 0;
 }
 .message.permission .permission-card-toggle {
     background: transparent;
-    border: 1px solid transparent;
-    border-radius: 4px;
+    border: none;
     color: var(--dim);
     cursor: pointer;
     flex-shrink: 0;
@@ -1369,7 +1363,6 @@ body {
     padding: 2px 6px;
 }
 .message.permission .permission-card-toggle:hover {
-    border-color: var(--border);
     color: var(--fg);
 }
 .message.permission .permission-card-toggle .permission-card-arrow {
@@ -1380,7 +1373,7 @@ body {
     transform: rotate(-90deg);
 }
 .message.permission .permission-detail-wrap {
-    margin-bottom: 10px;
+    margin-top: 6px;
 }
 .message.permission .permission-detail-scroll {
     font-size: 12px;
@@ -1389,8 +1382,9 @@ body {
     white-space: pre-wrap;
 }
 .message.permission .permission-detail-scroll.is-collapsed {
-    overflow: auto;
-    scrollbar-width: thin;
+    max-height: 80px;
+    overflow: hidden;
+    position: relative;
 }
 .message.permission .permission-detail-text {
     display: block;
@@ -1418,9 +1412,10 @@ body {
     display: flex;
     flex-wrap: wrap;
     gap: 6px;
+    margin-top: 8px;
 }
 .message.permission .permission-btn {
-    background: var(--input-bg);
+    background: transparent;
     border: 1px solid var(--border);
     border-radius: 4px;
     color: var(--fg);
@@ -1445,8 +1440,12 @@ body {
     border-color: var(--error);
     color: var(--error);
 }
+/* Resolved / auto-approved: flat, borderless, dimmed — one line, no card */
 .message.permission.resolved {
-    opacity: 0.72;
+    opacity: 0.6;
+    border-left-color: color-mix(in srgb, var(--success, #65bc4a) 35%, transparent);
+    padding-top: 2px;
+    padding-bottom: 2px;
 }
 .message.permission.resolved .permission-actions {
     display: none;
@@ -1454,22 +1453,20 @@ body {
 .message.permission .permission-status {
     font-size: 11px;
     color: var(--dim);
-    margin-top: 4px;
+    margin-top: 0;
 }
 /* ============================================
    REASONING/THOUGHT MESSAGES - Distinct Style
     ============================================ */
 
 .message.thought {
-    background: color-mix(in srgb, var(--reasoning-bg) 60%, transparent);
-    border: 1px solid var(--reasoning-border);
-    border-radius: var(--radius-md);
-    padding: var(--space-sm) var(--space-md);
+    background: transparent;
+    border: none;
+    padding: 0;
     font-size: 12px;
-    line-height: 1.5;
+    font-family: var(--vscode-editor-font-family, monospace);
+    line-height: 1.4;
     position: relative;
-    transition: all var(--transition-base);
-    /* opacity: 0.75; */
 }
 
 .message.thought .aux-header {
@@ -1562,31 +1559,33 @@ body {
    MESSAGE BUBBLES - Consistent Styling
     ============================================ */
 
+/* TUI-Style: Full-width blocks instead of bubbles */
 .message {
-    padding: var(--space-md) var(--space-lg);
     white-space: pre-wrap;
-    min-width: 96px;
     position: relative;
     font-size: 13px;
-    line-height: 1.65;
+    font-family: var(--vscode-editor-font-family, 'Cascadia Code', 'Fira Code', monospace);
+    line-height: 1.55;
 }
+.message p { margin: 0 0 6px; }
+.message p:last-child { margin-bottom: 0; }
 
 .message.user {
-    max-width: 75%;
-    width: fit-content;
-    background: color-mix(in srgb, var(--primary) 10%, transparent);
-    border: 1px solid color-mix(in srgb, var(--primary) 20%, transparent);
-    border-radius: var(--radius-md);
-    border-bottom-right-radius: var(--radius-sm);
+    background: color-mix(in srgb, var(--primary) 8%, transparent);
+    border: 1px solid var(--glass-stroke);
+    border-left: 3px solid var(--primary);
+    border-radius: 0;
+    padding: var(--space-sm) var(--space-md);
 }
 
 .message.assistant {
     background: transparent;
     border: none;
-    border-left: 2px solid var(--primary);
-    padding: var(--space-md) var(--space-lg);
-    border-radius: 0 var(--radius-md) var(--radius-md) 0;
+    border-left: 3px solid var(--primary);
+    border-radius: 0;
     color: var(--fg);
+    font-family: var(--vscode-editor-font-family, monospace);
+    width: 100%;
 }
 
 .message.assistant .content {
@@ -1601,13 +1600,20 @@ body {
     letter-spacing: 0.01em;
 }
 
-/* Live activity labels Ã¢â‚¬â€ unified breathing pulse */
+/* Live activity labels — unified breathing pulse */
 .message.assistant.streaming .label,
 .message.thought.is-live .aux-label,
 .message.tool.is-live .aux-label {
     opacity: 1;
     font-weight: 700;
     animation: live-label-breathe 1.6s ease-in-out infinite;
+}
+
+/* Tool messages - hide outer wrapper since tool-call-card handles styling */
+.message.tool {
+    background: transparent;
+    border: none;
+    padding: 0;
 }
 @keyframes live-label-breathe {
     0%, 100% { opacity: 1; }
@@ -2915,7 +2921,7 @@ body {
     backdrop-filter: var(--glass-blur);
     -webkit-backdrop-filter: var(--glass-blur);
     border: 1px solid var(--glass-stroke);
-    border-radius: 24px;
+    border-radius: var(--radius-sm);
     overflow: hidden;
     transition: border-color 0.2s ease, box-shadow 0.2s ease;
     box-shadow: var(--glass-shadow-sm);
@@ -2929,7 +2935,7 @@ body {
     align-items: center;
     justify-content: flex-end;
     gap: 6px;
-    padding: 2px 6px 4px min(350px, 80vw);
+    padding: 4px 8px 6px;
     border-top: 1px solid color-mix(in srgb, var(--border) 40%, transparent);
 }
 .input-composite-shell.waiting .input-composite {
@@ -3527,39 +3533,39 @@ mark.search-mark-active {
    UNIFIED DESIGN SYSTEM - Hermes Desktop Inspired
     ============================================ */
 
-/* Tool Call Cards - Clean Hierarchical Design */
+/* Tool Call Cards — borderless, hairline accent (desktop parity) */
 .tool-call-card {
-    background: var(--glass-bg);
-    border: 1px solid var(--glass-stroke);
-    border-radius: var(--radius-md);
+    background: transparent;
+    border: none;
+    border-left: 1px solid var(--tool-border, var(--border-subtle, var(--border)));
+    border-radius: 0;
     overflow: hidden;
-    transition: background 0.2s ease, border-color 0.2s ease;
+    transition: background 0.15s ease;
     position: relative;
     width: 100%;
-    text-rendering: optimizeLegibility;
-    -webkit-font-smoothing: antialiased;
+    font-family: var(--vscode-editor-font-family, 'Cascadia Code', 'Fira Code', monospace);
+    font-size: 12px;
+    line-height: 1.5;
 }
 
 .tool-call-card.is-live {
-    background: color-mix(in srgb, var(--tool-accent) 8%, transparent);
-    border-color: color-mix(in srgb, var(--tool-accent) 30%, transparent);
+    background: transparent;
+    border-left-color: var(--tool-accent);
 }
-
 .tool-call-card.is-live::before {
     content: '';
     position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    pointer-events: none;
-    z-index: 0;
-    background: linear-gradient(90deg, var(--tool-accent) 0%, transparent 100%);
-    opacity: 0.15;
-    animation: toolGlow 2s ease-in-out infinite;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: var(--tool-accent);
+    opacity: 0.25;
+    animation: tuiPulse 2s ease-in-out infinite;
 }
-
-@keyframes toolGlow {
-    0%, 100% { opacity: 0.1; }
-    50% { opacity: 0.25; }
+@keyframes tuiPulse {
+    0%, 100% { opacity: 0.15; }
+    50% { opacity: 0.35; }
 }
 
 .tool-call-card.is-complete {
@@ -3567,7 +3573,7 @@ mark.search-mark-active {
 }
 
 .tool-call-card.is-failed {
-    border-color: color-mix(in srgb, var(--tool-error) 40%, transparent);
+    border-left-color: color-mix(in srgb, var(--tool-error) 60%, transparent);
 }
 
 .tool-call-card.is-complete .tool-call-header,
@@ -3579,15 +3585,14 @@ mark.search-mark-active {
 .tool-call-header {
     display: flex;
     background: transparent;
-    border-bottom: 1px solid var(--glass-stroke);
+    border-bottom: none;
     align-items: center;
-    gap: var(--space-sm);
-    padding: var(--space-sm) var(--space-md);
+    gap: var(--space-xs);
+    padding: var(--space-xs) var(--space-sm);
     cursor: pointer;
     user-select: none;
-    transition: background var(--transition-fast);
-    position: relative;
-    z-index: 1;
+    font-family: var(--vscode-editor-font-family, monospace);
+    font-size: 11px;
 }
 
 .tool-call-header:hover {
@@ -3602,24 +3607,24 @@ mark.search-mark-active {
 .tool-call-card.is-executing { --tool-accent: var(--state-executing); }
 .tool-call-card.is-error     { --tool-accent: var(--state-error); }
 
-/* State-specific header tints — override defaults from .tool-call-card.is-live .tool-call-header */
+/* State-specific header tints — keep flat (borderless parity); only a whisper of tint */
 .tool-call-card.is-live.is-analyzing .tool-call-header {
-    background: color-mix(in srgb, var(--state-analyzing) 8%, transparent);
+    background: color-mix(in srgb, var(--state-analyzing) 3%, transparent);
 }
 .tool-call-card.is-live.is-searching .tool-call-header {
-    background: color-mix(in srgb, var(--state-searching) 8%, transparent);
+    background: color-mix(in srgb, var(--state-searching) 3%, transparent);
 }
 .tool-call-card.is-live.is-reading .tool-call-header {
-    background: color-mix(in srgb, var(--state-reading) 8%, transparent);
+    background: color-mix(in srgb, var(--state-reading) 3%, transparent);
 }
 .tool-call-card.is-live.is-writing .tool-call-header {
-    background: color-mix(in srgb, var(--state-writing) 8%, transparent);
+    background: color-mix(in srgb, var(--state-writing) 3%, transparent);
 }
 .tool-call-card.is-live.is-executing .tool-call-header {
-    background: color-mix(in srgb, var(--state-executing) 8%, transparent);
+    background: color-mix(in srgb, var(--state-executing) 3%, transparent);
 }
 .tool-call-card.is-live.is-error .tool-call-header {
-    background: color-mix(in srgb, var(--state-error) 8%, transparent);
+    background: color-mix(in srgb, var(--state-error) 3%, transparent);
 }
 
 .tool-call-icon {
@@ -3652,6 +3657,7 @@ mark.search-mark-active {
     align-items: center;
     gap: var(--space-xs);
     opacity: 0.7;
+    margin-right: 22px;
 }
 
 .tool-call-status.is-running {
@@ -3685,6 +3691,40 @@ mark.search-mark-active {
 
 .tool-call-card.is-expanded .tool-call-chevron {
     transform: rotate(180deg);
+}
+
+.tool-call-copy {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    background: none;
+    border: none;
+    color: var(--dim);
+    cursor: pointer;
+    padding: 0;
+    border-radius: 3px;
+    line-height: 1;
+    opacity: 0;
+    transition: opacity var(--transition-fast), color var(--transition-fast), background var(--transition-fast);
+}
+.tool-call-header:hover .tool-call-copy {
+    opacity: 1;
+}
+.tool-call-copy:hover {
+    color: var(--fg);
+    background: var(--text-block);
+}
+.tool-call-copy.copied {
+    color: var(--primary);
+    opacity: 1;
+}
+.tool-call-copy svg {
+    width: 14px;
+    height: 14px;
+    fill: currentColor;
 }
 
 /* Tool Call Body */
@@ -3723,44 +3763,39 @@ mark.search-mark-active {
 }
 
 .tool-call-section {
-    padding: var(--space-md) var(--space-lg);
+    padding: var(--space-sm) var(--space-md);
     font-size: 11px;
+    font-family: var(--vscode-editor-font-family, monospace);
     width: 100%;
     box-sizing: border-box;
-}
-
-.tool-call-section:first-child {
-    /* border-top already removed */
+    line-height: 1.5;
 }
 
 .tool-call-section-title {
     font-weight: 600;
     color: var(--dim);
     margin-bottom: var(--space-xs);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
     font-size: 10px;
     opacity: 0.8;
 }
 
 .tool-call-section-content {
-    background: color-mix(in srgb, var(--vscode-textCodeBlock-background, #1e1e1e) 80%, transparent);
-    border: 1px solid var(--tool-border);
-    border-radius: var(--radius-sm);
-    padding: var(--space-md);
+    background: transparent;
+    border: none;
+    border-left: 1px solid var(--tool-border, var(--border-subtle, var(--border)));
+    border-radius: 0;
+    padding: 2px 6px;
     font-family: var(--vscode-editor-font-family, monospace);
     font-size: 11px;
-    line-height: 1.5;
+    line-height: 1.4;
     white-space: pre-wrap;
     word-break: break-word;
     color: var(--fg);
     position: relative;
-    box-sizing: border-box;
-    width: 100%;
     min-width: 0;
 }
 
-/* Preview Mode - Show first 10 lines */
+/* Expand/Collapse Button for Tool Results */
 .tool-call-section-content.is-preview {
     max-height: 180px;
     overflow-y: auto;

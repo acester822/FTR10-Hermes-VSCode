@@ -1211,8 +1211,29 @@ export class AcpClient {
         logToFile(`[Hermes ACP] Initial mcpServers from resolver: ${mcpServers.length}`);
 
         // Always advertise the local SSE MCP server for editor tools.
-        // The agent connects to it via its existing MCP SSE transport support.
         if (this._editorToolsMcpServer) {
+            // Re-write inline tool definitions on every session request so the
+            // ACP adapter can register them even if the process is reused from
+            // a prior extension load (the file is consumed + deleted once).
+            try {
+                const { getRegisteredTools } = require('./acpToolRegistration');
+                const tools = getRegisteredTools();
+                const schemas = tools.map((t: any) => ({
+                    name: t.name,
+                    description: t.description,
+                    parameters: t.parameters,
+                    toolset: 'mcp-vscode',
+                }));
+                const fs = require('fs');
+                fs.writeFileSync('/tmp/vscode-editor-tools.json', JSON.stringify({
+                    mcp_url: this._editorToolsMcpServer.url,
+                    tools: schemas,
+                }, null, 2));
+                logToFile(`[Hermes ACP] Re-wrote inline tool definitions (${schemas.length} tools, ${this._editorToolsMcpServer.url})`);
+            } catch (err) {
+                logToFile(`[Hermes ACP] Failed to rewrite inline tools: ${err}`);
+            }
+
             const mcpServerConfig = {
                 type: 'sse' as const,
                 name: VSCODE_MCP_SERVER_NAME,

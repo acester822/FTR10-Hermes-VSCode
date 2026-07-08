@@ -6,6 +6,10 @@ async function main() {
         const extensionDevelopmentPath = path.resolve(__dirname, '../..');
         const extensionTestsPath = path.resolve(__dirname, './suite/index');
 
+        // Unset ELECTRON_RUN_AS_NODE which is set by code-server and breaks
+        // VS Code's CLI argument parsing (causes "bad option" errors for all flags)
+        delete process.env.ELECTRON_RUN_AS_NODE;
+
         await runTests({
             extensionDevelopmentPath,
             extensionTestsPath,

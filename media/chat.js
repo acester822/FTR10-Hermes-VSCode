@@ -2068,7 +2068,25 @@
         return { callPart: callPart, bodyPart: bodyPart };
     }
 
+    function isToolCallEmpty(text) {
+        const summaryText = text || '';
+        const sepIdx = summaryText.indexOf('\n\n');
+        const callPart = sepIdx >= 0 ? summaryText.slice(0, sepIdx).trim() : summaryText.trim();
+        const bodyPart = sepIdx >= 0 ? summaryText.slice(sepIdx + 2).trim() : '';
+        if (bodyPart) return false;
+        const info = parseToolCallText(callPart);
+        if (info.args) return false;
+        const t = (info.title || '').trim();
+        if (t && t !== 'Tool') return false;
+        // No body, no args, and no real tool name — this is a ghost/empty block.
+        return true;
+    }
+
     function handleToolMessage(text, toolCallId) {
+        // Skip truly empty tool calls so they don't render as blank/ghost blocks.
+        if (isToolCallEmpty(text)) {
+            return;
+        }
         if (toolCallMap[toolCallId]) {
             const group = document.getElementById(toolCallMap[toolCallId]);
             if (group && group._auxState) {
@@ -2168,10 +2186,47 @@
         // Skip rendering partial/empty text to avoid garbled display during initialization
         if (!text || text.trim().length < 3) return;
         state.rawText = text || '';
-        state.contentEl.innerHTML = renderMarkdown(state.rawText);
+        state.contentEl.innerHTML = formatToolOutput(state.rawText);
         setupContentBlocks(state.contentEl);
         processFileRefs(state.contentEl);
+        // Reveal + (re)compute expand affordance for the unified Result section.
+        if (state.bodyInner) {
+            const section = state.bodyInner.querySelector('.tool-call-section');
+            if (section) section.style.display = '';
+            if (resultContentNeedsToggle(state.contentEl)) {
+                ensureToolResultToggle(state.bodyInner, state.contentEl);
+            } else {
+                state.contentEl.classList.remove('is-preview');
+            }
+        }
         syncAuxiliaryDetailView(group);
+    }
+
+    // Decide whether a Result section needs a Show more/less toggle.
+    function resultContentNeedsToggle(el) {
+        if (!el) return false;
+        return el.scrollHeight > el.clientHeight + 10;
+    }
+
+    // Ensure a .tool-result-toggle button exists for a Result section's content node.
+    function ensureToolResultToggle(bodyInner, resultContent) {
+        if (!bodyInner || !resultContent) return;
+        const section = resultContent.closest('.tool-call-section');
+        if (!section) return;
+        if (section.querySelector('.tool-result-toggle')) return;
+        const toggleBtn = document.createElement('button');
+        toggleBtn.type = 'button';
+        toggleBtn.className = 'tool-result-toggle';
+        toggleBtn.innerHTML = '<span>Show more</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>';
+        toggleBtn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            const isExpanded = resultContent.classList.contains('is-expanded');
+            resultContent.classList.toggle('is-preview', !isExpanded);
+            resultContent.classList.toggle('is-expanded', isExpanded);
+            toggleBtn.classList.toggle('is-expanded', !isExpanded);
+            toggleBtn.querySelector('span').textContent = isExpanded ? 'Show more' : 'Show less';
+        });
+        section.appendChild(toggleBtn);
     }
 
 function parseToolCallText(text) {
@@ -2465,9 +2520,29 @@ function parseToolCallText(text) {
             chevron.className = 'tool-call-chevron';
             chevron.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>';
 
+            const copyBtn = document.createElement('button');
+            copyBtn.type = 'button';
+            copyBtn.className = 'tool-call-copy';
+            copyBtn.title = locale.copy;
+            copyBtn.innerHTML = COPY_ICON_SVG;
+            copyBtn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                const text = bodyPart || callPart || toolInfo.title;
+                if (!text) return;
+                copyToClipboard(text).then(function() {
+                    copyBtn.title = locale.copied;
+                    copyBtn.classList.add('copied');
+                    setTimeout(function() {
+                        copyBtn.title = locale.copy;
+                        copyBtn.classList.remove('copied');
+                    }, 1500);
+                });
+            });
+
             header.appendChild(iconEl);
             header.appendChild(titleEl);
             header.appendChild(statusEl);
+            header.appendChild(copyBtn);
             header.appendChild(chevron);
 
             const bodyDiv = document.createElement('div');
@@ -2498,19 +2573,21 @@ function parseToolCallText(text) {
                 bodyInner.appendChild(argsSection);
             }
 
+            let resultSection = document.createElement('div');
+            resultSection.className = 'tool-call-section';
+            const resultTitle = document.createElement('div');
+            resultTitle.className = 'tool-call-section-title';
+            resultTitle.textContent = 'Result';
+
+            const resultContent = document.createElement('div');
+            resultContent.className = 'tool-call-section-content is-preview';
+            resultSection.appendChild(resultTitle);
+            resultSection.appendChild(resultContent);
+            bodyInner.appendChild(resultSection);
+
             if (bodyPart) {
-                const resultSection = document.createElement('div');
-                resultSection.className = 'tool-call-section';
-                const resultTitle = document.createElement('div');
-                resultTitle.className = 'tool-call-section-title';
-                resultTitle.textContent = 'Result';
-
-                const resultContent = document.createElement('div');
-                resultContent.className = 'tool-call-section-content is-preview';
-
                 // Format the output properly
-                var formattedOutput = formatToolOutput(bodyPart);
-                resultContent.innerHTML = formattedOutput;
+                resultContent.innerHTML = formatToolOutput(bodyPart);
 
                 // Check if content needs expand button
                 setTimeout(() => {
@@ -2529,15 +2606,14 @@ function parseToolCallText(text) {
                             toggleBtn.querySelector('span').textContent = isExpanded ? 'Show more' : 'Show less';
                         });
 
-                        resultSection.appendChild(resultContent);
                         resultSection.appendChild(toggleBtn);
                     } else {
                         resultContent.classList.remove('is-preview');
-                        resultSection.appendChild(resultContent);
                     }
                 }, 100);
-
-                bodyInner.appendChild(resultSection);
+            } else {
+                // No body yet (arrives via live update) — keep hidden until filled.
+                resultSection.style.display = 'none';
             }
 
             bodyDiv.appendChild(bodyInner);
@@ -2554,12 +2630,12 @@ function parseToolCallText(text) {
             const scrollEl = document.createElement('div');
             scrollEl.className = 'aux-body-scroll';
             scrollEl.style.display = 'none';
-            const contentEl = bodyDiv;
+            const contentEl = resultContent;
             const dummyBtn = document.createElement('button');
             dummyBtn.style.display = 'none';
             dummyBtn.hidden = true;
 
-            return { div: msgEl, scrollEl: scrollEl, contentEl: contentEl, moreBtn: dummyBtn, lessBtn: dummyBtn, role: role, rawText: bodyPart, callText: callPart, bodyDiv: bodyDiv };
+            return { div: msgEl, scrollEl: scrollEl, contentEl: contentEl, moreBtn: dummyBtn, lessBtn: dummyBtn, role: role, rawText: bodyPart, callText: callPart, bodyDiv: bodyDiv, bodyInner: bodyInner };
         }
 
         const header = document.createElement('div');
@@ -3794,16 +3870,17 @@ function parseToolCallText(text) {
         const copyBtn = document.createElement('button');
         copyBtn.type = 'button';
         copyBtn.className = 'copy-btn';
-        copyBtn.textContent = 'Copy';
+        copyBtn.title = locale.copy;
+        copyBtn.innerHTML = COPY_ICON_SVG;
         copyBtn.addEventListener('click', function(e) {
             e.stopPropagation();
             const text = getMessagePlainText(group);
             if (!text) return;
             copyToClipboard(text).then(function() {
-                copyBtn.textContent = 'Copied';
+                copyBtn.title = locale.copied;
                 copyBtn.classList.add('copied');
                 setTimeout(function() {
-                    copyBtn.textContent = 'Copy';
+                    copyBtn.title = locale.copy;
                     copyBtn.classList.remove('copied');
                 }, 1500);
             });
@@ -5745,6 +5822,8 @@ function parseToolCallText(text) {
             if (chosenOpt) {
                 const label = chosenOpt.name || chosenOpt.optionId;
                 applyPermissionResolvedUI(group, (localeText('permissionSelected', label)) + ' (auto)');
+                // Auto-approved: collapse the card so only the status indicator shows.
+                collapseAutoPermission(group);
                 pendingPermissions.delete(id);
                 vscode.postMessage({ type: 'permissionResponse', id: id, optionId: chosenOpt.optionId });
             }
@@ -5757,15 +5836,28 @@ function parseToolCallText(text) {
                 const chosenOpt = rejectAlways || rejectOnce;
                 const label = chosenOpt.name || chosenOpt.optionId;
                 applyPermissionResolvedUI(group, (localeText('permissionSelected', label)) + ' (auto)');
+                collapseAutoPermission(group);
                 pendingPermissions.delete(id);
                 vscode.postMessage({ type: 'permissionResponse', id: id, optionId: chosenOpt.optionId });
             } else {
                 // No reject option — cancel
                 pendingPermissions.delete(id);
                 applyPermissionResolvedUI(group, (locale.permissionCancelled || 'Cancelled') + ' (auto)');
+                collapseAutoPermission(group);
                 vscode.postMessage({ type: 'permissionResponse', id: id, optionId: null });
             }
         }
+    }
+
+    // Collapse an auto-resolved permission so it shows only a minimal indicator,
+    // not the fully expanded card with all details.
+    function collapseAutoPermission(group) {
+        if (!group || !group._permissionState) return;
+        group._permissionState.cardCollapsed = true;
+        const div = group.querySelector('.message.permission');
+        if (div) div.classList.add('is-card-collapsed');
+        if (group._permissionState.wrapEl) group._permissionState.wrapEl.style.display = 'none';
+        syncPermissionDetailView(group);
     }
 
     function resolvePermission(id, optionId, selectedLabel) {

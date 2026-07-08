@@ -1,7 +1,19 @@
 import * as http from 'http';
 import * as vscode from 'vscode';
+import * as fs from 'fs';
 import { getRegisteredTools, type AcpToolDef } from './acpToolRegistration';
 import { logToFile } from './fileLogger';
+
+// Preferred loopback port for the editor-tools MCP server. A static port is
+// used because the extension is a single process per VS Code window and the
+// server is created exactly once per activation. A fixed port:
+//   - removes the session-init race where the tool-definition file was written
+//     with port 0 (http://127.0.0.1:0/mcp) before bind() resolved;
+//   - avoids "port already in use" surprises on reload when an old process
+//     briefly holds the prior random port;
+//   - makes the mcp_url the agent receives deterministic.
+// If the preferred port is unavailable we fall back to a random free port.
+const PREFERRED_PORT = 39517;
 
 export class EditorToolsMcpServer {
     private server: http.Server | null = null;
@@ -90,20 +102,62 @@ export class EditorToolsMcpServer {
             }
         });
 
-        await new Promise<void>((resolve, reject) => {
-            this.server!.listen(0, '127.0.0.1', () => {
-                const addr = this.server!.address();
-                if (addr && typeof addr === 'object') {
-                    this.port = addr.port;
-                    logToFile(`[Hermes ACP] MCP Server listening on port ${this.port}`);
-                }
-                resolve();
-            });
-            this.server!.on('error', (err) => {
+        // Try the preferred static port first; fall back to a random free
+        // port (0) if it is already taken (e.g. a surviving old process).
+        const candidatePorts = [PREFERRED_PORT, 0];
+        for (const candidate of candidatePorts) {
+            let bound = false;
+            try {
+                await new Promise<void>((resolve, reject) => {
+                    const onError = (err: NodeJS.ErrnoException) => {
+                        if (candidate !== 0 && (err.code === 'EADDRINUSE' || err.code === 'EACCES')) {
+                            // Preferred port unavailable — try a random port next.
+                            logToFile(`[Hermes ACP] Preferred port ${candidate} unavailable (${err.code}); falling back to random port`);
+                            resolve();
+                            return;
+                        }
+                        logToFile('[Hermes ACP] MCP Server failed to start: ' + (err instanceof Error ? err.message : String(err)));
+                        reject(err);
+                    };
+                    this.server!.once('error', onError);
+                    this.server!.listen(candidate, '127.0.0.1', () => {
+                        this.server!.removeListener('error', onError);
+                        const addr = this.server!.address();
+                        if (addr && typeof addr === 'object') {
+                            this.port = addr.port;
+                            logToFile(`[Hermes ACP] MCP Server listening on port ${this.port}`);
+                        }
+                        bound = true;
+                        resolve();
+                    });
+                });
+                if (bound) break;
+            } catch (err) {
                 logToFile('[Hermes ACP] MCP Server failed to start: ' + (err instanceof Error ? err.message : String(err)));
-                reject(err);
-            });
-        });
+                throw err;
+            }
+        }
+
+        // Write inline tool definitions AFTER the server is listening (and the
+        // port is known) so the mcp_url is always valid. Writing this BEFORE
+        // bind() resolved previously produced http://127.0.0.1:0/mcp, which
+        // the agent could not connect to — causing the editor tools to be
+        // skipped on session init.
+        try {
+            const schemas = tools.map(t => ({
+                name: t.name,
+                description: t.description,
+                parameters: t.parameters,
+                toolset: 'mcp-vscode',
+            }));
+            fs.writeFileSync('/tmp/vscode-editor-tools.json', JSON.stringify({
+                mcp_url: this.url,
+                tools: schemas,
+            }, null, 2));
+            logToFile(`[Hermes ACP] Wrote inline tool definitions to /tmp/vscode-editor-tools.json (${schemas.length} tools, mcp_url=${this.url})`);
+        } catch (err) {
+            logToFile(`[Hermes ACP] Failed to write inline tool definitions: ${err}`);
+        }
     }
 
     private async _handleJsonRpc(msg: any, tools: AcpToolDef[]): Promise<any> {

@@ -412,7 +412,7 @@
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
     "package": "vsce package",
-    "test": "node ./out/tests/runTest.js"
+    "test": "xvfb-run -a node ./out/tests/runTest.js"
   },
   "devDependencies": {
     "@types/mocha": "^10.0.10",
