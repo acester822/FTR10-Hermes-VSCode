@@ -3049,6 +3049,11 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
         }
         const result = await this._diffReview.accept();
         this._postMessage({ type: 'diffReviewResult', ...result });
+        // Round-trip the acceptance back into the running agent session so the
+        // assistant turn that called propose_diff wakes and acknowledges. Without
+        // this, the extension shows the result locally but the ACP session never
+        // receives a signal, leaving the agent silent until the user types again.
+        this._notifyAgentOfDiffResolution(result.message || 'Diff accepted.', 'accepted');
     }
 
     private async _handleRejectDiff(): Promise<void> {
@@ -3058,6 +3063,23 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
         }
         const result = await this._diffReview.reject();
         this._postMessage({ type: 'diffReviewResult', ...result });
+        // Same round-trip as accept — let the agent know the diff was rejected.
+        this._notifyAgentOfDiffResolution(result.message || 'Diff rejected.', 'rejected');
+    }
+
+    /**
+     * Inject a short follow-up message into the active ACP session after a diff
+     * is accepted or rejected. sendMessage only fires when the session is
+     * 'ready' (i.e. the assistant turn that proposed the diff has already
+     * returned), which is exactly the state we are in here, so this starts a
+     * fresh turn and wakes the agent to respond.
+     */
+    private _notifyAgentOfDiffResolution(text: string, outcome: 'accepted' | 'rejected'): void {
+        if (!this._acp) {
+            return;
+        }
+        const note = `[diff ${outcome}] ${text}`;
+        void this._acp.sendMessage(note);
     }
 
     private _postMessage(msg: any): void {
