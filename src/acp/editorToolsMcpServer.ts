@@ -226,4 +226,70 @@ export class EditorToolsMcpServer {
             this.port = 0;
         }
     }
+
+    /**
+     * Probe liveness: perform a full MCP `initialize` handshake followed by
+     * `tools/list`. Returns the tool names the server advertises, or `null`
+     * if the server is not yet reachable / healthy.
+     *
+     * Used by the ACP client to gate session creation until the editor-tools
+     * MCP server is actually serving (it must NOT race the agent's
+     * `session/new` → `register_mcp_servers` connection attempt).
+     */
+    async probeHealthy(timeoutMs: number = 5000): Promise<string[] | null> {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), timeoutMs);
+        try {
+            const res = await fetch(this.url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json, text/event-stream',
+                },
+                body: JSON.stringify({
+                    jsonrpc: '2.0',
+                    id: 1,
+                    method: 'initialize',
+                    params: {
+                        protocolVersion: '2024-11-05',
+                        capabilities: {},
+                        clientInfo: { name: 'hermes-vscode-probe', version: '1.0.0' },
+                    },
+                }),
+                signal: controller.signal,
+            });
+            if (!res.ok) {
+                return null;
+            }
+            const init = await res.json() as { result?: { serverInfo?: { name?: string } } };
+            if (!init.result || init.result.serverInfo?.name !== 'vscode-editor-tools') {
+                return null;
+            }
+
+            const res2 = await fetch(this.url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json, text/event-stream',
+                },
+                body: JSON.stringify({
+                    jsonrpc: '2.0',
+                    id: 2,
+                    method: 'tools/list',
+                    params: {},
+                }),
+                signal: controller.signal,
+            });
+            if (!res2.ok) {
+                return null;
+            }
+            const list = await res2.json() as { result?: { tools?: Array<{ name: string }> } };
+            const tools = list.result?.tools ?? [];
+            return tools.map((t) => t.name);
+        } catch {
+            return null;
+        } finally {
+            clearTimeout(timer);
+        }
+    }
 }

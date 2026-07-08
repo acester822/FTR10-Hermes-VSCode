@@ -40,6 +40,74 @@ import {
 } from './vscodeMcpBridge';
 import { EditorToolsMcpServer } from './editorToolsMcpServer';
 
+// ---------------------------------------------------------------------------
+// Editor-tools MCP server: a single process-wide instance, started once when
+// the extension activates and torn down on deactivation. It must NOT be
+// created/destroyed per ACP session — recreating it on every session start
+// races the agent's `session/new` → `register_mcp_servers` connection attempt,
+// causing the vscode tools to silently fail to register (the agent parks the
+// connection and only self-probes every 5 min). Keeping one long-lived server
+// that is healthy before any session opens removes that race.
+// ---------------------------------------------------------------------------
+let _editorToolsMcpServerSingleton: EditorToolsMcpServer | null = null;
+
+/** Start the shared editor-tools MCP server (idempotent). */
+export async function startEditorToolsMcpServer(): Promise<void> {
+    if (_editorToolsMcpServerSingleton) {
+        return;
+    }
+    const server = new EditorToolsMcpServer();
+    await server.start();
+    _editorToolsMcpServerSingleton = server;
+}
+
+/** Stop the shared editor-tools MCP server (idempotent). */
+export function stopEditorToolsMcpServer(): void {
+    if (_editorToolsMcpServerSingleton) {
+        _editorToolsMcpServerSingleton.stop();
+        _editorToolsMcpServerSingleton = null;
+    }
+}
+
+/** Accessor for the shared server instance (may be null before start()). */
+export function getEditorToolsMcpServer(): EditorToolsMcpServer | null {
+    return _editorToolsMcpServerSingleton;
+}
+
+/**
+ * Wait until the shared editor-tools MCP server is healthy (responds to a full
+ * `initialize` + `tools/list` handshake) before allowing a session to open.
+ *
+ * The agent connects to this server during `session/new` → `register_mcp_servers`.
+ * If the server is not yet serving, that connection is raced and the agent
+ * parks it (only self-probing every ~5 min), so the vscode tools silently fail
+ * to appear. Gating the session on a healthy probe eliminates that race.
+ *
+ * Resolves to `true` if a healthy server was observed (or no server is expected,
+ * in which case callers proceed as before), `false` if the probe never succeeded
+ * within `timeoutMs`.
+ */
+export async function waitForEditorToolsMcpHealthy(timeoutMs: number = 30000): Promise<boolean> {
+    const server = _editorToolsMcpServerSingleton;
+    if (!server) {
+        return true; // no server expected — let the caller proceed (it will warn)
+    }
+    const deadline = Date.now() + timeoutMs;
+    let attempt = 0;
+    while (Date.now() < deadline) {
+        attempt++;
+        const tools = await server.probeHealthy(5000).catch(() => null);
+        if (tools && tools.length > 0) {
+            logToFile(`[Hermes ACP] Editor-tools MCP server healthy (probe returned ${tools.length} tools) after ${attempt} attempt(s)`);
+            return true;
+        }
+        logToFile(`[Hermes ACP] Editor-tools MCP server not yet healthy (probe attempt ${attempt}) — waiting before opening session`);
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+    }
+    logToFile('[Hermes ACP] WARNING: editor-tools MCP server did not become healthy before session open (proceeding anyway)');
+    return false;
+}
+
 
 /** Resolve the Hermes venv Python path from the hermes executable. */
 export async function resolveHermesVenvPython(): Promise<string | null> {
@@ -580,12 +648,17 @@ export class AcpClient {
                 logToFile('[Hermes ACP] Agent does NOT advertise mcpCapabilities.http either');
             }
 
-            // Always start the local SSE MCP server for editor tools.
-            // The agent discovers and connects to it via the mcpServers entry
-            // in session/new (type: 'http'), which Hermes already supports.
-            this._editorToolsMcpServer = new EditorToolsMcpServer();
-            await this._editorToolsMcpServer.start();
-            this._onLog(`Editor tools MCP server listening on ${this._editorToolsMcpServer.url}`);
+            // Use the shared, process-wide editor-tools MCP server (started
+            // once at extension activation — see startEditorToolsMcpServer()).
+            // It must be healthy before any session opens so the agent's
+            // session/new -> register_mcp_servers connection does not race a
+            // server that is still binding. We do NOT create/destroy it here.
+            this._editorToolsMcpServer = getEditorToolsMcpServer();
+            if (this._editorToolsMcpServer) {
+                this._onLog(`Editor tools MCP server listening on ${this._editorToolsMcpServer.url}`);
+            } else {
+                logToFile('[Hermes ACP] WARNING: shared editor tools MCP server is not running! Editor tools will be unavailable.');
+            }
 
             // NOTE: We do NOT create a session here anymore. The caller must
             // explicitly call createNewSession() for a fresh session, or
@@ -638,6 +711,9 @@ export class AcpClient {
         if (!this._conn) {
             throw new Error('Not connected');
         }
+        // Gate on a healthy editor-tools MCP server so the agent's
+        // register_mcp_servers connection during session/load is not raced.
+        await waitForEditorToolsMcpHealthy();
         if (this._session) {
             this._session.dispose();
             this._session = null;
@@ -695,10 +771,13 @@ export class AcpClient {
             }
         }
         this._sessionStarting = true;
-        if (this._status === 'prompting') {
-            await this.cancel();
-        }
         try {
+            // Gate on a healthy editor-tools MCP server so the agent's
+            // register_mcp_servers connection during session/new is not raced.
+            await waitForEditorToolsMcpHealthy();
+            if (this._status === 'prompting') {
+                await this.cancel();
+            }
             this._session?.dispose();
             this._responseBuffer = '';
             this._thoughtBuffer = '';
@@ -939,10 +1018,12 @@ export class AcpClient {
         try {
             this._session?.dispose();
         } catch { /* ignore */ }
-        if (this._editorToolsMcpServer) {
-            this._editorToolsMcpServer.stop();
-            this._editorToolsMcpServer = null;
-        }
+        // NOTE: We deliberately do NOT stop the editor-tools MCP server here.
+        // It is a shared, process-wide instance owned by the extension
+        // lifecycle (started in activate(), stopped in deactivate()). Tearing
+        // it down on every session stop/cleanup is what caused the
+        // register/connect race with the agent — keep it alive for the whole
+        // extension lifetime.
         for (const [, term] of this._terminals) {
             try { term.process.kill(); } catch { /* ignore */ }
         }

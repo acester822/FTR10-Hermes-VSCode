@@ -119,9 +119,9 @@
 }
 
 
-* {margin: 0;padding: 0;box-sizing: border-box;}
+* {margin: 2px;padding: 0;box-sizing: border-box;}
 body {
-    font-family: var(--ftr10-body-font, var(--vscode-font-family, -apple-system, BlinkMacSystemFont, sans-serif));
+    font-family: var(--ftr10-font-auxiliarybar);
     font-size: var(--vscode-font-size, 13px);
     background: transparent;
     color: var(--fg);
@@ -626,7 +626,7 @@ body {
     word-break: break-all;
 }
 .info-modal-body code {
-    font-family: var(--vscode-editor-font-family, 'Cascadia Code', monospace);
+    font-family: var(--ftr10-font-auxiliarybar);
     font-size: 11px;
 }
 .info-modal-body a {
@@ -1036,7 +1036,7 @@ body {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-family: var(--vscode-editor-font-family, monospace);
+    font-family: var(--ftr10-font-auxiliarybar);
 }
 .tab-context-menu .tab-ctx-sid-copy {
     flex-shrink: 0;
@@ -1460,13 +1460,13 @@ body {
     ============================================ */
 
 .message.thought {
-    background: transparent;
-    border: none;
-    padding: 0;
+    background: var(--ftr10-code-bg);
+    /* border: 2px solid var(--accent-2); */
     font-size: 12px;
-    font-family: var(--vscode-editor-font-family, monospace);
+    font-family: var(--ftr10-font-auxiliarybar);
     line-height: 1.4;
     position: relative;
+    border-radius: 8px;
 }
 
 .message.thought .aux-header {
@@ -1477,7 +1477,7 @@ body {
 }
 
 .message.thought .aux-label {
-    color: var(--reasoning-accent);
+    color: var(--ftr10-accent-3);
     font-size: 11px;
     font-weight: 600;
     text-transform: uppercase;
@@ -1490,11 +1490,12 @@ body {
 
 .message.thought .aux-label::before {
     content: '';
+    /* align-items: normal; */
     display: inline-block;
     width: 6px;
     height: 6px;
     border-radius: 50%;
-    background: var(--reasoning-accent);
+    background: var(--ftr10-accent-3);
     opacity: 0.7;
 }
 
@@ -1511,7 +1512,7 @@ body {
     color: var(--fg);
     opacity: 0.85;
     font-size: 12px;
-    line-height: 1.5;
+    line-height: 1.6;
 }
 
 .message.thought .aux-body-scroll.is-collapsed {
@@ -1564,10 +1565,10 @@ body {
     white-space: pre-wrap;
     position: relative;
     font-size: 13px;
-    font-family: var(--vscode-editor-font-family, 'Cascadia Code', 'Fira Code', monospace);
+    font-family: var(--ftr10-font-auxiliarybar);
     line-height: 1.55;
 }
-.message p { margin: 0 0 6px; }
+.message p {/* margin: 0 0 24px; */}
 .message p:last-child { margin-bottom: 0; }
 
 .message.user {
@@ -1581,10 +1582,10 @@ body {
 .message.assistant {
     background: transparent;
     border: none;
-    border-left: 3px solid var(--primary);
+    /* border-left: 3px solid var(--primary); */
     border-radius: 0;
     color: var(--fg);
-    font-family: var(--vscode-editor-font-family, monospace);
+    font-family: var(--ftr10-font-auxiliarybar);
     width: 100%;
 }
 
@@ -1632,7 +1633,7 @@ body {
 .message pre {
     background: var(--ftr10-code-bg, var(--vscode-textCodeBlock-background, #1e1e1e));
     border: 1px solid var(--border);
-    border-left: 2px solid var(--ftr10-code-border-l, var(--primary));
+    border: 2px solid var(--ftr10-code-border-l, var(--primary));
     border-radius: var(--radius-sm);
     padding: 8px;
     overflow: auto;
@@ -1643,7 +1644,7 @@ body {
 .message pre code {
     background: none;
     padding: 0;
-    font-family: var(--ftr10-code-font, var(--vscode-editor-font-family, 'Cascadia Code', 'Fira Code', monospace));
+    font-family: var(--ftr10-font-auxiliarybar);
     user-select: text;
     color: var(--ftr10-text, inherit);
 }
@@ -1652,11 +1653,11 @@ body {
     padding: 1px 4px;
     border-radius: 3px;
     font-size: 0.9em;
-    font-family: var(--ftr10-code-font, var(--vscode-editor-font-family, 'Cascadia Code', monospace));
-    color: var(--ftr10-info);
+    font-family: var(--ftr10-font-auxiliarybar);
+    color: var(--ftr10-accent-3);
 }
 
-.message ul, .message ol { padding-left: 18px; margin: 2px 0; }
+.message ul, .message ol {padding-left: 18px;margin-bottom: 18px;}
 .message li { margin: 1px 0; }
 .message li > p { margin: 0; }
 .message h1, .message h2, .message h3, .message h4 {
@@ -2030,7 +2031,7 @@ body {
     color: var(--fg);
     padding: 6px 10px;
     font-size: 12px;
-    font-family: var(--ftr10-code-font, var(--vscode-editor-font-family, monospace));
+    font-family: var(--ftr10-font-auxiliarybar);
     cursor: pointer;
     white-space: nowrap;
     overflow: hidden;
@@ -2064,7 +2065,7 @@ body {
     font-size: 11px;
     color: var(--dim);
     border-bottom: 1px solid var(--border);
-    font-family: var(--vscode-editor-font-family, monospace);
+    font-family: var(--ftr10-font-auxiliarybar);
 }
 .file-preview-tooltip pre {
     margin: 0;
@@ -2073,7 +2074,7 @@ body {
     line-height: 1.45;
     white-space: pre-wrap;
     word-break: break-all;
-    font-family: var(--vscode-editor-font-family, monospace);
+    font-family: var(--ftr10-font-auxiliarybar);
     background: transparent;
     border: none;
     cursor: default;
@@ -2576,7 +2577,7 @@ body {
     border-radius: 4px;
     padding: 6px 28px 6px 8px;
     font-size: 12px;
-    font-family: var(--vscode-font-family, monospace);
+    font-family: var(--ftr10-font-auxiliarybar);
 }
 .configure-env-path-clear {
     position: absolute;
@@ -2828,7 +2829,7 @@ body {
     background: color-mix(in srgb, var(--border) 35%, transparent);
 }
 .configure-env-candidate-path {
-    font-family: var(--vscode-font-family, monospace);
+    font-family: var(--ftr10-font-auxiliarybar);
     font-size: 11px;
     word-break: break-all;
     line-height: 1.45;
@@ -2857,7 +2858,7 @@ body {
     margin: 0;
 }
 .configure-env-system-hint code {
-    font-family: var(--vscode-font-family, monospace);
+    font-family: var(--ftr10-font-auxiliarybar);
     font-size: 10px;
     color: var(--fg);
 }
@@ -2967,7 +2968,7 @@ body {
     border: none;
     padding: 10px 12px 6px;
     resize: none;
-    font-family: var(--ftr10-code-font, inherit);
+    font-family: var(--ftr10-font-auxiliarybar);
     font-size: inherit;
     outline: none;
     min-height: 48px;
@@ -3535,22 +3536,22 @@ mark.search-mark-active {
 
 /* Tool Call Cards — borderless, hairline accent (desktop parity) */
 .tool-call-card {
-    background: transparent;
-    border: none;
-    border-left: 1px solid var(--tool-border, var(--border-subtle, var(--border)));
-    border-radius: 0;
+    background: #00000000;
+    /* border: none; */
+    /* border-left: 1px solid var(--tool-border, var(--border-subtle, var(--border))); */
+    /* border-radius: 0; */
     overflow: hidden;
     transition: background 0.15s ease;
     position: relative;
     width: 100%;
-    font-family: var(--vscode-editor-font-family, 'Cascadia Code', 'Fira Code', monospace);
+    font-family: var(--ftr10-font-auxiliarybar);
     font-size: 12px;
-    line-height: 1.5;
+    line-height: 1;
 }
 
 .tool-call-card.is-live {
-    background: transparent;
-    border-left-color: var(--tool-accent);
+    /* background: transparent; */
+    /* border-left-color: var(--tool-accent); */
 }
 .tool-call-card.is-live::before {
     content: '';
@@ -3591,7 +3592,7 @@ mark.search-mark-active {
     padding: var(--space-xs) var(--space-sm);
     cursor: pointer;
     user-select: none;
-    font-family: var(--vscode-editor-font-family, monospace);
+    font-family: var(--ftr10-font-auxiliarybar);
     font-size: 11px;
 }
 
@@ -3603,7 +3604,7 @@ mark.search-mark-active {
 .tool-call-card.is-analyzing { --tool-accent: var(--state-analyzing); }
 .tool-call-card.is-searching { --tool-accent: var(--state-searching); }
 .tool-call-card.is-reading   { --tool-accent: var(--state-reading); }
-.tool-call-card.is-writing   { --tool-accent: var(--state-writing); }
+.tool-call-card.is-writing   {--tool-accent: #4db681;}
 .tool-call-card.is-executing { --tool-accent: var(--state-executing); }
 .tool-call-card.is-error     { --tool-accent: var(--state-error); }
 
@@ -3681,7 +3682,8 @@ mark.search-mark-active {
     flex-shrink: 0;
     transition: transform var(--transition-base);
     color: var(--dim);
-    opacity: 0;
+    margin-left: auto;
+    opacity: 1;
 }
 
 .tool-call-header:hover .tool-call-chevron,
@@ -3746,6 +3748,7 @@ mark.search-mark-active {
     opacity: 1;
     padding: var(--space-sm) var(--space-md);
     visibility: visible;
+    overflow: visible;
     transition: grid-template-rows var(--transition-spring),
                 opacity var(--transition-base),
                 padding var(--transition-base),
@@ -3763,9 +3766,9 @@ mark.search-mark-active {
 }
 
 .tool-call-section {
-    padding: var(--space-sm) var(--space-md);
+    padding: 0;
     font-size: 11px;
-    font-family: var(--vscode-editor-font-family, monospace);
+    font-family: var(--ftr10-font-auxiliarybar);
     width: 100%;
     box-sizing: border-box;
     line-height: 1.5;
@@ -3782,10 +3785,9 @@ mark.search-mark-active {
 .tool-call-section-content {
     background: transparent;
     border: none;
-    border-left: 1px solid var(--tool-border, var(--border-subtle, var(--border)));
     border-radius: 0;
     padding: 2px 6px;
-    font-family: var(--vscode-editor-font-family, monospace);
+    font-family: var(--ftr10-font-auxiliarybar);
     font-size: 11px;
     line-height: 1.4;
     white-space: pre-wrap;
@@ -4089,7 +4091,7 @@ mark.search-mark-active {
     font-size: 10px;
     color: var(--dim);
     opacity: 0.6;
-    font-family: monospace;
+    font-family: var(--ftr10-font-auxiliarybar);
     flex-shrink: 0;
 }
 .session-picker-empty {

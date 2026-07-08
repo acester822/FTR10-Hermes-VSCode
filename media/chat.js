@@ -2105,6 +2105,9 @@
                     } else if (toolInfo.status === 'completed') {
                         cd.statusEl.classList.add('is-complete');
                         cd.statusEl.textContent = 'Done';
+                    } else if (toolInfo.status === 'cancelled') {
+                        cd.statusEl.classList.add('is-failed');
+                        cd.statusEl.textContent = 'Cancelled';
                     } else if (toolInfo.status === 'failed') {
                         cd.statusEl.classList.add('is-failed');
                         cd.statusEl.textContent = 'Failed';
@@ -2112,7 +2115,7 @@
                     cd.card.classList.remove('is-live', 'is-complete', 'is-failed', 'is-analyzing', 'is-searching', 'is-reading', 'is-writing', 'is-executing', 'is-error');
                     if (toolInfo.status === 'completed') {
                         cd.card.classList.add('is-complete');
-                    } else if (toolInfo.status === 'failed') {
+                    } else if (toolInfo.status === 'failed' || toolInfo.status === 'cancelled') {
                         cd.card.classList.add('is-failed');
                     } else {
                         cd.card.classList.add('is-live');
@@ -2189,15 +2192,12 @@
         state.contentEl.innerHTML = formatToolOutput(state.rawText);
         setupContentBlocks(state.contentEl);
         processFileRefs(state.contentEl);
-        // Reveal + (re)compute expand affordance for the unified Result section.
+        // Reveal + ensure a Show more/less toggle for the unified Result section.
         if (state.bodyInner) {
             const section = state.bodyInner.querySelector('.tool-call-section');
             if (section) section.style.display = '';
-            if (resultContentNeedsToggle(state.contentEl)) {
-                ensureToolResultToggle(state.bodyInner, state.contentEl);
-            } else {
-                state.contentEl.classList.remove('is-preview');
-            }
+            ensureToolResultToggle(state.bodyInner, state.contentEl);
+            state.contentEl.classList.add('is-preview');
         }
         syncAuxiliaryDetailView(group);
     }
@@ -2589,28 +2589,21 @@ function parseToolCallText(text) {
                 // Format the output properly
                 resultContent.innerHTML = formatToolOutput(bodyPart);
 
-                // Check if content needs expand button
-                setTimeout(() => {
-                    if (resultContent.scrollHeight > resultContent.clientHeight + 10) {
-                        const toggleBtn = document.createElement('button');
-                        toggleBtn.type = 'button';
-                        toggleBtn.className = 'tool-result-toggle';
-                        toggleBtn.innerHTML = '<span>Show more</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>';
-
-                        toggleBtn.addEventListener('click', function(e) {
-                            e.stopPropagation();
-                            const isExpanded = resultContent.classList.contains('is-expanded');
-                            resultContent.classList.toggle('is-preview', !isExpanded);
-                            resultContent.classList.toggle('is-expanded', isExpanded);
-                            toggleBtn.classList.toggle('is-expanded', !isExpanded);
-                            toggleBtn.querySelector('span').textContent = isExpanded ? 'Show more' : 'Show less';
-                        });
-
-                        resultSection.appendChild(toggleBtn);
-                    } else {
-                        resultContent.classList.remove('is-preview');
-                    }
-                }, 100);
+                // Always provide a Show more/less control; it reveals/expands the
+                // result section regardless of the card's collapsed/expanded state.
+                const toggleBtn = document.createElement('button');
+                toggleBtn.type = 'button';
+                toggleBtn.className = 'tool-result-toggle';
+                toggleBtn.innerHTML = '<span>Show more</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>';
+                toggleBtn.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    const isExpanded = resultContent.classList.contains('is-expanded');
+                    resultContent.classList.toggle('is-preview', !isExpanded);
+                    resultContent.classList.toggle('is-expanded', !isExpanded);
+                    toggleBtn.classList.toggle('is-expanded', !isExpanded);
+                    toggleBtn.querySelector('span').textContent = isExpanded ? 'Show more' : 'Show less';
+                });
+                resultSection.appendChild(toggleBtn);
             } else {
                 // No body yet (arrives via live update) — keep hidden until filled.
                 resultSection.style.display = 'none';
@@ -4025,13 +4018,17 @@ function parseToolCallText(text) {
                     const card = (msg._cardData && msg._cardData.card) || msg.querySelector('.tool-call-card');
                     if (card) {
                         card.classList.remove('is-live', 'is-analyzing', 'is-searching', 'is-reading', 'is-writing', 'is-executing', 'is-error');
+                        // Any tool left in a live state at stream end has no further
+                        // update coming — flip it to a terminal (complete) state so it
+                        // doesn't stay stuck showing "Running...".
                         if (!card.classList.contains('is-complete') && !card.classList.contains('is-failed')) {
                             card.classList.add('is-complete');
                         }
                         const statusEl = msg._cardData ? msg._cardData.statusEl : card.querySelector('.tool-call-status');
                         if (statusEl) {
-                            statusEl.className = 'tool-call-status is-complete';
-                            statusEl.innerHTML = '<span class="status-dot"></span> Done';
+                            const isFailed = card.classList.contains('is-failed');
+                            statusEl.className = 'tool-call-status ' + (isFailed ? 'is-failed' : 'is-complete');
+                            statusEl.innerHTML = '<span class="status-dot"></span> ' + (isFailed ? 'Failed' : 'Done');
                         }
                     }
                 }

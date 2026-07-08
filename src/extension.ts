@@ -6,6 +6,7 @@ import { registerCodeLensProvider } from './codeLens';
 import { registerDiffCommands } from './diffViewer';
 import { DiffReviewManager, registerDiffContentProvider } from './acp/DiffReviewManager';
 import { HermesSettingsPanel } from './settings/hermesSettingsPanel';
+import { startEditorToolsMcpServer, stopEditorToolsMcpServer } from './acp/AcpClient';
 import { logToFile } from './acp/fileLogger';
 
 let chatProvider: HermesChatProvider | undefined;
@@ -168,9 +169,20 @@ export function activate(context: vscode.ExtensionContext) {
         logToFile('[Hermes ACP] Failed to get tool manifest: ' + (err instanceof Error ? err.message : String(err)));
     }
 
+    // Start the shared editor-tools MCP server ONCE, before any ACP session is
+    // opened. This guarantees the server is healthy and listening before the
+    // agent's session/new -> register_mcp_servers connects to it, eliminating
+    // the race that previously caused the vscode tools to silently fail to
+    // register. The server lives for the whole extension lifetime and is torn
+    // down only on deactivate().
+    void startEditorToolsMcpServer().catch((err) => {
+        logToFile('[Hermes ACP] Failed to start editor-tools MCP server: ' + (err instanceof Error ? err.message : String(err)));
+    });
+
     logToFile('[Hermes ACP] FTR10 Hermes VSCode activated');
 }
 
 export function deactivate() {
     chatProvider?.dispose();
+    stopEditorToolsMcpServer();
 }
