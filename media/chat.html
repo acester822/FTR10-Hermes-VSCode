@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src {{CSP_SOURCE}} https: data:; style-src {{CSP_SOURCE}} 'unsafe-inline'; script-src {{CSP_SOURCE}} 'unsafe-inline'; connect-src http://127.0.0.1:8765; frame-ancestors 'none';">
 <link rel="stylesheet" href="{{HIGHLIGHT_CSS_URI}}">
 <link rel="stylesheet" href="{{CHAT_CSS_URI}}">
 <script src="{{MARKED_URI}}"></script>
@@ -35,6 +36,23 @@
     <div id="tabContextMenu" class="tab-context-menu" hidden></div>
 <div id="chat-body" class="chat-body">
 <div id="messages">
+    <!-- Per-step usage bar graph (Kilo/Kline-style). Polls the hermes-telemetry
+         local dashboard for step token sizes; purely cosmetic, degrades silently. -->
+    <div class="step-graph" id="stepGraph" hidden>
+        <div class="step-graph-header">
+            <span class="step-graph-title">Step usage</span>
+            <span class="step-graph-total" id="stepGraphTotal"></span>
+        </div>
+        <div class="step-graph-bars" id="stepGraphBars"></div>
+        <div class="step-graph-legend" id="stepGraphLegend">
+            <span class="sl sl-think">think</span>
+            <span class="sl sl-read">read</span>
+            <span class="sl sl-write">write</span>
+            <span class="sl sl-search">search</span>
+            <span class="sl sl-exec">exec</span>
+            <span class="sl sl-act">act</span>
+        </div>
+    </div>
     <div class="placeholder" id="placeholder">
         <div class="hermes-loading" id="hermesLoading" hidden>
             <svg class="hermes-loading-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -173,20 +191,13 @@
             <textarea id="input" rows="1" disabled></textarea>
             <div class="input-composite-bar">
                 <div class="input-action">
-                    <div class="token-usage-ring" id="tokenUsageRing" hidden>
-                        <svg viewBox="0 0 28 28" aria-hidden="true">
-                            <circle class="token-ring-bg" cx="14" cy="14" r="11"></circle>
-                            <circle class="token-ring-fg" id="tokenUsageArc" cx="14" cy="14" r="11"></circle>
-                        </svg>
-                        <span class="token-usage-label" id="tokenUsagePct" aria-hidden="true"></span>
-                    </div>
                     <div class="context-usage" id="contextUsage" hidden>
                         <span class="context-usage-num" id="contextUsageNum"></span>
                         <span class="context-usage-bar" aria-hidden="true"><span class="context-usage-fill" id="contextUsageFill"></span></span>
                     </div>
                     <div class="picker permission-mode-picker icon-only" id="permissionModePicker">
                         <button type="button" class="permission-mode-btn" id="permissionModeBtn" title="Permission mode" aria-label="Permission mode">
-                            <span class="input-picker-icon" aria-hidden="true"><svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm0 1.5a5.5 5.5 0 1 1 0 11 5.5 5.5 0 0 1 0-11zM8 4a1 1 0 1 1 0 2 1 1 0 0 1 0-2zm0 3.5a.75.75 0 0 1 .75.75v2.5a.75.75 0 0 1-1.5 0v-2.5A.75.75 0 0 1 8 7.5z"/></svg></span>
+                            <img class="input-picker-icon" id="permissionModeIcon" src="accelerate-svgrepo-com.svg" alt="" aria-hidden="true">
                         </button>
                         <div class="dropdown" id="permissionModeDropdown" style="display:none">
                             <div class="dropdown-header">Permission mode</div>
@@ -371,6 +382,7 @@
 <script>
 {{LOCALE_HELPER}}
 var locale = {{LOCALE_JSON}};
+var FTR10_MEDIA_URI = '{{MEDIA_URI}}';
 </script>
 <script src="{{CHAT_JS_URI}}"></script>
 </body>

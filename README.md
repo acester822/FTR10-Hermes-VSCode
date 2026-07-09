@@ -86,14 +86,7 @@ On connect the extension probes your Hermes install end-to-end: `hermes --versio
 This build is not yet published to the marketplace, so install it from the repository:
 
 1. Clone the repo and open it in VS Code / Cursor.
-2. Run the build: `npm install` then `npm run compile`.
-3. Press `F5` to launch the Extension Development Host, or run `vsce package` and install the generated `.vsix` via **Install from VSIX…** in the Extensions view.
-
-### Verify
-1. `hermes --version` works in a terminal
-2. Click the **Hermes Agent** icon in the activity bar
-3. Wait for the status pill to read **Ready** (green)
-4. Type a message → **Enter**
+2. Run the build: `npm install` then `npm run compile` for debugging, or `npm run package` to compile and generate the vsix.
 
 ---
 

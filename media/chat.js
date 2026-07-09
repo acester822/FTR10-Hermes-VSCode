@@ -8,14 +8,9 @@
     const inputCompositeShellEl = inputCompositeEl ? inputCompositeEl.closest('.input-composite-shell') : null;
     const inputResizeHandle = document.getElementById('inputResizeHandle');
     const sendBtn = document.getElementById('sendBtn');
-    const tokenUsageRing = document.getElementById('tokenUsageRing');
-    const tokenUsageArc = document.getElementById('tokenUsageArc');
-    const tokenUsagePct = document.getElementById('tokenUsagePct');
     const contextUsageEl = document.getElementById('contextUsage');
     const contextUsageNum = document.getElementById('contextUsageNum');
     const contextUsageFill = document.getElementById('contextUsageFill');
-    const TOKEN_RING_RADIUS = 11;
-    const TOKEN_RING_CIRCUMFERENCE = 2 * Math.PI * TOKEN_RING_RADIUS;
     const clearChatBtn = document.getElementById('clearChatBtn');
     const clearInputBtn = document.getElementById('clearInputBtn');
     const copySessionBtn = document.getElementById('copySessionBtn');
@@ -826,9 +821,9 @@
             quickActionsTrigger.setAttribute('aria-label', locale.quickActions);
         }
         if (inputEl) inputEl.placeholder = locale.inputPlaceholder;
-        if (tokenUsageRing) {
-            tokenUsageRing.title = locale.tokenUsage;
-            tokenUsageRing.setAttribute('aria-label', locale.tokenUsage);
+        if (contextUsageEl) {
+            contextUsageEl.title = locale.tokenUsage;
+            contextUsageEl.setAttribute('aria-label', locale.tokenUsage);
         }
         if (sendBtn) sendBtn.textContent = locale.send;
         const stopBtnLabel = document.getElementById('stopBtnLabel');
@@ -920,7 +915,7 @@
 
     const INPUT_HEIGHT_STORAGE_KEY = 'hermes-chat-input-max-height';
     const INPUT_HEIGHT_MIN = 36;
-    const INPUT_HEIGHT_DEFAULT = 120;
+    const INPUT_HEIGHT_DEFAULT = 200;
 
     function getChatRegionHeight() {
         const chatH = chatBodyEl ? chatBodyEl.clientHeight : 0;
@@ -1825,27 +1820,15 @@
     }
 
     function updateTokenUsage(used, size) {
-        if (!tokenUsageRing || !tokenUsageArc) return;
         const usedTokens = Math.max(0, Number(used) || 0);
         const totalTokens = Math.max(0, Number(size) || 0);
         if (totalTokens <= 0) {
-            tokenUsageRing.hidden = true;
             if (contextUsageEl) contextUsageEl.hidden = true;
             return;
         }
         const pct = Math.min(100, Math.round((usedTokens / totalTokens) * 100));
-        const filled = (pct / 100) * TOKEN_RING_CIRCUMFERENCE;
-        tokenUsageArc.style.strokeDasharray = filled + ' ' + TOKEN_RING_CIRCUMFERENCE;
         const level = pct >= 90 ? 'high' : pct >= 70 ? 'medium' : 'low';
-        tokenUsageRing.dataset.level = level;
-        if (tokenUsagePct) {
-            tokenUsagePct.textContent = pct + '%';
-            tokenUsagePct.style.fontSize = pct >= 100 ? '7px' : '8px';
-        }
         const label = localeText('tokenUsageLabel', formatTokenCount(usedTokens), formatTokenCount(totalTokens), pct);
-        tokenUsageRing.title = label;
-        tokenUsageRing.setAttribute('aria-label', label);
-        tokenUsageRing.hidden = false;
         if (contextUsageEl && contextUsageNum && contextUsageFill) {
             contextUsageEl.hidden = false;
             contextUsageNum.textContent = formatTokenCount(usedTokens) + ' / ' + formatTokenCount(totalTokens) + ' (' + pct + '%)';
@@ -5183,6 +5166,7 @@ function parseToolCallText(text) {
     // Permission mode picker
     const permissionModePickerEl = document.getElementById('permissionModePicker');
     const permissionModeBtnEl = document.getElementById('permissionModeBtn');
+    const permissionModeIconEl = document.getElementById('permissionModeIcon');
     const permissionModeDropdownEl = document.getElementById('permissionModeDropdown');
     const permissionModeListEl = document.getElementById('permissionModeList');
     const permissionModes = [
@@ -5199,6 +5183,22 @@ function parseToolCallText(text) {
             const hint = mode.hint || '';
             permissionModeBtnEl.setAttribute('title', label + (hint ? ' — ' + hint : ''));
             permissionModeBtnEl.setAttribute('aria-label', label);
+        }
+        if (permissionModeIconEl) {
+            const mediaBase = (typeof FTR10_MEDIA_URI === 'string' && FTR10_MEDIA_URI) ? FTR10_MEDIA_URI.replace(/\/$/, '') + '/' : '';
+            if (permissionMode === 'yolo') {
+                permissionModeIconEl.src = mediaBase + 'accelerate-svgrepo-com.svg';
+                permissionModeIconEl.style.transform = '';
+            } else if (permissionMode === 'autoApprove') {
+                permissionModeIconEl.src = mediaBase + 'thumbs-up-svgrepo-com.svg';
+                permissionModeIconEl.style.transform = '';
+            } else if (permissionMode === 'denyAll') {
+                permissionModeIconEl.src = mediaBase + 'thumbs-up-svgrepo-com.svg';
+                permissionModeIconEl.style.transform = 'rotate(180deg)';
+            } else {
+                permissionModeIconEl.src = mediaBase + 'shield-svgrepo-com.svg';
+                permissionModeIconEl.style.transform = '';
+            }
         }
         if (permissionModePickerEl) {
             permissionModePickerEl.classList.remove('mode-manual', 'mode-autoApprove', 'mode-yolo', 'mode-denyAll');
@@ -5239,10 +5239,39 @@ function parseToolCallText(text) {
                 permissionModePickerEl.classList.add('is-open');
                 permissionModeDropdownEl.style.display = 'block';
                 renderPermissionModeOptions();
+                positionPermissionDropdown();
             }
         });
         permissionModeDropdownEl.addEventListener('click', function(e) { e.stopPropagation(); });
     }
+
+    function positionPermissionDropdown() {
+        if (!permissionModeDropdownEl || !permissionModeBtnEl) return;
+        const rect = permissionModeBtnEl.getBoundingClientRect();
+        const dropW = permissionModeDropdownEl.offsetWidth || 220;
+        const dropH = permissionModeDropdownEl.offsetHeight || 200;
+        const margin = 6;
+        let left = rect.right - dropW;
+        if (left < margin) left = margin;
+        if (left + dropW > window.innerWidth - margin) left = window.innerWidth - dropW - margin;
+        let top = rect.bottom + margin;
+        if (top + dropH > window.innerHeight - margin) {
+            const above = rect.top - dropH - margin;
+            top = above >= margin ? above : Math.max(margin, window.innerHeight - dropH - margin);
+        }
+        permissionModeDropdownEl.style.position = 'fixed';
+        permissionModeDropdownEl.style.left = left + 'px';
+        permissionModeDropdownEl.style.top = top + 'px';
+        permissionModeDropdownEl.style.bottom = 'auto';
+        permissionModeDropdownEl.style.right = 'auto';
+        permissionModeDropdownEl.style.zIndex = '1000';
+    }
+
+    window.addEventListener('resize', function() {
+        if (permissionModeDropdownEl && permissionModeDropdownEl.style.display !== 'none') {
+            positionPermissionDropdown();
+        }
+    });
     updatePermissionModeUI();
 
     const switchSessionStayBtn = document.getElementById('switchSessionStayBtn');
@@ -6282,6 +6311,110 @@ function parseToolCallText(text) {
             vscode.postMessage({ type: 'rejectDiff' });
         });
     }
+
+    // -----------------------------------------------------------------------
+    // Step-usage bar graph (Kilo/Kline-style). Polls the hermes-telemetry
+    // local dashboard for per-step token sizes. Purely cosmetic: every error
+    // path hides the graph and stops silently, so a missing/unreachable
+    // dashboard never affects the chat.
+    // -----------------------------------------------------------------------
+    (function initStepGraph() {
+        const HOST = 'http://127.0.0.1:8765';
+        const POLL_MS = 1500;
+        const root = document.getElementById('stepGraph');
+        const barsEl = document.getElementById('stepGraphBars');
+        const totalEl = document.getElementById('stepGraphTotal');
+        if (!root || !barsEl || !totalEl) return;
+
+        let timer = null;
+        let lastSession = '';
+        let lastSig = '';
+
+        function fmtTokens(n) {
+            if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
+            if (n >= 1e3) return (n / 1e3).toFixed(1) + 'k';
+            return String(n);
+        }
+
+        function fmtCost(c) {
+            if (!c || c <= 0) return '';
+            return '$' + (c < 0.01 ? c.toFixed(4) : c.toFixed(2));
+        }
+
+        function render(steps) {
+            if (!steps || !steps.length) {
+                root.hidden = true;
+                return;
+            }
+            root.hidden = false;
+            const maxTokens = Math.max.apply(null, steps.map(function (s) {
+                return (s.tokens_in || 0) + (s.tokens_out || 0) || 1;
+            }));
+            let totalIn = 0, totalOut = 0, totalCost = 0;
+            const frag = document.createDocumentFragment();
+            steps.forEach(function (s) {
+                const cost = s.tokens_in + s.tokens_out || 1;
+                totalIn += s.tokens_in || 0;
+                totalOut += s.tokens_out || 0;
+                totalCost += s.cost_usd || 0;
+                const seg = document.createElement('div');
+                seg.className = 'step-seg';
+                seg.dataset.kind = s.step_kind || 'act';
+                const h = Math.max(6, Math.round((cost / maxTokens) * 32));
+                seg.style.height = h + 'px';
+                seg.title = [
+                    s.step_kind || 'act',
+                    'in ' + fmtTokens(s.tokens_in || 0) + ' / out ' + fmtTokens(s.tokens_out || 0),
+                    fmtCost(s.cost_usd),
+                    (s.model || '') + ''
+                ].filter(Boolean).join('  ·  ');
+                frag.appendChild(seg);
+            });
+            barsEl.replaceChildren(frag);
+            const parts = ['Σ ' + fmtTokens(totalIn) + ' in', fmtTokens(totalOut) + ' out'];
+            const c = fmtCost(totalCost);
+            if (c) parts.push(c);
+            totalEl.textContent = parts.join('   ');
+        }
+
+        function fetchSteps(sessionId) {
+            const url = HOST + '/api/steps?session=' + encodeURIComponent(sessionId || '');
+            fetch(url, { cache: 'no-store' })
+                .then(function (r) { return r.ok ? r.json() : null; })
+                .then(function (data) {
+                    if (!data || !data.steps) { root.hidden = true; return; }
+                    render(data.steps);
+                    lastSession = data.session_id || sessionId || '';
+                })
+                .catch(function () { root.hidden = true; });
+        }
+
+        function tick() {
+            const sid = (typeof lastActiveSessionId !== 'undefined' && lastActiveSessionId)
+                ? lastActiveSessionId : '';
+            const sig = sid || 'latest';
+            if (sig !== lastSig) {
+                lastSig = sig;
+                // session changed: clear and refetch immediately
+                barsEl.replaceChildren();
+                lastSession = '';
+            }
+            fetchSteps(sid);
+        }
+
+        function start() {
+            if (timer) return;
+            tick();
+            timer = setInterval(tick, POLL_MS);
+        }
+
+        // Start polling once the panel is ready (postMessage 'ready' is sent
+        // just after this IIFE). Refresh immediately on window focus too, so
+        // bars never go stale while the webview is backgrounded.
+        start();
+        window.addEventListener('focus', function () { if (timer) tick(); });
+    })();
+    // -----------------------------------------------------------------------
 
     showHermesLoading('Connecting to Hermes');
     vscode.postMessage({ type: 'ready' });
