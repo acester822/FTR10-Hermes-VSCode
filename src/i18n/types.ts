@@ -183,6 +183,7 @@ export interface LocaleStrings {
     roleMessage: string;
     permissionTitle: string;
     permissionCancelled: string;
+    permissionDestructiveHold: string;
     permissionAllowOnce: string;
     permissionAllowAlways: string;
     permissionAllowSession: string;

@@ -54,7 +54,6 @@
     <span class="status-dot" id="statusDot"></span>
     <span class="status-text" id="statusText"></span>
     <button class="retry-btn" id="retryBtn" hidden>↻</button>
-    <button class="retry-btn detect-env-btn" id="detectEnvBtn" hidden></button>
 </div>
 <div id="todoPanel" class="todo-panel" hidden>
     <div class="todo-panel-header">
@@ -94,8 +93,8 @@
             <button type="button" id="multiSelectExitBtn" class="ms-exit"></button>
         </div>
     </div>
-    <div class="input-quick-panel" id="inputQuickPanel" aria-hidden="true">
-        <div class="input-quick-panel-inner">
+    <div class="input-quick-popup" id="inputQuickPanel" aria-hidden="true">
+        <div class="input-quick-popup-inner">
             <div class="input-quick-toolbar">
                 <div class="chat-search">
                     <svg class="chat-search-icon" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M6.5 1a5.5 5.5 0 1 1 0 11 5.5 5.5 0 0 1 0-11zm0 1.5a4 4 0 1 0 0 8 4 4 0 0 0 0-8zm5.03 8.47 2.5 2.5-.7.7-2.5-2.5.7-.7z"/></svg>
@@ -121,9 +120,6 @@
         </div>
     </div>
      <div class="input-composite-wrap">
-         <button type="button" id="quickToggleBtn" class="quick-toggle-btn" aria-expanded="false" aria-controls="inputQuickPanel">
-             <svg class="quick-toggle-chevron" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M4.5 10.5 8 7l3.5 3.5-.7.7L8 8.4l-2.8 2.8-.7-.7z"/></svg>
-         </button>
          <div class="diff-review-bar" id="diffReviewBar" hidden>
              <div class="diff-review-info">
                  <span class="diff-review-icon" aria-hidden="true">
@@ -173,16 +169,6 @@
                 </div>
             </div>
             </div>
-            <div class="picker permission-mode-picker" id="permissionModePicker">
-                <button type="button" class="permission-mode-btn" id="permissionModeBtn" title="Permission mode">
-                    <span class="input-picker-icon" aria-hidden="true"><svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm0 1.5a5.5 5.5 0 1 1 0 11 5.5 5.5 0 0 1 0-11zM8 4a1 1 0 1 1 0 2 1 1 0 0 1 0-2zm0 3.5a.75.75 0 0 1 .75.75v2.5a.75.75 0 0 1-1.5 0v-2.5A.75.75 0 0 1 8 7.5z"/></svg></span>
-                    <span class="input-picker-label" id="permissionModeLabel">Manual</span>
-                </button>
-                <div class="dropdown" id="permissionModeDropdown" style="display:none">
-                    <div class="dropdown-header">Permission mode</div>
-                    <div class="permission-mode-options" id="permissionModeList"></div>
-                </div>
-            </div>
             <div class="input-composite" id="inputComposite">
             <textarea id="input" rows="1" disabled></textarea>
             <div class="input-composite-bar">
@@ -193,6 +179,22 @@
                             <circle class="token-ring-fg" id="tokenUsageArc" cx="14" cy="14" r="11"></circle>
                         </svg>
                         <span class="token-usage-label" id="tokenUsagePct" aria-hidden="true"></span>
+                    </div>
+                    <div class="context-usage" id="contextUsage" hidden>
+                        <span class="context-usage-num" id="contextUsageNum"></span>
+                        <span class="context-usage-bar" aria-hidden="true"><span class="context-usage-fill" id="contextUsageFill"></span></span>
+                    </div>
+                    <div class="picker permission-mode-picker icon-only" id="permissionModePicker">
+                        <button type="button" class="permission-mode-btn" id="permissionModeBtn" title="Permission mode" aria-label="Permission mode">
+                            <span class="input-picker-icon" aria-hidden="true"><svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm0 1.5a5.5 5.5 0 1 1 0 11 5.5 5.5 0 0 1 0-11zM8 4a1 1 0 1 1 0 2 1 1 0 0 1 0-2zm0 3.5a.75.75 0 0 1 .75.75v2.5a.75.75 0 0 1-1.5 0v-2.5A.75.75 0 0 1 8 7.5z"/></svg></span>
+                        </button>
+                        <div class="dropdown" id="permissionModeDropdown" style="display:none">
+                            <div class="dropdown-header">Permission mode</div>
+                            <div class="permission-mode-options" id="permissionModeList"></div>
+                        </div>
+                    </div>
+                    <div class="input-quick-trigger" id="quickActionsTrigger" title="Quick actions" aria-label="Quick actions" aria-expanded="false" role="button" tabindex="0">
+                        <svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M6.5 1a5.5 5.5 0 1 1 0 11 5.5 5.5 0 0 1 0-11zm0 1.5a4 4 0 1 0 0 8 4 4 0 0 0 0-8zm5.03 8.47 2.5 2.5-.7.7-2.5-2.5.7-.7z"/></svg>
                     </div>
                     <div class="input-submit-slot">
                         <button id="sendBtn" disabled></button>

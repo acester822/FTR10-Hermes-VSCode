@@ -268,6 +268,7 @@ hermes --profile &lt;name&gt; acp</code></pre>
     roleMessage: 'Message',
     permissionTitle: 'Permission required',
     permissionCancelled: 'Cancelled',
+    permissionDestructiveHold: 'Destructive action — held for approval',
     permissionAllowOnce: 'Allow once',
     permissionAllowAlways: 'Always allow',
     permissionAllowSession: 'Allow for session',

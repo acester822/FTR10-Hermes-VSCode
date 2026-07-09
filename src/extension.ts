@@ -152,8 +152,6 @@ export function activate(context: vscode.ExtensionContext) {
     bindChatCommand(context, 'hermes.openHelp', provider => provider.openHelp());
     bindChatCommand(context, 'hermes.openFaq', provider => provider.openFaq());
     bindChatCommand(context, 'hermes.openLogs', provider => provider.openLogs());
-    bindChatCommand(context, 'hermes.detectEnvironment', provider => provider.detectEnvironment());
-    bindChatCommand(context, 'hermes.detectEnvironmentBusy', () => undefined);
     bindChatCommand(context, 'hermes.configureEnvironment', provider => provider.configureEnvironment());
 
     // Log tool manifest

@@ -11,12 +11,15 @@
     const tokenUsageRing = document.getElementById('tokenUsageRing');
     const tokenUsageArc = document.getElementById('tokenUsageArc');
     const tokenUsagePct = document.getElementById('tokenUsagePct');
+    const contextUsageEl = document.getElementById('contextUsage');
+    const contextUsageNum = document.getElementById('contextUsageNum');
+    const contextUsageFill = document.getElementById('contextUsageFill');
     const TOKEN_RING_RADIUS = 11;
     const TOKEN_RING_CIRCUMFERENCE = 2 * Math.PI * TOKEN_RING_RADIUS;
     const clearChatBtn = document.getElementById('clearChatBtn');
     const clearInputBtn = document.getElementById('clearInputBtn');
     const copySessionBtn = document.getElementById('copySessionBtn');
-    const quickToggleBtn = document.getElementById('quickToggleBtn');
+    const quickActionsTrigger = document.getElementById('quickActionsTrigger');
     const inputQuickPanel = document.getElementById('inputQuickPanel');
     const chatSearchInput = document.getElementById('chatSearchInput');
     const chatSearchCount = document.getElementById('chatSearchCount');
@@ -730,11 +733,6 @@
 
         if (toolbarStatus) toolbarStatus.title = locale.connectionStatus;
         if (retryBtnEl) retryBtnEl.title = locale.retry;
-        const detectEnvBtnEl = document.getElementById('detectEnvBtn');
-        if (detectEnvBtnEl) {
-            detectEnvBtnEl.textContent = locale.detectEnvironment || '';
-            detectEnvBtnEl.title = locale.detectEnvironment || '';
-        }
         const profileLabelText = document.getElementById('profileLabelText');
         if (profileLabelText) profileLabelText.textContent = locale.profile;
         if (profileBtnEl) profileBtnEl.title = locale.switchProfile;
@@ -823,9 +821,9 @@
         if (multiSelectExportBtn) multiSelectExportBtn.textContent = locale.multiSelectExport;
         if (multiSelectExitBtn) multiSelectExitBtn.textContent = locale.multiSelectExit;
         updateMultiSelectToolbar();
-        if (quickToggleBtn) {
-            quickToggleBtn.title = locale.quickActions;
-            quickToggleBtn.setAttribute('aria-label', locale.quickActions);
+        if (quickActionsTrigger) {
+            quickActionsTrigger.title = locale.quickActions;
+            quickActionsTrigger.setAttribute('aria-label', locale.quickActions);
         }
         if (inputEl) inputEl.placeholder = locale.inputPlaceholder;
         if (tokenUsageRing) {
@@ -1832,6 +1830,7 @@
         const totalTokens = Math.max(0, Number(size) || 0);
         if (totalTokens <= 0) {
             tokenUsageRing.hidden = true;
+            if (contextUsageEl) contextUsageEl.hidden = true;
             return;
         }
         const pct = Math.min(100, Math.round((usedTokens / totalTokens) * 100));
@@ -1847,6 +1846,14 @@
         tokenUsageRing.title = label;
         tokenUsageRing.setAttribute('aria-label', label);
         tokenUsageRing.hidden = false;
+        if (contextUsageEl && contextUsageNum && contextUsageFill) {
+            contextUsageEl.hidden = false;
+            contextUsageNum.textContent = formatTokenCount(usedTokens) + ' / ' + formatTokenCount(totalTokens) + ' (' + pct + '%)';
+            contextUsageFill.style.width = pct + '%';
+            contextUsageEl.dataset.level = level;
+            contextUsageEl.title = label;
+            contextUsageEl.setAttribute('aria-label', label);
+        }
     }
     let toolCallMap = {};
     let toolAggregateGroupId = null;
@@ -2222,9 +2229,9 @@
             e.stopPropagation();
             const isExpanded = resultContent.classList.contains('is-expanded');
             resultContent.classList.toggle('is-preview', !isExpanded);
-            resultContent.classList.toggle('is-expanded', isExpanded);
+            resultContent.classList.toggle('is-expanded', !isExpanded);
             toggleBtn.classList.toggle('is-expanded', !isExpanded);
-            toggleBtn.querySelector('span').textContent = isExpanded ? 'Show more' : 'Show less';
+            toggleBtn.querySelector('span').textContent = isExpanded ? 'Show less' : 'Show more';
         });
         section.appendChild(toggleBtn);
     }
@@ -2589,21 +2596,23 @@ function parseToolCallText(text) {
                 // Format the output properly
                 resultContent.innerHTML = formatToolOutput(bodyPart);
 
-                // Always provide a Show more/less control; it reveals/expands the
-                // result section regardless of the card's collapsed/expanded state.
-                const toggleBtn = document.createElement('button');
-                toggleBtn.type = 'button';
-                toggleBtn.className = 'tool-result-toggle';
-                toggleBtn.innerHTML = '<span>Show more</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>';
-                toggleBtn.addEventListener('click', function(e) {
-                    e.stopPropagation();
-                    const isExpanded = resultContent.classList.contains('is-expanded');
-                    resultContent.classList.toggle('is-preview', !isExpanded);
-                    resultContent.classList.toggle('is-expanded', !isExpanded);
-                    toggleBtn.classList.toggle('is-expanded', !isExpanded);
-                    toggleBtn.querySelector('span').textContent = isExpanded ? 'Show more' : 'Show less';
-                });
-                resultSection.appendChild(toggleBtn);
+                // Only show the toggle when content actually overflows 10 lines.
+                const needsToggle = resultContent.scrollHeight > resultContent.clientHeight + 5;
+                if (needsToggle) {
+                    const toggleBtn = document.createElement('button');
+                    toggleBtn.type = 'button';
+                    toggleBtn.className = 'tool-result-toggle';
+                    toggleBtn.innerHTML = '<span>Show more</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>';
+                    toggleBtn.addEventListener('click', function(e) {
+                        e.stopPropagation();
+                        const isExpanded = resultContent.classList.contains('is-expanded');
+                        resultContent.classList.toggle('is-preview', !isExpanded);
+                        resultContent.classList.toggle('is-expanded', !isExpanded);
+                        toggleBtn.classList.toggle('is-expanded', !isExpanded);
+                        toggleBtn.querySelector('span').textContent = isExpanded ? 'Show less' : 'Show more';
+                    });
+                    resultSection.appendChild(toggleBtn);
+                }
             } else {
                 // No body yet (arrives via live update) — keep hidden until filled.
                 resultSection.style.display = 'none';
@@ -2988,7 +2997,6 @@ function parseToolCallText(text) {
     let connectionAttempted = false;
     const cancelBtn = document.getElementById('cancelBtn');
     const retryBtn = document.getElementById('retryBtn');
-    const detectEnvBtn = document.getElementById('detectEnvBtn');
     let activeSessionId = '';
 
     const filePickerEl = document.getElementById('filePicker');
@@ -3032,11 +3040,11 @@ function parseToolCallText(text) {
     }
 
     function setQuickPanelOpen(open) {
-        if (!inputQuickPanel || !quickToggleBtn) return;
+        if (!inputQuickPanel || !quickActionsTrigger) return;
         inputQuickPanel.classList.toggle('open', open);
         inputQuickPanel.setAttribute('aria-hidden', open ? 'false' : 'true');
-        quickToggleBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
-        quickToggleBtn.title = open ? locale.quickActionsCollapse : locale.quickActionsExpand;
+        quickActionsTrigger.setAttribute('aria-expanded', open ? 'true' : 'false');
+        quickActionsTrigger.classList.toggle('is-active', open);
         if (open && chatSearchInput && !chatSearchInput.disabled) {
             setTimeout(function() { chatSearchInput.focus(); }, 280);
         }
@@ -3052,17 +3060,11 @@ function parseToolCallText(text) {
             retryBtn.hidden = !showActions;
             retryBtn.disabled = status === 'connecting';
         }
-        if (detectEnvBtn) {
-            detectEnvBtn.hidden = !showActions;
-            detectEnvBtn.disabled = status === 'connecting';
-        }
     }
 
     function bindConnectionErrorActions() {
         const phRetry = document.getElementById('placeholderRetryBtn');
         if (phRetry) phRetry.addEventListener('click', doRetry);
-        const phDetect = document.getElementById('placeholderDetectEnvBtn');
-        if (phDetect) phDetect.addEventListener('click', doDetectEnvironment);
     }
 
     function buildConnectionErrorPlaceholder(errText) {
@@ -3070,7 +3072,6 @@ function parseToolCallText(text) {
         return escapeHtml(errText) +
             '<div class="connection-error-actions" style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;justify-content:center">' +
             '<button type="button" class="retry-btn" id="placeholderRetryBtn">' + escapeHtml(locale.retryConnect) + '</button>' +
-            '<button type="button" class="retry-btn" id="placeholderDetectEnvBtn">' + escapeHtml(locale.detectEnvironment) + '</button>' +
             '</div>';
     }
 
@@ -3082,11 +3083,6 @@ function parseToolCallText(text) {
         if (retryBtn && retryBtn.disabled) return;
         connectionAttempted = true;
         vscode.postMessage({ type: 'retry' });
-    }
-
-    function doDetectEnvironment() {
-        if (detectEnvBtn && detectEnvBtn.disabled) return;
-        vscode.postMessage({ type: 'detectEnvironment' });
     }
 
     function updateStatus(status, message) {
@@ -4657,8 +4653,17 @@ function parseToolCallText(text) {
 
     sendBtn.addEventListener('click', sendMessage);
 
-    if (quickToggleBtn) {
-        quickToggleBtn.addEventListener('click', toggleQuickPanel);
+    if (quickActionsTrigger) {
+        quickActionsTrigger.addEventListener('click', function(e) {
+            e.stopPropagation();
+            toggleQuickPanel();
+        });
+        quickActionsTrigger.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                toggleQuickPanel();
+            }
+        });
     }
 
     if (chatSearchInput) {
@@ -4810,9 +4815,6 @@ function parseToolCallText(text) {
 
     if (retryBtn) {
         retryBtn.addEventListener('click', doRetry);
-    }
-    if (detectEnvBtn) {
-        detectEnvBtn.addEventListener('click', doDetectEnvironment);
     }
     if (configureEnvBrowseBtn) {
         configureEnvBrowseBtn.addEventListener('click', browseConfigureEnvPath);
@@ -5114,6 +5116,7 @@ function parseToolCallText(text) {
         modelPicker.classList.remove('is-open');
         if (contextAttachPicker) contextAttachPicker.classList.remove('is-open');
         if (permissionModePickerEl) permissionModePickerEl.classList.remove('is-open');
+        if (inputQuickPanel) setQuickPanelOpen(false);
         if (profileDropdown) profileDropdown.style.display = 'none';
         modelDropdown.style.display = 'none';
         if (contextAttachDropdown) contextAttachDropdown.style.display = 'none';
@@ -5180,22 +5183,25 @@ function parseToolCallText(text) {
     // Permission mode picker
     const permissionModePickerEl = document.getElementById('permissionModePicker');
     const permissionModeBtnEl = document.getElementById('permissionModeBtn');
-    const permissionModeLabelEl = document.getElementById('permissionModeLabel');
     const permissionModeDropdownEl = document.getElementById('permissionModeDropdown');
     const permissionModeListEl = document.getElementById('permissionModeList');
     const permissionModes = [
         { id: 'manual', label: 'Manual', hint: 'Ask every time' },
-        { id: 'autoApprove', label: 'Auto Approve', hint: 'Approve all' },
+        { id: 'autoApprove', label: 'Auto Approve', hint: 'Approve all safe actions' },
+        { id: 'yolo', label: 'Yolo', hint: 'Approve everything' },
         { id: 'denyAll', label: 'Deny All', hint: 'Reject all' },
     ];
 
     function updatePermissionModeUI() {
-        if (permissionModeLabelEl) {
-            const mode = permissionModes.find(function(m) { return m.id === permissionMode; });
-            permissionModeLabelEl.textContent = mode ? mode.label : 'Manual';
+        const mode = permissionModes.find(function(m) { return m.id === permissionMode; });
+        if (permissionModeBtnEl && mode) {
+            const label = mode.label;
+            const hint = mode.hint || '';
+            permissionModeBtnEl.setAttribute('title', label + (hint ? ' — ' + hint : ''));
+            permissionModeBtnEl.setAttribute('aria-label', label);
         }
         if (permissionModePickerEl) {
-            permissionModePickerEl.classList.remove('mode-manual', 'mode-autoApprove', 'mode-denyAll');
+            permissionModePickerEl.classList.remove('mode-manual', 'mode-autoApprove', 'mode-yolo', 'mode-denyAll');
             permissionModePickerEl.classList.add('mode-' + permissionMode);
         }
         if (permissionModeListEl) {
@@ -5809,20 +5815,46 @@ function parseToolCallText(text) {
         pendingPermissions.set(id, group);
         maybeScrollToBottom();
 
-        // Auto-resolve based on permission mode
-        if (permissionMode === 'autoApprove') {
+        // Auto-resolve based on permission mode.
+        // yolo  => approve everything, no exceptions.
+        // autoApprove => approve everything EXCEPT destructive actions
+        //                (e.g. rm -rf on the wrong dir, overwriting the wrong
+        //                file), which are left to the user to confirm.
+        // denyAll => reject everything.
+        const msgText = ((msg.title || '') + ' ' + (msg.detail || '')).toLowerCase();
+        const isDestructive = /rm\s+-rf|rm\s+-fr|del\s+\/|format\s|mkfs|>\s*\/dev\/|truncate|overwrite|force\s+write|shred|dd\s+if=|:\s*!\s*$/i.test(msgText)
+            || /\b(rm|del|delete|remove)\b[\s\S]{0,80}?(all|everything|\*|\/|\.\.\/|home|system)/i.test(msgText);
+
+        if (permissionMode === 'yolo') {
             const options = msg.options || [];
-            // Prefer allow_always, then allow_once, then first option
             const allowAlways = options.find(function(o) { return o.kind === 'allow_always'; });
             const allowOnce = options.find(function(o) { return o.kind === 'allow_once'; });
             const chosenOpt = allowAlways || allowOnce || options[0];
             if (chosenOpt) {
                 const label = chosenOpt.name || chosenOpt.optionId;
-                applyPermissionResolvedUI(group, (localeText('permissionSelected', label)) + ' (auto)');
-                // Auto-approved: collapse the card so only the status indicator shows.
+                applyPermissionResolvedUI(group, (localeText('permissionSelected', label)) + ' (yolo)');
                 collapseAutoPermission(group);
                 pendingPermissions.delete(id);
                 vscode.postMessage({ type: 'permissionResponse', id: id, optionId: chosenOpt.optionId });
+            }
+        } else if (permissionMode === 'autoApprove') {
+            if (isDestructive) {
+                // Leave destructive actions for the user to confirm manually.
+                applyPermissionResolvedUI(group, localeText('permissionDestructiveHold') || 'Destructive action — needs approval');
+            } else {
+                const options = msg.options || [];
+                // Prefer allow_always, then allow_once, then first option
+                const allowAlways = options.find(function(o) { return o.kind === 'allow_always'; });
+                const allowOnce = options.find(function(o) { return o.kind === 'allow_once'; });
+                const chosenOpt = allowAlways || allowOnce || options[0];
+                if (chosenOpt) {
+                    const label = chosenOpt.name || chosenOpt.optionId;
+                    applyPermissionResolvedUI(group, (localeText('permissionSelected', label)) + ' (auto)');
+                    // Auto-approved: collapse the card so only the status indicator shows.
+                    collapseAutoPermission(group);
+                    pendingPermissions.delete(id);
+                    vscode.postMessage({ type: 'permissionResponse', id: id, optionId: chosenOpt.optionId });
+                }
             }
         } else if (permissionMode === 'denyAll') {
             const options = msg.options || [];
@@ -6118,6 +6150,12 @@ function parseToolCallText(text) {
             case 'config':
                 window._showThoughts = msg.showThoughts;
                 window._showToolCalls = msg.showToolCalls;
+                // Apply persisted permission mode so a new session restores the
+                // user's last selection instead of always defaulting to 'manual'.
+                if (msg.permissionMode && msg.permissionMode !== permissionMode) {
+                    permissionMode = msg.permissionMode;
+                    updatePermissionModeUI();
+                }
                 // Apply to existing messages
                 document.querySelectorAll('.message-group.thought').forEach(function(el) {
                     el.style.display = msg.showThoughts ? '' : 'none';

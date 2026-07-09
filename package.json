@@ -6,6 +6,13 @@
   "publisher": "FTR10",
   "icon": "media/icon.png",
   "license": "MIT",
+  "author": "acester822",
+  "contributors": [
+    {
+      "name": "acester822",
+      "email": "acester822@gmail.com"
+    }
+  ],
   "engines": {
     "vscode": "^1.85.0"
   },
@@ -155,16 +162,6 @@
         "icon": "$(output)"
       },
       {
-        "command": "hermes.detectEnvironment",
-        "title": "%commands.hermes.detectEnvironment.title%",
-        "icon": "$(search)"
-      },
-      {
-        "command": "hermes.detectEnvironmentBusy",
-        "title": "%commands.hermes.detectEnvironmentBusy.title%",
-        "icon": "$(sync~spin)"
-      },
-      {
         "command": "hermes.configureEnvironment",
         "title": "%commands.hermes.configureEnvironment.title%",
         "icon": "$(settings-gear)"
@@ -220,27 +217,12 @@
           "group": "navigation@2"
         },
         {
-          "command": "hermes.detectEnvironment",
-          "when": "view == hermesChat && !hermesDetectInProgress",
-          "group": "navigation@3"
-        },
-        {
           "command": "hermes.reloadExtension",
           "when": "view == hermesChat",
           "group": "navigation@4"
         }
       ],
       "hermes.envMenu": [
-        {
-          "command": "hermes.detectEnvironment",
-          "when": "!hermesDetectInProgress",
-          "group": "1@1"
-        },
-        {
-          "command": "hermes.detectEnvironmentBusy",
-          "when": "hermesDetectInProgress",
-          "group": "1@1"
-        },
         {
           "command": "hermes.configureEnvironment",
           "when": "!hermesDetectInProgress",
@@ -328,11 +310,13 @@
           "enum": [
             "manual",
             "autoApprove",
+            "yolo",
             "denyAll"
           ],
           "enumDescriptions": [
             "%configuration.hermes.permissionMode.manual.description%",
             "%configuration.hermes.permissionMode.autoApprove.description%",
+            "%configuration.hermes.permissionMode.yolo.description%",
             "%configuration.hermes.permissionMode.denyAll.description%"
           ],
           "description": "%configuration.hermes.permissionMode.description%"

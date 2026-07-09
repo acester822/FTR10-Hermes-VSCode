@@ -28,7 +28,7 @@ This isn't a thin wrapper that pastes prompts. The agent sees your editor: the f
 | **Editor Tools Bridge** | Hermes reads your active file, open tabs, cursor, selection, and live diagnostics through an in-process MCP server — and can read/write workspace files. |
 | **Model picker with live pricing** | Browse every model Hermes exposes, grouped by provider, with per-token output cost shown inline. Switch provider + model in one click. |
 | **Profile auto-discovery** | Hermes profiles are detected from your config and surfaced as a one-tap selector. |
-| **Permission modes** | `auto` / `confirm` / `manual` — decide how much the agent asks before it touches your system. |
+| **Permission modes** | `manual` / `autoApprove` / `yolo` / `denyAll` — decide how much the agent asks before it touches your system. |
 | **Diff viewer** | Proposed changes render as a real diff. Preview, then apply to disk. |
 | **Multi-session tabs** | Parallel conversations, persisted locally. Rename, delete, revisit. |
 | **Context attachment** | Carry prior-session messages into a new chat so the agent isn't amnesiac. |
@@ -64,11 +64,11 @@ Hermes suggests a change → you see original vs. proposed → you apply. Comman
 ### 🧭 Control Center
 An embedded Hermes dashboard panel for agent configuration, tools, and permissions — no browser tab required.
 
-### 🛠️ Environment detection (L0–L5)
-The wrench menu scans your Hermes install end-to-end: `hermes --version`, `hermes acp --check`, and auto-installs `agent-client-protocol` when missing. A compact percentage progress keeps you oriented.
+### 🛠️ Automatic environment detection
+On connect the extension probes your Hermes install end-to-end: `hermes --version`, `hermes acp --check`, and auto-installs `agent-client-protocol` when missing. If anything is broken it surfaces a guided panel so you can fix it without leaving the editor.
 
 ### 📊 Visibility & diagnostics
-- **Token usage ring** in the toolbar
+- **Token usage ring + numeric readout** in the input bar — shows used / total and a filling bar gauge
 - **Local-history badge** marking messages restored from storage (agent context resets on switch)
 - **Thoughts & tool calls** — optional reasoning + tool notifications
 - **Connection logs** — view/copy ACP logs from the toolbar
@@ -82,15 +82,12 @@ The wrench menu scans your Hermes install end-to-end: `hermes --version`, `herme
 - **[Hermes Agent](https://hermes-agent.nousresearch.com)** installed; `hermes` on `PATH` (or set `hermes.path`)
 - Node + Python for ACP dependencies (auto-installed on first connect)
 
-### VS Code
-1. Extensions (`Ctrl+Shift+X` / `Cmd+Shift+X`)
-2. Search **FTR10 Hermes VSCode** (or **FTR10**)
-3. **Install**
+### From source (VS Code / Cursor)
+This build is not yet published to the marketplace, so install it from the repository:
 
-Or: [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=FTR10.FTR10-Hermes-VSCode)
-
-### Cursor
-Search the same name, or grab it from [Open VSX](https://open-vsx.org/extension/FTR10/FTR10-Hermes-VSCode).
+1. Clone the repo and open it in VS Code / Cursor.
+2. Run the build: `npm install` then `npm run compile`.
+3. Press `F5` to launch the Extension Development Host, or run `vsce package` and install the generated `.vsix` via **Install from VSIX…** in the Extensions view.
 
 ### Verify
 1. `hermes --version` works in a terminal
@@ -135,7 +132,6 @@ Search the same name, or grab it from [Open VSX](https://open-vsx.org/extension/
 | `Hermes: Apply Hermes Changes` | Apply proposed changes to a file |
 | `Hermes: Open Control Center` | Open the embedded Hermes dashboard |
 | `Hermes: Set API Key` | Store an API key securely |
-| `Hermes: Detect Environment` | Scan for Hermes installation |
 | `Hermes: Configure Environment` | Configure detected Hermes installation |
 | `Hermes: Open Settings` | Open extension settings |
 | `Hermes: Check for Updates` | Check for extension updates |
@@ -154,13 +150,21 @@ Open **Settings** (`Ctrl+,` / `Cmd+,`) and search **Hermes**, or use **More opti
 | `hermes.path` | Path to Hermes executable | auto-detect |
 | `hermes.cwd` | Working directory for sessions | workspace root |
 | `hermes.profile` | Hermes profile name | default |
-| `hermes.permissionMode` | `auto` / `confirm` / `manual` | `confirm` |
+| `hermes.permissionMode` | `manual` / `autoApprove` / `yolo` / `denyAll` | `manual` |
 | `hermes.showThoughts` | Show agent thinking process | `true` |
 | `hermes.showToolCalls` | Show tool call notifications | `true` |
 | `hermes.contextAttachVisibility` | When to show context attachment picker | `onNewSession` |
 | `hermes.models` | Fallback model list when agent provides none | `[]` |
 | `hermes.defaultModel` | Default model id (fallback list only) | `""` |
 | `hermes.agents` | Named agent configurations for quick switching | `[]` |
+
+**Permission modes**
+- **Manual** (default) — you must approve or deny each request.
+- **Auto Approve** — automatically approve all *non-destructive* requests. Destructive commands (e.g. `rm -rf` on the wrong directory, overwriting the wrong file) are held for your manual approval.
+- **Yolo** — approve *everything* automatically, including destructive commands. Use with caution.
+- **Deny All** — automatically deny all permission requests.
+
+The selected mode is persisted across sessions.
 
 **Multiple agents:**
 ```json
@@ -187,7 +191,7 @@ Connection-related setting changes trigger an automatic reconnect.
 
 | Symptom | What to try |
 |---------|-------------|
-| Stuck on **Connecting…** | Wrench menu → **Environment detection**; ensure `hermes` is on PATH or set `hermes.path` |
+| Stuck on **Connecting…** | Ensure `hermes` is on PATH or set `hermes.path` in Settings; the extension runs environment detection automatically on connect. |
 | **ACP dependencies missing** | Detection runs `pip install agent-client-protocol==0.9.0` automatically; else `hermes acp --check` in a terminal |
 | **Connection error** | Click **Retry** in the toolbar; check logs via **More options → Logs** |
 | **Hermes is initializing…** | Normal on first message after connect — plugin load can take 1–3 min; wait or check logs |
@@ -212,9 +216,13 @@ Before filing, search [existing issues](https://github.com/acester822/FTR10-Herm
 
 **Links**
 - Repository: [github.com/acester822/FTR10-Hermes-VSCode](https://github.com/acester822/FTR10-Hermes-VSCode)
-- VS Code Marketplace: [FTR10.FTR10-Hermes-VSCode](https://marketplace.visualstudio.com/items?itemName=FTR10.FTR10-Hermes-VSCode)
-- Cursor (Open VSX): [FTR10/FTR10-Hermes-VSCode](https://open-vsx.org/extension/FTR10/FTR10-Hermes-VSCode)
 - Hermes Agent docs: [hermes-agent.nousresearch.com](https://hermes-agent.nousresearch.com)
+
+---
+
+## Contributors
+
+- [acester822](https://github.com/acester822)
 
 ---
 

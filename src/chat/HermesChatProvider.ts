@@ -351,12 +351,6 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
                 case 'retry':
                     void this._handleRetry();
                     break;
-                case 'detectEnvironment':
-                    void this.detectEnvironment();
-                    break;
-                case 'detectEnvironmentDismiss':
-                    this._handleDetectEnvironmentDismiss();
-                    break;
                 case 'configureEnvironmentBrowse':
                     void this._handleConfigureEnvironmentBrowse();
                     break;
@@ -1491,7 +1485,7 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
     }
 
     private _handlePermissionModeChange(mode: string | undefined): void {
-        const validModes = ['manual', 'autoApprove', 'denyAll'];
+        const validModes = ['manual', 'autoApprove', 'yolo', 'denyAll'];
         const resolved = validModes.includes(mode ?? '') ? mode! : 'manual';
         this._log(`Permission mode changed: ${resolved}`);
         const config = vscode.workspace.getConfiguration('hermes');
@@ -1812,28 +1806,6 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
         }
         this._setDetectContext(false, true);
         return report;
-    }
-
-    public async detectEnvironment(): Promise<void> {
-        if (this._detectInProgress) {
-            return;
-        }
-        this._log('Environment detection requested');
-        const config = vscode.workspace.getConfiguration('hermes');
-        const configuredPath = config.get<string>('path') || undefined;
-        const report = await this._runEnvironmentDetectionWithUi(configuredPath, 'manual');
-
-        if (report.status === 'cancelled') {
-            return;
-        }
-        if (report.status === 'not_found') {
-            await vscode.window.showErrorMessage(t('detectEnvironmentNotFound'));
-            return;
-        }
-        if (report.status === 'broken') {
-            await vscode.window.showErrorMessage(this._formatDetectBrokenMessage(report));
-            return;
-        }
     }
 
     public configureEnvironment(): void {

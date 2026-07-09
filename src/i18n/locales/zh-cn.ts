@@ -268,6 +268,7 @@ hermes --profile &lt;name&gt; acp</code></pre>
     roleMessage: '消息',
     permissionTitle: '需要授权',
     permissionCancelled: '已取消',
+    permissionDestructiveHold: '破坏性操作 — 等待批准',
     permissionAllowOnce: '允许一次',
     permissionAllowAlways: '始终允许',
     permissionAllowSession: '本会话允许',
