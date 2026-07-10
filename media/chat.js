@@ -37,7 +37,9 @@
     const statusText = document.getElementById('statusText');
     const todoPanel = document.getElementById('todoPanel');
     const todoPanelList = document.getElementById('todoPanelList');
+    const todoPanelCount = document.getElementById('todoPanelCount');
     const todoPanelClear = document.getElementById('todoPanelClear');
+    const todoPanelToggle = document.getElementById('todoPanelToggle');
     let activeTodos = [];
     let placeholder = document.getElementById('placeholder');
     let lastSessions = [];
@@ -1693,6 +1695,7 @@
 
     function executeSendMessage(text, attachOverride) {
         hideFilePicker();
+        hideSlashCommandPicker();
         resetAutoScrollFollow();
         addMessage('user', text);
         inputEl.value = '';
@@ -1951,67 +1954,62 @@
 
     /* ── Todo Panel ── */
 
+    // Detect the Hermes `todo` tool's actual output signatures ONLY — not loose
+    // keywords like "task"/"step" (which would hijack unrelated tool output).
+    // Result format:  "**Todo list**\n\n- <emoji> item ..."
+    // Initial format: "Updating todo list\n\n- <status>: item ..."
     function isTodoContent(text) {
-        return /todo|task|step|\[ \]|\[\s*x\s*\]|checklist/i.test(text);
+        if (!text) return false;
+        return /(^|\n)\s*\*\*Todo list\*\*/i.test(text)
+            || /(^|\n)\s*(Updating|Reading) todo list/i.test(text);
+    }
+
+    var TODO_STATUS_ICON = {
+        completed: '✓',
+        in_progress: '◐',
+        pending: '○',
+        cancelled: '✕'
+    };
+    function normalizeTodoStatus(token) {
+        var t = (token || '').toLowerCase().trim();
+        if (t === '✅' || t === 'completed' || t === 'complete' || t === 'done') return 'completed';
+        if (t === '🔄' || t === 'in_progress' || t === 'in progress' || t === 'active' || t === 'running') return 'in_progress';
+        if (t === '✗' || t === '✕' || t === 'cancelled' || t === 'canceled') return 'cancelled';
+        return 'pending'; // ⏳ / • / pending / anything else
     }
 
     function parseTodoItems(text) {
-        const items = [];
-        const lines = text.split('\n');
-        var inTodoBlock = false;
+        var items = [];
+        if (!text) return items;
+        var lines = text.split('\n');
         for (var i = 0; i < lines.length; i++) {
             var line = lines[i].trim();
-            // Detect todo/task header lines
-            if (/^(# |## |### |### |#### )?\s*(todo|task|checklist|steps?):?\s*$/i.test(line) && !line.match(/\[/)) {
-                inTodoBlock = true;
+            if (!line) continue;
+            // Skip headers + the "**Progress:**" footer.
+            if (/^\*\*Todo list\*\*$/i.test(line)) continue;
+            if (/^\*\*Progress:\*\*/i.test(line)) continue;
+            if (/^(Updating|Reading) todo list$/i.test(line)) continue;
+            // Result bullet:  "- <emoji> content"   e.g. "- ✅ Fix parser"
+            var m = line.match(/^[-*]\s*(✅|🔄|⏳|✗|✕|•)\s*(.+)$/);
+            if (m) {
+                items.push({ text: m[2].trim(), status: normalizeTodoStatus(m[1]) });
                 continue;
             }
-            // Parse checkbox items: [ ] or [x]
-            var checkMatch = line.match(/^[-*]?\s*\[(\s|x)\]\s*(.+)/i);
-            if (checkMatch) {
-                inTodoBlock = true;
-                items.push({
-                    text: checkMatch[2].trim(),
-                    done: checkMatch[1].toLowerCase() === 'x',
-                });
+            // Initial bullet:  "- <status>: content"  e.g. "- in_progress: Fix parser"
+            var m2 = line.match(/^[-*]\s*(pending|in[_ ]progress|completed|complete|cancelled|canceled|done)\s*:\s*(.+)$/i);
+            if (m2) {
+                items.push({ text: m2[2].trim(), status: normalizeTodoStatus(m2[1]) });
                 continue;
-            }
-            // Numbered items (1. 2. 3.) inside a todo block
-            var numMatch = inTodoBlock ? line.match(/^\d+[.)]\s+(.+)/) : null;
-            if (numMatch) {
-                items.push({
-                    text: numMatch[1].trim(),
-                    done: false,
-                });
-                continue;
-            }
-            // Stop at the first non-todo line after the block
-            if (inTodoBlock && line === '') {
-                continue;
-            }
-            if (inTodoBlock && !line.match(/^[-*]\s/) && !line.match(/^\[\^/)) {
-                break;
             }
         }
         return items;
     }
 
-    function renderTodos(items, toolCallId) {
-        if (!todoPanel || items.length === 0) return;
-        // Merge with existing todos, keyed by text to avoid duplicates
-        for (var i = 0; i < items.length; i++) {
-            var exists = false;
-            for (var j = 0; j < activeTodos.length; j++) {
-                if (activeTodos[j].text === items[i].text) {
-                    exists = true;
-                    break;
-                }
-            }
-            if (!exists) {
-                items[i].toolCallId = toolCallId;
-                activeTodos.push(items[i]);
-            }
-        }
+    // The todo tool always emits the FULL current list, so each update REPLACES
+    // the panel state (so items check off / drop out), never appends.
+    function renderTodos(items) {
+        if (!todoPanel || !Array.isArray(items) || items.length === 0) return;
+        activeTodos = items;
         rebuildTodoPanel();
     }
 
@@ -2021,15 +2019,26 @@
             todoPanel.hidden = true;
             return;
         }
+        var done = 0;
+        for (var k = 0; k < activeTodos.length; k++) {
+            var st = activeTodos[k].status;
+            if (st === 'completed' || st === 'cancelled') done++;
+        }
         todoPanel.hidden = false;
+        todoPanel.classList.toggle('is-all-done', done === activeTodos.length);
         todoPanelList.innerHTML = '';
         for (var i = 0; i < activeTodos.length; i++) {
             var item = activeTodos[i];
+            var status = item.status || 'pending';
+            var isDone = status === 'completed' || status === 'cancelled';
             var el = document.createElement('div');
-            el.className = 'todo-item' + (item.done ? ' is-done' : '');
-            el.innerHTML = '<span class="todo-checkbox">' + (item.done ? '✓' : '○') + '</span>'
+            el.className = 'todo-item is-' + status + (isDone ? ' is-done' : '');
+            el.innerHTML = '<span class="todo-checkbox">' + (TODO_STATUS_ICON[status] || '○') + '</span>'
                 + '<span class="todo-text">' + escapeHtml(item.text) + '</span>';
             todoPanelList.appendChild(el);
+        }
+        if (todoPanelCount) {
+            todoPanelCount.textContent = done + '/' + activeTodos.length;
         }
     }
 
@@ -2043,6 +2052,16 @@
         activeTodos = [];
         if (todoPanel) todoPanel.hidden = true;
         if (todoPanelList) todoPanelList.innerHTML = '';
+    }
+
+    // Wire up todo collapse toggle (header stays visible, list hides)
+    if (todoPanelToggle) {
+        todoPanelToggle.addEventListener('click', function () {
+            if (!todoPanel) return;
+            const collapsed = todoPanel.classList.toggle('is-collapsed');
+            todoPanelToggle.setAttribute('aria-expanded', String(!collapsed));
+            todoPanelToggle.title = collapsed ? 'Expand tasks' : 'Collapse tasks';
+        });
     }
 
     // Wire up todo clear button
@@ -2132,7 +2151,7 @@
                     // Check for todo content in the body
                     if (isTodoContent(bodyPart)) {
                         var todoItems = parseTodoItems(bodyPart);
-                        renderTodos(todoItems, toolCallId);
+                        renderTodos(todoItems);
                     }
                 }
                 // Only set live if the tool is actually still in progress
@@ -2169,7 +2188,7 @@
         var initialBody = bodySep >= 0 ? text.slice(bodySep + 2).trim() : '';
         if (initialBody && isTodoContent(initialBody)) {
             var todoItems = parseTodoItems(initialBody);
-            renderTodos(todoItems, toolCallId);
+            renderTodos(todoItems);
         }
     }
 
@@ -2985,6 +3004,114 @@ function parseToolCallText(text) {
     const filePickerEl = document.getElementById('filePicker');
     let mentionStart = -1;
     let filePickerVisible = false;
+
+    // ---- Slash command picker (input starts with "/") ----
+    const slashCommandPickerEl = document.getElementById('slashCommandPicker');
+    let slashCommands = [];
+    let slashCommandItems = [];
+    let slashCommandIndex = 0;
+    let slashCommandVisible = false;
+
+    function hideSlashCommandPicker() {
+        slashCommandVisible = false;
+        slashCommandItems = [];
+        slashCommandIndex = 0;
+        if (slashCommandPickerEl) {
+            slashCommandPickerEl.classList.remove('visible');
+            slashCommandPickerEl.innerHTML = '';
+            slashCommandPickerEl.hidden = true;
+        }
+    }
+
+    function renderSlashCommandPicker() {
+        if (!slashCommandPickerEl) { return; }
+        const val = inputEl.value;
+        const pos = inputEl.selectionStart;
+        // Only show when the input is exactly a leading "/..." token.
+        const before = val.slice(0, pos);
+        const match = before.match(/^\/([\w-]*)$/);
+        if (!match) {
+            hideSlashCommandPicker();
+            return;
+        }
+        const query = match[1].toLowerCase();
+        const filtered = slashCommands.filter(function (c) {
+            return query === '' || c.name.toLowerCase().startsWith(query);
+        });
+        slashCommandItems = filtered;
+        slashCommandIndex = 0;
+        slashCommandPickerEl.innerHTML = '';
+        if (slashCommands.length > 0) {
+            const header = document.createElement('div');
+            header.className = 'slash-command-picker-header';
+            header.textContent = locale.slashCommandsTitle || 'Commands';
+            slashCommandPickerEl.appendChild(header);
+        }
+        if (filtered.length === 0) {
+            const empty = document.createElement('div');
+            empty.className = 'slash-command-empty';
+            empty.textContent = locale.noMatchingCommands || 'No matching commands';
+            slashCommandPickerEl.appendChild(empty);
+            slashCommandPickerEl.hidden = false;
+            slashCommandPickerEl.classList.add('visible');
+            slashCommandVisible = true;
+            return;
+        }
+        filtered.forEach(function (cmd, idx) {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'slash-command-item' + (idx === 0 ? ' active' : '');
+            const name = document.createElement('div');
+            name.className = 'slash-command-name';
+            name.textContent = cmd.name;
+            const desc = document.createElement('div');
+            desc.className = 'slash-command-desc';
+            desc.textContent = cmd.description || (cmd.inputHint ? cmd.inputHint : '');
+            btn.appendChild(name);
+            btn.appendChild(desc);
+            btn.addEventListener('mousedown', function (e) {
+                e.preventDefault();
+                selectSlashCommand(cmd);
+            });
+            slashCommandPickerEl.appendChild(btn);
+        });
+        slashCommandPickerEl.hidden = false;
+        slashCommandPickerEl.classList.add('visible');
+        slashCommandVisible = true;
+    }
+
+    function updateSlashCommandHighlight() {
+        if (!slashCommandPickerEl) { return; }
+        slashCommandPickerEl.querySelectorAll('.slash-command-item').forEach(function (el, idx) {
+            el.classList.toggle('active', idx === slashCommandIndex);
+            if (idx === slashCommandIndex) {
+                el.scrollIntoView({ block: 'nearest' });
+            }
+        });
+    }
+
+    // Apply the chosen command: replace the leading "/token" with "/name ".
+    function selectSlashCommand(cmd) {
+        const val = inputEl.value;
+        const pos = inputEl.selectionStart;
+        const before = val.slice(0, pos);
+        const match = before.match(/^(\/[\w-]*)$/);
+        const replacement = '/' + cmd.name + ' ';
+        let newVal, newPos;
+        if (match) {
+            newVal = replacement + val.slice(match[1].length);
+            newPos = replacement.length;
+        } else {
+            // Fallback: append on its own line.
+            newVal = val + '\n' + replacement;
+            newPos = newVal.length;
+        }
+        inputEl.value = newVal;
+        inputEl.setSelectionRange(newPos, newPos);
+        hideSlashCommandPicker();
+        syncInputHeightFromContent();
+        inputEl.focus();
+    }
     let filePickerItems = [];
     let filePickerIndex = 0;
     let fileListRequestId = 0;
@@ -4594,11 +4721,36 @@ function parseToolCallText(text) {
     inputEl.addEventListener('input', function() {
         syncInputHeightFromContent();
         detectFileMention();
+        renderSlashCommandPicker();
         updateQuickActionBtns();
     });
 
     // Enter to send, Shift+Enter for newline; file picker navigation
     inputEl.addEventListener('keydown', function(e) {
+        if (slashCommandVisible && slashCommandItems.length > 0) {
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                slashCommandIndex = (slashCommandIndex + 1) % slashCommandItems.length;
+                updateSlashCommandHighlight();
+                return;
+            }
+            if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                slashCommandIndex = (slashCommandIndex - 1 + slashCommandItems.length) % slashCommandItems.length;
+                updateSlashCommandHighlight();
+                return;
+            }
+            if (e.key === 'Tab') {
+                e.preventDefault();
+                selectSlashCommand(slashCommandItems[slashCommandIndex]);
+                return;
+            }
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                selectSlashCommand(slashCommandItems[slashCommandIndex]);
+                return;
+            }
+        }
         if (filePickerVisible && filePickerItems.length > 0) {
             if (e.key === 'ArrowDown') {
                 e.preventDefault();
@@ -4621,6 +4773,11 @@ function parseToolCallText(text) {
         if (e.key === 'Escape' && filePickerVisible) {
             e.preventDefault();
             hideFilePicker();
+            return;
+        }
+        if (e.key === 'Escape' && slashCommandVisible) {
+            e.preventDefault();
+            hideSlashCommandPicker();
             return;
         }
         if (e.key === 'Escape' && multiSelectMode) {
@@ -5945,6 +6102,22 @@ function parseToolCallText(text) {
     window.addEventListener('message', function(event) {
         const msg = event.data;
         switch (msg.type) {
+            case 'slashCommands':
+                if (!isMessageForActiveSession(msg)) {
+                    break;
+                }
+                if (Array.isArray(msg.commands)) {
+                    slashCommands = msg.commands.map(function (c) {
+                        return {
+                            name: String(c.name || ''),
+                            description: String(c.description || ''),
+                            inputHint: c.inputHint != null ? String(c.inputHint) : null,
+                        };
+                    }).filter(function (c) { return c.name.length > 0; });
+                    renderSlashCommandPicker();
+                }
+                break;
+
             case 'addMessage':
                 if (!isMessageForActiveSession(msg)) {
                     break;
@@ -6319,7 +6492,6 @@ function parseToolCallText(text) {
     // dashboard never affects the chat.
     // -----------------------------------------------------------------------
     (function initStepGraph() {
-        const HOST = 'http://127.0.0.1:8765';
         const POLL_MS = 1500;
         const root = document.getElementById('stepGraph');
         const barsEl = document.getElementById('stepGraphBars');
@@ -6342,11 +6514,14 @@ function parseToolCallText(text) {
         }
 
         function render(steps) {
+            root.hidden = false;
             if (!steps || !steps.length) {
-                root.hidden = true;
+                root.classList.add('is-empty');
+                barsEl.replaceChildren();
+                totalEl.textContent = 'No step data yet';
                 return;
             }
-            root.hidden = false;
+            root.classList.remove('is-empty');
             const maxTokens = Math.max.apply(null, steps.map(function (s) {
                 return (s.tokens_in || 0) + (s.tokens_out || 0) || 1;
             }));
@@ -6377,16 +6552,50 @@ function parseToolCallText(text) {
             totalEl.textContent = parts.join('   ');
         }
 
+        let pending = false;
+
         function fetchSteps(sessionId) {
-            const url = HOST + '/api/steps?session=' + encodeURIComponent(sessionId || '');
-            fetch(url, { cache: 'no-store' })
-                .then(function (r) { return r.ok ? r.json() : null; })
-                .then(function (data) {
-                    if (!data || !data.steps) { root.hidden = true; return; }
-                    render(data.steps);
-                    lastSession = data.session_id || sessionId || '';
-                })
-                .catch(function () { root.hidden = true; });
+            if (pending) return;
+            pending = true;
+            vscode.postMessage({
+                type: 'telemetrySteps',
+                session: sessionId || '',
+                requestId: 'stepgraph'
+            });
+        }
+
+        // The extension host performs the actual HTTP call (Node has no webview
+        // CSP), then posts the result back as { type: 'telemetryStepsResult' }.
+        window.addEventListener('message', function (event) {
+            const msg = event.data;
+            if (!msg || msg.type !== 'telemetryStepsResult') return;
+            pending = false;
+            const data = msg.data;
+            if (!data || !data.steps || !data.steps.length) {
+                // Show an empty state rather than hiding the graph entirely.
+                root.hidden = false;
+                root.classList.add('is-empty');
+                barsEl.replaceChildren();
+                totalEl.textContent = 'No step data yet';
+                return;
+            }
+            render(data.steps);
+            lastSession = data.session_id || lastSession || '';
+        });
+
+        // Fallback: if the extension never responds (e.g. dashboard not
+        // running), keep the graph visible with an explanatory empty state
+        // instead of hiding it.
+        function armTimeout() {
+            setTimeout(function () {
+                if (pending) {
+                    pending = false;
+                    root.hidden = false;
+                    root.classList.add('is-empty');
+                    barsEl.replaceChildren();
+                    totalEl.textContent = 'Telemetry unavailable';
+                }
+            }, 4000);
         }
 
         function tick() {
@@ -6400,6 +6609,7 @@ function parseToolCallText(text) {
                 lastSession = '';
             }
             fetchSteps(sid);
+            armTimeout();
         }
 
         function start() {

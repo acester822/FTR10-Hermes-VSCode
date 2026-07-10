@@ -33,6 +33,7 @@ This isn't a thin wrapper that pastes prompts. The agent sees your editor: the f
 | **Multi-session tabs** | Parallel conversations, persisted locally. Rename, delete, revisit. |
 | **Context attachment** | Carry prior-session messages into a new chat so the agent isn't amnesiac. |
 | **CodeLens** | "Ask Hermes about this file" and "Explain this" straight above functions and classes. |
+| **Slash-command picker** | Type `/` for a live, filterable list of every command the agent advertises (`/help`, `/model`, `/reset`, `/context`, …). Arrow-key or click to complete — the command runs locally in the agent, no LLM round-trip. |
 | **Bilingual UI** | English + 简体中文, following your VS Code display language. |
 
 ---
@@ -57,6 +58,9 @@ At session start the extension registers a `vscode-editor-tools` MCP server the 
 ### 🔍 CodeLens, minus the ceremony
 - **"Ask Hermes about this file"** — top of every file; pre-fills a prompt about purpose, structure, and risks
 - **"Explain this"** — above each `function`/`class`; explains that specific symbol
+
+### ⚡ Slash commands, built in
+Type `/` anywhere in the input and a glass popup lists every command the running Hermes agent advertises — name plus a one-line description, filtered live as you keep typing. ↑/↓ (or click) to highlight, **Enter**/**Tab** to complete to `/name `, **Esc** to dismiss. Commands execute locally inside the agent (e.g. `/reset` clears context, `/model` shows or switches the model), so they're instant and don't burn a model call. Unknown commands fall through to the model as plain text. The list is driven by the ACP `available_commands_update` message, so it always reflects what your Hermes build actually exposes.
 
 ### 🩹 Diff viewer
 Hermes suggests a change → you see original vs. proposed → you apply. Commands: `hermes.showDiff`, `hermes.previewDiff`, `hermes.applyDiff`.
@@ -100,14 +104,16 @@ This build is not yet published to the marketplace, so install it from the repos
 
 **4. Reference files.** Type `@` for the workspace file picker; click any path in a reply to open it.
 
-**5. Send editor context.** Select code → right-click → **Hermes: Insert Selection into Chat**.
+**5. Run slash commands.** Type `/` for the command picker — a filterable list of every command the agent advertises (↑/↓ or click to highlight, **Enter**/**Tab** to complete, **Esc** to dismiss). Try `/help` to list them all, `/reset` to clear context, `/model` to inspect or switch the model.
 
-**6. CodeLens.** "Ask Hermes about this file" at a file's top; "Explain this" above any function/class.
+**6. Send editor context.** Select code → right-click → **Hermes: Insert Selection into Chat**.
 
-**7. Sessions.** **+ New** for a fresh chat; switch tabs for history; rename/delete from the tab bar.
+**7. CodeLens.** "Ask Hermes about this file" at a file's top; "Explain this" above any function/class.
+
+**8. Sessions.** **+ New** for a fresh chat; switch tabs for history; rename/delete from the tab bar.
 > Switching resets the agent's in-memory context. Restored messages are flagged with a **local-history** banner — the agent doesn't retain that context unless Hermes adds session restore.
 
-**8. Switch model / profile.** Use the **Model** and **Profile** dropdowns in the toolbar. If Hermes exposes no list, configure fallback presets in Settings.
+**9. Switch model / profile.** Use the **Model** and **Profile** dropdowns in the toolbar. If Hermes exposes no list, configure fallback presets in Settings.
 
 ---
 

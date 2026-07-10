@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
+import * as http from 'http';
 import { AcpClient, AcpStatus, ModelListState, PermissionRequest, TokenUsage } from '../acp/AcpClient';
 import { buildModelListStateFromCatalog, isRuntimeModelSource, encodeHermesModelValueId } from '../acp/modelConfig';
 import { resolveModelCatalog } from '../acp/acpModelCatalog';
@@ -301,6 +302,9 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
                     break;
                 case 'getSessions':
                     this._postSessionList();
+                    break;
+                case 'telemetrySteps':
+                    void this._fetchTelemetrySteps(message.session || '', message.requestId);
                     break;
                 case 'deleteSession':
                     this._handleDeleteSession(message.sessionId);
@@ -1257,6 +1261,12 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
                 this._flushThoughtToHistory();
                 this._postMessage({ type: 'finishAssistantBubble', sessionId: this._sessionId });
             },
+            (commands) => {
+                if (!this._isViewingPromptSession()) {
+                    return;
+                }
+                this._postMessage({ type: 'slashCommands', commands, sessionId: this._sessionId });
+            },
             (cwd) => {
                 const servers = resolveMcpServersForSession(cwd);
                 if (servers.length > 0) {
@@ -1500,6 +1510,38 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
         this._tokenUsage = null;
         this._postTokenUsage();
         await this._connect(this._activeSelectionId || undefined);
+    }
+
+    /**
+     * Fetch per-step usage from the hermes-telemetry local dashboard (loopback
+     * only, no auth). The webview cannot call this directly — VS Code webview
+     * CSP blocks arbitrary fetches — so the extension host performs the request
+     * and posts the JSON back. Silently no-ops if the dashboard is unreachable.
+     */
+    private _fetchTelemetrySteps(session: string, requestId?: string): void {
+        const url = `http://127.0.0.1:8765/api/steps?session=${encodeURIComponent(session || '')}`;
+        const req = http.get(url, (res) => {
+            if (!res.statusCode || res.statusCode < 200 || res.statusCode >= 300) {
+                res.resume();
+                this._postMessage({ type: 'telemetryStepsResult', requestId, data: null });
+                return;
+            }
+            let body = '';
+            res.setEncoding('utf8');
+            res.on('data', (chunk) => { body += chunk; });
+            res.on('end', () => {
+                let data: unknown = null;
+                try { data = JSON.parse(body); } catch { data = null; }
+                this._postMessage({ type: 'telemetryStepsResult', requestId, data });
+            });
+        });
+        req.on('error', () => {
+            this._postMessage({ type: 'telemetryStepsResult', requestId, data: null });
+        });
+        req.setTimeout(2000, () => {
+            req.destroy();
+            this._postMessage({ type: 'telemetryStepsResult', requestId, data: null });
+        });
     }
 
     /** Handle user picking a Hermes session from the webview picker. */
@@ -3247,7 +3289,6 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
 
         if (this._view) {
             const webview = this._view.webview;
-            const cspSource = webview.cspSource;
             const vendorUri = (file: string) =>
                 webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'media', 'vendor', file)).toString();
             const ftr10Vars = this._readFtr10Vars();
@@ -3255,7 +3296,6 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
                 ? JSON.stringify(ftr10Vars).replace(/</g, '\\\\u003c')
                 : '{}';
             html = html
-                .replace('{{CSP_SOURCE}}', cspSource)
                 .replace('{{CHAT_CSS_URI}}', webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'media', 'chat.css')).toString())
                 .replace('{{CHAT_JS_URI}}', webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'media', 'chat.js')).toString())
                 .replace('{{MEDIA_URI}}', webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'media')).toString())
@@ -3268,7 +3308,6 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
                 .replace('{{FTR10_VARS_JSON}}', ftr10VarsJson);
         } else {
             html = html
-                .replace('{{CSP_SOURCE}}', "'self'")
                 .replace('{{CHAT_CSS_URI}}', '')
                 .replace('{{CHAT_JS_URI}}', '')
                 .replace('{{MEDIA_URI}}', '')

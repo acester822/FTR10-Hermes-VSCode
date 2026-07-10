@@ -183,6 +183,14 @@ export type UsageHandler = (usage: TokenUsage) => void;
 export type McpServersResolver = (cwd: string) => SessionMcpServer[];
 /** Called when an assistant/thought segment ends (tool call, permission, etc.). */
 export type SegmentEndHandler = () => void;
+/** A slash command advertised by the agent (name + description + optional input hint). */
+export interface SlashCommand {
+    name: string;
+    description: string;
+    inputHint?: string | null;
+}
+/** Called when the agent advertises or updates its supported slash commands. */
+export type SlashCommandsHandler = (commands: SlashCommand[]) => void;
 
 interface TerminalInstance {
     process: ChildProcess;
@@ -260,6 +268,7 @@ export class AcpClient {
     private _onModelsChanged: ModelsChangedHandler;
     private _onUsage: UsageHandler;
     private _onSegmentEnd: SegmentEndHandler;
+    private _onSlashCommands: SlashCommandsHandler;
     private _resolveMcpServers: McpServersResolver;
     /** Monotonic id so stale prompt rejections after cancel are ignored. */
     private _activePromptId = 0;
@@ -304,6 +313,7 @@ export class AcpClient {
         onUsage?: UsageHandler,
         onModelsChanged?: ModelsChangedHandler,
         onSegmentEnd?: SegmentEndHandler,
+        onSlashCommands?: SlashCommandsHandler,
         resolveMcpServers?: McpServersResolver
     ) {
         this._onMessage = onMessage;
@@ -320,6 +330,7 @@ export class AcpClient {
         this._onUsage = onUsage || (() => {});
         this._onModelsChanged = onModelsChanged || (() => {});
         this._onSegmentEnd = onSegmentEnd || (() => {});
+        this._onSlashCommands = onSlashCommands || (() => {});
         this._resolveMcpServers = resolveMcpServers || (() => []);
     }
 
@@ -1202,6 +1213,20 @@ export class AcpClient {
                 if (size > 0) {
                     this._onUsage({ used, size });
                 }
+                break;
+            }
+
+            case 'available_commands_update': {
+                const raw = update.availableCommands;
+                if (!Array.isArray(raw)) {
+                    break;
+                }
+                const commands: SlashCommand[] = raw.map((c: any) => ({
+                    name: String(c?.name ?? ''),
+                    description: String(c?.description ?? ''),
+                    inputHint: c?.input?.hint != null ? String(c.input.hint) : null,
+                })).filter((c: SlashCommand) => c.name.length > 0);
+                this._onSlashCommands(commands);
                 break;
             }
         }

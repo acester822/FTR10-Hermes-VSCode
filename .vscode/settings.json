@@ -4,5 +4,10 @@
     "i18n-ally.localesPaths": [
         "src/i18n",
         "src/i18n/locales"
-    ]
+    ],
+    "files.encoding": "utf8",
+    "files.autoGuessEncoding": false,
+    "[css]": {
+        "files.encoding": "utf8"
+    }
 }

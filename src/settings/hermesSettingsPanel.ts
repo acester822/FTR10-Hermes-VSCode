@@ -33,7 +33,7 @@ export class HermesSettingsPanel {
   }
 
   private _getHtmlForWebview(): string {
-    const dashboardUrl = 'https://herm.ftr10.dev';
+    const dashboardUrl = 'https://hermes_na.ftr10.dev/config';
     const webview = this._panel.webview;
     return `<!DOCTYPE html>
 <html lang="en">

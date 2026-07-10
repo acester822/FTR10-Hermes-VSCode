@@ -6,7 +6,7 @@
     transition: outline-color 0.15s ease;
 }
 
-/* Subtle hover affordance â€” tool-call-card blends into the stream (no lift/shadow) */
+/* Subtle hover affordance -- tool-call-card blends into the stream (no lift/shadow) */
 .session-picker-card:hover {
     transform: translateY(-1px);
     box-shadow: var(--glass-shadow-sm);
@@ -58,7 +58,7 @@
     --radius-md: 8px;
     --radius-lg: 12px;
 
-    /* Transitions â€” "snappy but soft" spring curve */
+    /* Transitions -- "snappy but soft" spring curve */
     --transition-fast: 0.15s ease;
     --transition-base: 0.22s ease;
     --transition-slow: 0.3s ease;
@@ -72,7 +72,7 @@
     --tool-success: var(--success);
     --tool-error: var(--error);
 
-    /* Cognitive State Colors â€” drive tool call pulse colors */
+    /* Cognitive State Colors -- drive tool call pulse colors */
     --state-analyzing: var(--accent-2);  /* amber */
     --state-searching: #4fc3f7;          /* cyan */
     --state-reading: #81c784;            /* green */
@@ -119,16 +119,22 @@
 }
 
 
-* {margin: 2px;padding: 0;box-sizing: border-box;}
+* {margin: 0;padding: 0;box-sizing: border-box;}
+html {
+    height: 100%;
+    margin: 0;
+    overflow: hidden;
+}
 body {
     font-family: var(--ftr10-font-auxiliarybar);
     font-size: var(--vscode-font-size, 13px);
     background: transparent;
     color: var(--fg);
-    height: 100vh;
+    height: 100%;
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    padding: 4px 6px;
     container-type: inline-size;
     container-name: app;
 }
@@ -158,9 +164,8 @@ body {
 }
 .status-bar {
     display: flex;
-    align-items: center;
     justify-content: flex-end;
-    gap: 6px;
+    /* gap: 6px; */
     padding: 2px 0 4px;
     font-size: var(--font-size-sm);
     color: var(--dim);
@@ -1143,6 +1148,7 @@ body {
 #messages {
     flex: 1;
     overflow-y: auto;
+    overflow-x: hidden;
     padding: 4px var(--chat-gutter);
     display: flex;
     flex-direction: column;
@@ -1304,9 +1310,9 @@ body {
     gap: var(--space-xs);
 }
 
-/* TUI-Style: All messages full-width, left-aligned */
+/* TUI-Style: All messages full-width; user messages right-aligned */
 .message-group.user .message-group-inner {
-    align-items: flex-start;
+    align-items: flex-end;
 }
 
 .message-group.thought {
@@ -1332,7 +1338,7 @@ body {
 }
 
 /* Collapsed (auto-approved / resolved-with-detail-hidden): hide everything
-   except the one-line status indicator â€” no empty card, no dead space */
+   except the one-line status indicator -- no empty card, no dead space */
 .message.permission.is-card-collapsed {
     border-left-color: color-mix(in srgb, var(--success, #65bc4a) 35%, transparent);
     padding-top: 2px;
@@ -1440,7 +1446,7 @@ body {
     border-color: var(--error);
     color: var(--error);
 }
-/* Resolved / auto-approved: flat, borderless, dimmed â€” one line, no card */
+/* Resolved / auto-approved: flat, borderless, dimmed -- one line, no card */
 .message.permission.resolved {
     opacity: 0.6;
     border-left-color: color-mix(in srgb, var(--success, #65bc4a) 35%, transparent);
@@ -1461,7 +1467,7 @@ body {
 
 .message.thought {
     background: var(--ftr10-code-bg);
-    /* border: 2px solid var(--accent-2); */
+    border: 2px solid var(--accent-2);
     font-size: 12px;
     font-family: var(--ftr10-font-auxiliarybar);
     line-height: 1.4;
@@ -1469,11 +1475,29 @@ body {
     border-radius: 8px;
 }
 
+/* Tinted background that bleeds 2px beyond the element on all sides,
+   so the reasoning block reads as a distinct block without loosening margins. 
+.message.thought::before {
+    content: '';
+    position: absolute;
+    inset: -2px;
+    background: var(--reasoning-bg);
+    border-radius: 10px;
+    z-index: -1;
+    pointer-events: none;
+}*/
+
+.aux-body-content {
+    margin-left: 6px;
+}
+
 .message.thought .aux-header {
     display: flex;
     align-items: center;
     gap: var(--space-sm);
-    margin-bottom: var(--space-xs);
+    /* margin-bottom: var(--space-xs); */
+    margin-left: 4px;
+    margin-top: 5px;
 }
 
 .message.thought .aux-label {
@@ -1575,7 +1599,7 @@ body {
     background: color-mix(in srgb, var(--primary) 8%, transparent);
     border: 1px solid var(--glass-stroke);
     border-left: 3px solid var(--primary);
-    border-radius: 0;
+    border-radius: 8px;
     padding: var(--space-sm) var(--space-md);
 }
 
@@ -1601,7 +1625,7 @@ body {
     letter-spacing: 0.01em;
 }
 
-/* Live activity labels â€” unified breathing pulse */
+/* Live activity labels -- unified breathing pulse */
 .message.assistant.streaming .label,
 .message.thought.is-live .aux-label,
 .message.tool.is-live .aux-label {
@@ -1616,6 +1640,13 @@ body {
     border: none;
     margin: -4px;
 }
+
+/* Spacing between narrative (p) blocks and tool calls, while keeping
+   consecutive tool calls tight (they share no gap). Applied on the
+   message-group wrapper: space only at p<->tool boundaries. */
+.message-group + .message-group.tool { margin-top: var(--space-md); }
+.message-group.tool + .message-group:not(.tool) { margin-top: var(--space-md); }
+.message-group.tool + .message-group.tool { margin-top: 0; }
 @keyframes live-label-breathe {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.42; }
@@ -1631,7 +1662,7 @@ body {
 
 /* Code blocks */
 .message pre {
-    background: var(--ftr10-code-bg, var(--vscode-textCodeBlock-background, #1e1e1e));
+    background: var(--ftr10-code-bg, var(--vscode-textCodeBlock-background, #882727));
     border: 1px solid var(--border);
     border: 2px solid var(--ftr10-code-border-l, var(--primary));
     border-radius: var(--radius-sm);
@@ -1652,9 +1683,34 @@ body {
     background: var(--ftr10-code-bg, var(--vscode-textCodeBlock-background, #2d2d2d));
     padding: 1px 4px;
     border-radius: 3px;
-    font-size: 0.9em;
+    /* font-size: 0.9em; */
     font-family: var(--ftr10-font-auxiliarybar);
     color: var(--ftr10-accent-3);
+}
+
+/* --- Nested code blocks -----------------------------------------------
+   marked.parse() emits bare <pre><code> with no class, so .message pre
+   matches every code block at any depth. The selectors below have higher
+   specificity and give nested/inner blocks a distinct, quieter treatment
+   so they read as "inside" rather than as a top-level block.
+   ----------------------------------------------------------------------- */
+
+/* Code blocks rendered INSIDE reasoning/tool messages (container nesting). */
+.message.thought pre,
+.message.tool pre {
+    background: #4f4f4f66;
+    margin-right: 8px;
+    border: none;
+    /* border-left: 2px solid var(--ftr10-accent-3, var(--primary)); */
+    font-size: 11px;
+    line-height: 1.45;
+}
+
+/* A <pre> literally nested inside another <pre> (true DOM nesting). */
+.message pre pre {
+    background: transparent;
+    border: 1px dashed var(--border);
+    border-left: 2px solid var(--ftr10-accent-3, var(--primary));
 }
 
 .message ul, .message ol {padding-left: 18px;margin-bottom: 18px;}
@@ -2047,6 +2103,70 @@ body {
     color: var(--dim);
 }
 
+/* Slash command picker (shown when input starts with "/") */
+.slash-command-picker {
+    display: none;
+    position: absolute;
+    left: 10px;
+    right: 10px;
+    bottom: calc(100% - 4px);
+    max-height: 220px;
+    overflow-y: auto;
+    background: var(--glass-bg-elevated);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--glass-stroke);
+    box-shadow: var(--glass-shadow-md);
+    border-radius: var(--radius-md);
+    z-index: 30;
+    padding: 4px 0;
+}
+.slash-command-picker.visible {
+    display: block;
+}
+.slash-command-picker-header {
+    padding: 4px 10px 6px;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--dim);
+}
+.slash-command-item {
+    display: block;
+    width: 100%;
+    text-align: left;
+    background: none;
+    border: none;
+    color: var(--fg);
+    padding: 6px 10px;
+    font-family: var(--ftr10-font-auxiliarybar);
+    cursor: pointer;
+}
+.slash-command-item.active {
+    background: var(--ftr10-list-bg-hover, var(--vscode-list-hoverBackground, rgba(128, 128, 128, 0.15)));
+}
+.slash-command-name {
+    font-size: 13px;
+    font-weight: 600;
+}
+.slash-command-name::before {
+    content: "/";
+    opacity: 0.6;
+}
+.slash-command-desc {
+    font-size: 11px;
+    color: var(--dim);
+    margin-top: 1px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.slash-command-empty {
+    padding: 8px 10px;
+    font-size: 11px;
+    color: var(--dim);
+}
+
 /* File reference hover preview */
 .file-preview-tooltip {
     position: fixed;
@@ -2088,7 +2208,7 @@ body {
 
 /* Streaming cursor */
 .message.assistant.streaming::after {
-    content: 'ÃƒÂ¢Ã¢â‚¬â€œÃ…Â½';
+    content: '\258E';
     animation: blink 0.8s step-end infinite;
     margin-left: 2px;
     color: var(--primary);
@@ -2101,7 +2221,7 @@ body {
                 var(--glass-shadow);
 }
 .message.assistant.streaming::after {
-    content: 'ÃƒÂ¢Ã¢â‚¬â€œÃ…Â½';
+    content: '\258E';
     animation: blink 0.8s step-end infinite;
     margin-left: 2px;
     color: var(--accent-2);
@@ -2125,10 +2245,10 @@ body {
 
 /* Input area */
 #input-area {
-    --input-max-height: 160px;
+    /* --input-max-height: 160px; */
     /* padding: 4px var(--chat-gutter); */
-    border-top: 1px solid var(--border);
-    background: #13161db3;
+    /* border-top: 1px solid var(--border); */
+    /* background: #13161db3; */
     margin-top: 2px;
     margin-bottom: 5px;
     margin-left: 2px;
@@ -2181,7 +2301,8 @@ body {
 .input-composite-shell {
     position: relative;
     overflow: visible;
-    border: 1px solid transparent;
+    border: 1px solid #ff00007a;
+    background: #00000066;
     border-radius: 8px;
 }
 .input-picker-row {
@@ -2256,7 +2377,7 @@ body {
     align-items: center;
     gap: 4px;
     max-width: min(160px, 36vw);
-    padding: 3px 6px;
+    padding: 8px 13px;
     font-size: 11px;
     line-height: 1.35;
     font-family: inherit;
@@ -2337,6 +2458,8 @@ body {
 }
 .permission-mode-picker.mode-yolo .permission-mode-btn .input-picker-icon {
     filter: none;
+    background: #00ff0a;
+    border-radius: 5px;
 }
 .permission-mode-picker.mode-denyAll .permission-mode-btn .input-picker-icon {
     filter: var(--picker-icon-filter, brightness(0) invert(0.85));
@@ -2390,9 +2513,10 @@ body {
 }
 /* Icon-only permission picker (no text label) */
 .permission-mode-picker.icon-only .permission-mode-btn {
-    padding: 3px 5px;
+    padding: 3px 0px;
     max-width: none;
     gap: 0;
+    margin-left: 4px;
 }
 /* Quick-actions popup trigger (magnifier) next to the permission icon */
 .input-quick-trigger {
@@ -2980,11 +3104,11 @@ body {
     /* background: var(--glass-bg-elevated); */
     /* backdrop-filter: var(--glass-blur); */
     -webkit-backdrop-filter: var(--glass-blur);
-    border: 1px solid var(--glass-stroke);
+    /* border: 1px solid var(--glass-stroke); */
     border-radius: var(--radius-sm);
     overflow: hidden;
     transition: border-color 0.2s ease, box-shadow 0.2s ease;
-    box-shadow: var(--accent-2); 
+    box-shadow: var(--accent-2);
 }
 .input-composite:focus-within {
     border-color: var(--primary);
@@ -3030,9 +3154,9 @@ body {
     font-family: var(--ftr10-font-auxiliarybar);
     font-size: inherit;
     outline: none;
-    min-height: 48px;
-    max-height: var(--input-max-height, 160px);
-    line-height: 1.5;
+    min-height: 50px;
+    max-height: 215px;
+    line-height: 1.25;
     scrollbar-width: thin;
 }
 .input-composite textarea::placeholder {
@@ -3256,6 +3380,15 @@ body {
 .step-graph[hidden] {
     display: none !important;
 }
+.step-graph.is-empty .step-graph-bars {
+    align-items: center;
+    color: var(--fg);
+    opacity: 0.45;
+    font-style: italic;
+}
+.step-graph.is-empty .step-graph-total {
+    opacity: 0.55;
+}
 .step-graph-header {
     display: flex;
     align-items: baseline;
@@ -3277,7 +3410,7 @@ body {
 .step-graph-bars {
     display: flex;
     align-items: flex-end;
-    gap: 2px;
+    gap: 3px;
     height: 34px;
     overflow-x: auto;
     overflow-y: hidden;
@@ -3285,7 +3418,8 @@ body {
 }
 .step-seg {
     flex: 0 0 auto;
-    min-width: 3px;
+    width: 6px;
+    min-width: 6px;
     border-radius: 2px 2px 0 0;
     transition: height 0.25s ease, flex-grow 0.25s ease;
     cursor: default;
@@ -3300,6 +3434,9 @@ body {
 .step-seg[data-kind="search"] { background: #eab308; }
 .step-seg[data-kind="exec"]   { background: #ef4444; }
 .step-seg[data-kind="act"]    { background: #14b8a6; }
+.step-seg[data-kind="skill_manage"] { background: #f97316; }
+.step-seg[data-kind="todo"]   { background: #f59e0b; }
+.step-seg[data-kind="skill_list"] { background: #6366f1; }
 .step-graph-legend {
     display: flex;
     flex-wrap: wrap;
@@ -3326,6 +3463,9 @@ body {
 .step-graph-legend .sl-search::before { background: #eab308; }
 .step-graph-legend .sl-exec::before   { background: #ef4444; }
 .step-graph-legend .sl-act::before    { background: #14b8a6; }
+.step-graph-legend .sl-skill_manage::before { background: #f97316; }
+.step-graph-legend .sl-todo::before   { background: #f59e0b; }
+.step-graph-legend .sl-skill_list::before { background: #6366f1; }
 /* end step-graph */
 /* Icons moved into the action bar must not inherit the send-button sizing */
 .input-action .permission-mode-picker,
@@ -3564,7 +3704,7 @@ mark.search-mark-active {
     flex-shrink: 0;
 }
 
-/* Modals ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â responsive shell */
+/* Modals -- responsive shell */
 .modal-overlay {
     display: none;
     position: fixed;
@@ -3713,7 +3853,7 @@ mark.search-mark-active {
    UNIFIED DESIGN SYSTEM - Hermes Desktop Inspired
     ============================================ */
 
-/* Tool Call Cards â€” borderless, hairline accent (desktop parity) */
+/* Tool Call Cards -- borderless, hairline accent (desktop parity) */
 .tool-call-card {
     /* background: #e30f0f21; */
     /* border: none; */
@@ -3781,7 +3921,7 @@ mark.search-mark-active {
     background: var(--glass-bg-hover);
 }
 
-/* Cognitive state pulse colors â€” remap tool-accent so the pulse animation color changes */
+/* Cognitive state pulse colors -- remap tool-accent so the pulse animation color changes */
 .tool-call-card.is-analyzing { --tool-accent: var(--state-analyzing); }
 .tool-call-card.is-searching { --tool-accent: var(--state-searching); }
 .tool-call-card.is-reading   { --tool-accent: var(--state-reading); }
@@ -3789,7 +3929,7 @@ mark.search-mark-active {
 .tool-call-card.is-executing { --tool-accent: var(--state-executing); }
 .tool-call-card.is-error     { --tool-accent: var(--state-error); }
 
-/* State-specific header tints â€” keep flat (borderless parity); only a whisper of tint */
+/* State-specific header tints -- keep flat (borderless parity); only a whisper of tint */
 .tool-call-card.is-live.is-analyzing .tool-call-header {
     background: color-mix(in srgb, var(--state-analyzing) 3%, transparent);
 }
@@ -4108,8 +4248,9 @@ mark.search-mark-active {
     font-weight: 500;
     color: var(--success);
     background: color-mix(in srgb, var(--success) 8%, var(--text-block));
-    border-bottom: 1px solid color-mix(in srgb, var(--success) 20%, var(--border));
+    /* border-bottom: 1px solid color-mix(in srgb, var(--success) 20%, var(--border)); */
     user-select: none;
+    border-radius: 8px;
 }
 .hermes-history-header + .hermes-history-header {
     display: none;
@@ -4325,18 +4466,23 @@ mark.search-mark-active {
     }
 }
 
-/* â”€â”€ Todo Panel â”€â”€ */
+/* -- Todo Panel -- (sticky at top of the chat, above #messages, survives session switches) */
 .todo-panel {
+    flex: 0 0 auto;
     padding: var(--space-xs) var(--space-md);
-    background: color-mix(in srgb, var(--accent-2) 6%, var(--text-block));
-    border: 1px solid color-mix(in srgb, var(--accent-2) 25%, var(--border));
-    border-radius: var(--radius-md);
-    margin: var(--space-xs) var(--space-md);
+    background: color-mix(in srgb, var(--accent-2) 8%, var(--text-block));
+    border-bottom: 1px solid color-mix(in srgb, var(--accent-2) 25%, var(--border));
+    border-radius: 0;
+    margin: 0;
     position: sticky;
     top: 0;
     z-index: 15;
-    backdrop-filter: blur(4px);
-    -webkit-backdrop-filter: blur(4px);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+}
+
+.todo-panel.is-all-done {
+    opacity: 0.7;
 }
 
 .todo-panel-header {
@@ -4347,13 +4493,47 @@ mark.search-mark-active {
     margin-bottom: var(--space-xs);
 }
 
+.todo-panel-actions {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+
 .todo-panel-title {
     font-size: 10px;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.4px;
     color: var(--accent-2);
-    opacity: 0.8;
+    opacity: 0.85;
+}
+
+.todo-panel-count {
+    font-variant-numeric: tabular-nums;
+    opacity: 0.65;
+    margin-left: 4px;
+    font-weight: 500;
+}
+
+.todo-panel-toggle {
+    background: transparent;
+    border: none;
+    color: var(--accent-2);
+    cursor: pointer;
+    font-size: 12px;
+    line-height: 1;
+    padding: 1px 4px;
+    border-radius: 3px;
+    transition: transform 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+
+.todo-panel-toggle:hover {
+    color: var(--fg);
+    background: color-mix(in srgb, var(--border) 50%, transparent);
+}
+
+.todo-panel.is-collapsed .todo-panel-toggle {
+    transform: rotate(-90deg);
 }
 
 .todo-panel-clear {
@@ -4376,6 +4556,17 @@ mark.search-mark-active {
     display: flex;
     flex-direction: column;
     gap: 2px;
+    max-height: 200px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+}
+
+.todo-panel.is-collapsed .todo-panel-header {
+    margin-bottom: 0;
+}
+
+.todo-panel.is-collapsed .todo-panel-list {
+    display: none;
 }
 
 .todo-item {
@@ -4388,8 +4579,28 @@ mark.search-mark-active {
     color: var(--fg);
 }
 
-.todo-item.is-done {
-    opacity: 0.5;
+.todo-item.is-in_progress .todo-checkbox {
+    color: var(--accent-2);
+}
+
+.todo-item.is-completed .todo-checkbox {
+    color: var(--success);
+}
+
+.todo-item.is-cancelled {
+    opacity: 0.55;
+}
+
+.todo-item.is-cancelled .todo-checkbox {
+    color: var(--error);
+}
+
+.todo-item.is-completed,
+.todo-item.is-cancelled {
+    opacity: 0.6;
+}
+
+.todo-item.is-completed .todo-text {
     text-decoration: line-through;
 }
 
@@ -4405,7 +4616,7 @@ mark.search-mark-active {
     margin-top: 2px;
 }
 
-.todo-item.is-done .todo-checkbox {
+.todo-item.is-completed .todo-checkbox {
     color: var(--success);
 }
 

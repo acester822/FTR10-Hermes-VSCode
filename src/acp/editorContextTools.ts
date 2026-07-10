@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import type { DiffReviewManager } from './DiffReviewManager';
+import { resolveDiff } from './unifiedDiff';
 
 // Diff content provider (hermes-diff:// scheme) is registered via DiffReviewManager.
 // See src/acp/DiffReviewManager.ts → registerDiffContentProvider().
@@ -350,14 +351,36 @@ async function applyDiff(filePath: string, content: string): Promise<any> {
     // File doesn't exist yet
   }
 
-  if (originalContent === content) {
+  // Classify input: a real unified diff is applied surgically; otherwise it is
+  // treated as a whole-file replacement (guarded against data loss).
+  const resolved = resolveDiff(content, originalContent);
+
+  if (resolved.isDiff && resolved.error) {
+    return { status: 'error', filePath, applied: false, message: `Diff could not be applied: ${resolved.error}` };
+  }
+
+  if (resolved.isWholeFile && originalContent.length > 0 && content.length / originalContent.length < 0.5) {
+    return {
+      status: 'error',
+      filePath,
+      applied: false,
+      message:
+        `Content (${content.length} chars) is far shorter than the current file ` +
+        `(${originalContent.length} chars). apply_diff expects a full file or a unified diff ` +
+        `(with @@ hunks). Refusing to replace — no changes made.`,
+    };
+  }
+
+  const finalContent = resolved.isDiff ? resolved.merged : content;
+
+  if (originalContent === finalContent) {
     return { status: 'no_changes', filePath, applied: false, message: 'Proposed content is identical to current file.' };
   }
 
   const doc = await vscode.workspace.openTextDocument(uri);
   const fullRange = new vscode.Range(0, 0, doc.lineCount, 0);
   const edit = new vscode.WorkspaceEdit();
-  edit.replace(uri, fullRange, content);
+  edit.replace(uri, fullRange, finalContent);
   const applied = await vscode.workspace.applyEdit(edit);
 
   if (applied) {
@@ -501,13 +524,13 @@ export function registerEditorContextTools(diffReview?: DiffReviewManager): AcpT
     },
     {
       name: 'propose_diff',
-      description: 'Propose file changes for user review. Applies the changes to the file with visual diff decorations (red for removed, green for added). The user can accept or reject via the chat interface. Returns status "awaiting_review" when decorations are shown.',
+      description: 'Propose file changes for user review. Accepts EITHER a full new file (replaces the entire file) OR a unified diff (lines starting with @@ for hunks, +/- for changes) which is applied surgically to only the changed lines. The user can accept or reject via the chat interface. Returns status "awaiting_review" when decorations are shown.',
       parameters: {
         type: 'object',
         required: ['filePath', 'content'],
         properties: {
           filePath: { type: 'string', description: 'Absolute path to the file to modify' },
-          content: { type: 'string', description: 'The proposed new content for the entire file' },
+          content: { type: 'string', description: 'Either the full new file content, or a unified diff with @@ hunk headers and +/- lines. Passing a snippet without diff markers will be refused to prevent data loss.' },
         },
       },
       handler: async (args) => {
@@ -519,13 +542,13 @@ export function registerEditorContextTools(diffReview?: DiffReviewManager): AcpT
     },
     {
       name: 'apply_diff',
-      description: 'Apply file changes directly without review. Writes the content to the file immediately. Use propose_diff instead if the user wants to review changes first.',
+      description: 'Apply file changes directly without review. Writes the content to the file immediately. Accepts EITHER a full new file OR a unified diff (@@ hunks, +/- lines) applied surgically. Use propose_diff instead if the user wants to review changes first.',
       parameters: {
         type: 'object',
         required: ['filePath', 'content'],
         properties: {
           filePath: { type: 'string', description: 'Absolute path to the file to modify' },
-          content: { type: 'string', description: 'The new content for the entire file' },
+          content: { type: 'string', description: 'Either the full new file content, or a unified diff with @@ hunk headers and +/- lines.' },
         },
       },
       handler: async (args) => applyDiff(args.filePath, args.content),

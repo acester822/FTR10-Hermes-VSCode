@@ -1,0 +1,7 @@
+# Enforce consistent encoding + line endings so webview assets never get
+# re-encoded to Windows-1252 by an editor's bad auto-detect (the mojibake loop).
+* text=auto eol=lf
+
+media/*.css text working-tree-encoding=UTF-8 eol=lf
+media/*.js  text working-tree-encoding=UTF-8 eol=lf
+media/*.html text working-tree-encoding=UTF-8 eol=lf

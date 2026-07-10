@@ -139,6 +139,9 @@ export interface LocaleStrings {
     inputPlaceholder: string;
     resizeHandle: string;
     filePicker: string;
+    slashCommandsTitle: string;
+    slashCommandPlaceholder: string;
+    noMatchingCommands: string;
     searchChat: string;
     searchPrev: string;
     searchNext: string;

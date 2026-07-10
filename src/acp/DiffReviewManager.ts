@@ -1,9 +1,12 @@
 import * as vscode from 'vscode';
+import { resolveDiff } from './unifiedDiff';
 
 interface PendingDiff {
   filePath: string;
   originalContent: string;
   proposedContent: string;
+  /** True when proposedContent is a partial unified diff (not a full file). */
+  isDiff: boolean;
   uri: vscode.Uri;
   proposedUri: vscode.Uri;
 }
@@ -69,20 +72,53 @@ export class DiffReviewManager {
       // File doesn't exist yet — treat as empty
     }
 
-    if (originalContent === proposedContent) {
+    // Classify input: a real unified diff is applied surgically; otherwise it
+    // is treated as a whole-file replacement.
+    const resolved = resolveDiff(proposedContent, originalContent);
+
+    if (resolved.isDiff && resolved.error) {
+      return {
+        status: 'error',
+        message: `Proposed diff could not be applied: ${resolved.error}`,
+      };
+    }
+
+    // Data-loss guard: rejecting a whole-file replacement that is *much* shorter
+    // than the current file means the call almost certainly passed a snippet
+    // instead of the full file. Refuse rather than clobber the file.
+    if (resolved.isWholeFile && originalContent.length > 0) {
+      const ratio = proposedContent.length / originalContent.length;
+      if (ratio < 0.5) {
+        return {
+          status: 'error',
+          message:
+            `Proposed content (${proposedContent.length} chars) is far shorter than the ` +
+            `current file (${originalContent.length} chars). propose_diff expects either a ` +
+            `full file or a unified diff (with @@ hunks). Refusing to replace — no changes made. ` +
+            `Pass a unified diff to change only part of the file.`,
+        };
+      }
+    }
+
+    // The "display" content shown on the right side of the diff editor:
+    // for a real diff, show the merged result; for a whole-file, the proposed text.
+    const displayContent = resolved.isDiff ? resolved.merged : proposedContent;
+
+    if (originalContent === displayContent) {
       return { status: 'no_changes', message: 'Proposed content is identical to current file.' };
     }
 
     // Store proposed content in the virtual document map so the
     // hermes-diff:// content provider can serve it to the diff editor.
     const proposedUri = vscode.Uri.from({ scheme: HERMES_DIFF_SCHEME, path: filePath });
-    proposedContentMap.set(filePath, proposedContent);
+    proposedContentMap.set(filePath, displayContent);
 
     // Store pending state — the original file is NOT modified yet
     this.pending = {
       filePath,
       originalContent,
-      proposedContent,
+      proposedContent: displayContent,
+      isDiff: resolved.isDiff,
       uri,
       proposedUri,
     };
@@ -99,7 +135,9 @@ export class DiffReviewManager {
 
     return {
       status: 'awaiting_review',
-      message: 'Changes applied to file. Use accept_diff or reject_diff to finalize.',
+      message:
+        `Changes proposed for ${filePath} (${resolved.isDiff ? 'unified diff' : 'full file'}). ` +
+        `Use accept_diff or reject_diff to finalize. Nothing has been written yet.`,
     };
   }
 

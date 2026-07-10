@@ -3,7 +3,6 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src {{CSP_SOURCE}} https: data:; style-src {{CSP_SOURCE}} 'unsafe-inline'; script-src {{CSP_SOURCE}} 'unsafe-inline'; connect-src http://127.0.0.1:8765; frame-ancestors 'none';">
 <link rel="stylesheet" href="{{HIGHLIGHT_CSS_URI}}">
 <link rel="stylesheet" href="{{CHAT_CSS_URI}}">
 <script src="{{MARKED_URI}}"></script>
@@ -35,24 +34,39 @@
     <div id="tab-bar"></div>
     <div id="tabContextMenu" class="tab-context-menu" hidden></div>
 <div id="chat-body" class="chat-body">
-<div id="messages">
-    <!-- Per-step usage bar graph (Kilo/Kline-style). Polls the hermes-telemetry
-         local dashboard for step token sizes; purely cosmetic, degrades silently. -->
-    <div class="step-graph" id="stepGraph" hidden>
-        <div class="step-graph-header">
-            <span class="step-graph-title">Step usage</span>
-            <span class="step-graph-total" id="stepGraphTotal"></span>
-        </div>
-        <div class="step-graph-bars" id="stepGraphBars"></div>
-        <div class="step-graph-legend" id="stepGraphLegend">
-            <span class="sl sl-think">think</span>
-            <span class="sl sl-read">read</span>
-            <span class="sl sl-write">write</span>
-            <span class="sl sl-search">search</span>
-            <span class="sl sl-exec">exec</span>
-            <span class="sl sl-act">act</span>
-        </div>
+<!-- Per-step usage bar graph (Kilo/Kline-style). Lives OUTSIDE #messages on
+     purpose: #messages is wiped/rebuilt on every session switch, which would
+     destroy this node. Kept at the TOP of #chat-body so it sits above the
+     message scroll area. Polls the hermes-telemetry local dashboard; purely
+     cosmetic, degrades silently. -->
+<div class="step-graph" id="stepGraph" hidden>
+    <div class="step-graph-header">
+        <span class="step-graph-title">Step usage</span>
+        <span class="step-graph-total" id="stepGraphTotal"></span>
     </div>
+    <div class="step-graph-bars" id="stepGraphBars"></div>
+    <div class="step-graph-legend" id="stepGraphLegend">
+        <span class="sl sl-think">think</span>
+        <span class="sl sl-read">read</span>
+        <span class="sl sl-write">write</span>
+        <span class="sl sl-search">search</span>
+        <span class="sl sl-exec">exec</span>
+        <span class="sl sl-act">act</span>
+        <span class="sl sl-todo">todo</span>
+        <span class="sl sl-skill_list">skill_list</span>
+    </div>
+</div>
+<div id="todoPanel" class="todo-panel" hidden>
+    <div class="todo-panel-header">
+        <span class="todo-panel-title">Tasks <span class="todo-panel-count" id="todoPanelCount"></span></span>
+        <span class="todo-panel-actions">
+            <button type="button" class="todo-panel-toggle" id="todoPanelToggle" title="Collapse tasks" aria-expanded="true">▾</button>
+            <button type="button" class="todo-panel-clear" id="todoPanelClear" title="Clear tasks">✕</button>
+        </span>
+    </div>
+    <div class="todo-panel-list" id="todoPanelList"></div>
+</div>
+<div id="messages">
     <div class="placeholder" id="placeholder">
         <div class="hermes-loading" id="hermesLoading" hidden>
             <svg class="hermes-loading-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -73,13 +87,6 @@
     <span class="status-text" id="statusText"></span>
     <button class="retry-btn" id="retryBtn" hidden>↻</button>
 </div>
-<div id="todoPanel" class="todo-panel" hidden>
-    <div class="todo-panel-header">
-        <span class="todo-panel-title">Tasks</span>
-        <button type="button" class="todo-panel-clear" id="todoPanelClear" title="Clear tasks">✕</button>
-    </div>
-    <div class="todo-panel-list" id="todoPanelList"></div>
-</div>
 <div id="logModal" class="chat-area-overlay">
     <div class="modal-panel">
         <div class="modal-header">
@@ -99,6 +106,7 @@
 <div id="input-area">
     <div class="input-resize-handle" id="inputResizeHandle"></div>
     <div id="filePicker" class="file-picker" role="listbox"></div>
+    <div id="slashCommandPicker" class="slash-command-picker" role="listbox" hidden></div>
     <div class="input-stack">
     <div id="multiSelectToolbar" class="multi-select-toolbar" hidden>
         <span class="ms-count" id="multiSelectCount"></span>
@@ -124,12 +132,6 @@
                     </div>
                 </div>
                 <div class="input-quick-actions">
-                <button type="button" id="clearChatBtn" class="icon-btn" disabled>
-                    <svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M2.5 1h3l.5 1h6.5a.5.5 0 0 1 0 1H12v9.5a1.5 1.5 0 0 1-1.5 1.5h-5A1.5 1.5 0 0 1 4 12.5V3H1.5a.5.5 0 0 1 0-1H2.5zm2 2v9.5a.5.5 0 0 0 .5.5h5a.5.5 0 0 0 .5-.5V3H4.5zM6 5.5a.5.5 0 0 1 1 0v5a.5.5 0 0 1-1 0v-5zm3 0a.5.5 0 0 1 1 0v5a.5.5 0 0 1-1 0v-5z"/></svg>
-                </button>
-                <button type="button" id="clearInputBtn" class="icon-btn" disabled>
-                    <svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M2 4.5A1.5 1.5 0 0 1 3.5 3h9A1.5 1.5 0 0 1 14 4.5v6A1.5 1.5 0 0 1 12.5 12h-9A1.5 1.5 0 0 1 2 10.5v-6zM3.5 4.5v6h9v-6h-9zM5 6.5h5v1H5v-1zm0 2h3v1H5v-1z"/><path d="M10.5 9.5 13.5 12.5l-.7.7-2-2-2 2-.7-.7 2-2-2-2 .7-.7 2 2 2-2 .7.7-2 2 2 2-.7.7-2-2z"/></svg>
-                </button>
                 <button type="button" id="copySessionBtn" class="icon-btn" disabled>
                     <svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M4 2h8a1 1 0 0 1 1 1v1h1a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-1H4a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1h0zm1 2v8h8V5H5zm-2 2h1v6h6v1H4a1 1 0 0 1-1-1V6h0z"/></svg>
                 </button>
