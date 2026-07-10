@@ -3514,7 +3514,27 @@ body {
     display: flex;
     align-items: baseline;
     justify-content: space-between;
+    gap: 8px;
     margin-bottom: 6px;
+}
+.step-graph-toggle {
+    font: inherit;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: var(--primary, #4f8cff);
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1px 6px;
+    cursor: pointer;
+    flex: 0 0 auto;
+}
+.step-graph-toggle:hover { background: var(--bg-alt, rgba(127,127,127,0.08)); }
+.step-graph-toggle[aria-expanded="true"] {
+    background: var(--primary, #4f8cff);
+    color: var(--fg-on-primary, #fff);
+    border-color: transparent;
 }
 .step-graph-title {
     font-weight: 600;
@@ -3527,37 +3547,36 @@ body {
     color: var(--fg);
     opacity: 0.6;
     white-space: nowrap;
+    margin-left: auto;
 }
 .step-graph-bars {
     display: flex;
     align-items: flex-end;
     gap: 3px;
     height: 34px;
+    /* (d) Keep the graph portion itself scrollable, but hide the scrollbar
+       so there is no visible track. Mouse users scroll via shift+wheel or
+       the visible overflow once there are more bars than fit. */
     overflow-x: auto;
     overflow-y: hidden;
+    scrollbar-width: none;            /* Firefox */
+    -ms-overflow-style: none;         /* legacy Edge/IE */
     padding-bottom: 2px;
 }
+.step-graph-bars::-webkit-scrollbar { width: 0; height: 0; display: none; }
 .step-seg {
     flex: 0 0 auto;
     width: 6px;
     min-width: 6px;
     border-radius: 2px 2px 0 0;
-    transition: height 0.25s ease, flex-grow 0.25s ease;
+    transition: height 0.25s ease, background 0.15s ease;
     cursor: default;
     position: relative;
+    /* background is set inline per-segment for deterministic colouring */
 }
 .step-seg:hover {
     filter: brightness(1.25);
 }
-.step-seg[data-kind="think"]  { background: #8b5cf6; }
-.step-seg[data-kind="read"]   { background: #3b82f6; }
-.step-seg[data-kind="write"]  { background: #22c55e; }
-.step-seg[data-kind="search"] { background: #eab308; }
-.step-seg[data-kind="exec"]   { background: #ef4444; }
-.step-seg[data-kind="act"]    { background: #14b8a6; }
-.step-seg[data-kind="skill_manage"] { background: #f97316; }
-.step-seg[data-kind="todo"]   { background: #f59e0b; }
-.step-seg[data-kind="skill_list"] { background: #6366f1; }
 .step-graph-legend {
     display: flex;
     flex-wrap: wrap;
@@ -3571,22 +3590,37 @@ body {
     gap: 4px;
     color: var(--fg);
 }
-.step-graph-legend .sl::before {
-    content: "";
+.step-graph-legend .sl-sw {
     width: 8px;
     height: 8px;
     border-radius: 2px;
     display: inline-block;
+    flex: 0 0 auto;
 }
-.step-graph-legend .sl-think::before  { background: #8b5cf6; }
-.step-graph-legend .sl-read::before   { background: #3b82f6; }
-.step-graph-legend .sl-write::before  { background: #22c55e; }
-.step-graph-legend .sl-search::before { background: #eab308; }
-.step-graph-legend .sl-exec::before   { background: #ef4444; }
-.step-graph-legend .sl-act::before    { background: #14b8a6; }
-.step-graph-legend .sl-skill_manage::before { background: #f97316; }
-.step-graph-legend .sl-todo::before   { background: #f59e0b; }
-.step-graph-legend .sl-skill_list::before { background: #6366f1; }
+.step-graph-detail {
+    margin-top: 8px;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg-alt, rgba(127,127,127,0.04));
+    font-variant-numeric: tabular-nums;
+}
+.step-graph-detail[hidden] { display: none; }
+.step-graph-detail-list {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: 2px 12px;
+    margin: 0;
+}
+.step-graph-detail-list dt {
+    color: var(--fg);
+    opacity: 0.6;
+}
+.step-graph-detail-list dd {
+    margin: 0;
+    text-align: right;
+    color: var(--fg);
+}
 /* end step-graph */
 /* Icons moved into the action bar must not inherit the send-button sizing */
 .input-action .permission-mode-picker,

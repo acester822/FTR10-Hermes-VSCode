@@ -6833,21 +6833,123 @@ function parseToolCallText(text) {
         const root = document.getElementById('stepGraph');
         const barsEl = document.getElementById('stepGraphBars');
         const totalEl = document.getElementById('stepGraphTotal');
+        const legendEl = document.getElementById('stepGraphLegend');
+        const detailEl = document.getElementById('stepGraphDetail');
+        const toggleBtn = document.getElementById('stepGraphToggle');
         if (!root || !barsEl || !totalEl) return;
 
         let timer = null;
         let lastSession = '';
         let lastSig = '';
+        let currentModel = '';
+        let lastSummary = null;
+
+        // --- Step-kind taxonomy -------------------------------------------
+        // Fold the telemetry backend's inconsistent raw step_kind strings into
+        // a small set of canonical kinds before colouring/labelling. Keeps the
+        // bar + legend in sync and makes "mcp__vscode__propose_diff" and
+        // "skills_list" first-class instead of missing (brown default).
+        const KIND_ALIAS = {
+            think: 'think', reasoning: 'think', reason: 'think',
+            read: 'read', read_file: 'read', get_active_file: 'read',
+            mcp__vscode__get_active_file: 'read',
+            write: 'write', write_file: 'write', apply_diff: 'write',
+            mcp__vscode__apply_diff: 'write',
+            mcp__vscode__propose_diff: 'propose_diff', propose_diff: 'propose_diff',
+            search: 'search', search_files: 'search', web_search: 'search',
+            exec: 'exec', execute_command: 'exec', terminal: 'exec',
+            act: 'act', message: 'act', assistant: 'act', respond: 'act',
+            todo: 'todo',
+            skill_list: 'skills_list', skills_list: 'skills_list',
+            skill_manage: 'skills_list', skill_view: 'skills_list', skill: 'skills_list',
+        };
+
+        // Deterministic, single-source-of-truth colour + label table keyed by
+        // canonical kind. Setting the colour inline (below) guarantees the bar
+        // segment can never show the wrong colour the way the old CSS attribute
+        // selectors did (e.g. 'think' rendering brown).
+        const KIND_META = {
+            think:        { label: 'think',        color: '#8b5cf6' },
+            read:         { label: 'read',         color: '#3b82f6' },
+            write:        { label: 'write',        color: '#22c55e' },
+            propose_diff: { label: 'propose_diff', color: '#ec4899' },
+            search:       { label: 'search',       color: '#eab308' },
+            exec:         { label: 'exec',         color: '#ef4444' },
+            act:          { label: 'act',          color: '#14b8a6' },
+            todo:         { label: 'todo',         color: '#f59e0b' },
+            skills_list:  { label: 'skills_list',  color: '#6366f1' },
+            _other:       { label: 'other',        color: '#9ca3af' },
+        };
+        const CANON_ORDER = ['think', 'read', 'write', 'propose_diff', 'search', 'exec', 'act', 'todo', 'skills_list'];
+
+        function normalizeKind(raw) {
+            if (!raw) return 'act';
+            const key = String(raw).toLowerCase();
+            return KIND_ALIAS[key] || key;
+        }
+        function kindMeta(kind) { return KIND_META[kind] || KIND_META._other; }
 
         function fmtTokens(n) {
+            n = Number(n) || 0;
             if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
             if (n >= 1e3) return (n / 1e3).toFixed(1) + 'k';
             return String(n);
         }
-
         function fmtCost(c) {
             if (!c || c <= 0) return '';
             return '$' + (c < 0.01 ? c.toFixed(4) : c.toFixed(2));
+        }
+
+        function renderLegend() {
+            if (!legendEl) return;
+            legendEl.replaceChildren();
+            CANON_ORDER.forEach(function (kind) {
+                const meta = KIND_META[kind];
+                const span = document.createElement('span');
+                span.className = 'sl';
+                const sw = document.createElement('span');
+                sw.className = 'sl-sw';
+                sw.style.background = meta.color;
+                span.appendChild(sw);
+                span.appendChild(document.createTextNode(meta.label));
+                legendEl.appendChild(span);
+            });
+        }
+
+        function renderDetail(sum) {
+            if (!detailEl) return;
+            detailEl.replaceChildren();
+            if (!sum) return;
+            const rows = [
+                ['Session', (sum.sessionId || '').slice(0, 8) || '—'],
+                ['Model', sum.model || '—'],
+                ['Steps', String(sum.steps)],
+                ['In tokens', fmtTokens(sum.in)],
+                ['Out tokens', fmtTokens(sum.out)],
+                ['Reason tokens', fmtTokens(sum.reason)],
+                ['Cache read', fmtTokens(sum.cacheRead)],
+                ['Cache write', fmtTokens(sum.cacheWrite)],
+                ['Cache hit', sum.hitRate != null ? sum.hitRate.toFixed(1) + '%' : 'n/a'],
+                ['Cost', fmtCost(sum.cost) || '—'],
+            ];
+            const dl = document.createElement('dl');
+            dl.className = 'step-graph-detail-list';
+            rows.forEach(function (r) {
+                const dt = document.createElement('dt');
+                dt.textContent = r[0];
+                const dd = document.createElement('dd');
+                dd.textContent = r[1];
+                dl.appendChild(dt);
+                dl.appendChild(dd);
+            });
+            detailEl.appendChild(dl);
+        }
+
+        function setDetailOpen(open) {
+            if (!detailEl || !toggleBtn) return;
+            detailEl.hidden = !open;
+            toggleBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+            if (open) renderDetail(lastSummary);
         }
 
         function render(steps) {
@@ -6856,37 +6958,75 @@ function parseToolCallText(text) {
                 root.classList.add('is-empty');
                 barsEl.replaceChildren();
                 totalEl.textContent = 'No step data yet';
+                lastSummary = null;
+                setDetailOpen(false);
+                renderLegend();
                 return;
             }
             root.classList.remove('is-empty');
-            const maxTokens = Math.max.apply(null, steps.map(function (s) {
-                return (s.tokens_in || 0) + (s.tokens_out || 0) || 1;
-            }));
-            let totalIn = 0, totalOut = 0, totalCost = 0;
+            renderLegend();
+
+            const costOf = function (s) { return (s.tokens_in || 0) + (s.tokens_out || 0) || 1; };
+            const maxTokens = Math.max.apply(null, steps.map(costOf));
+
+            let totalIn = 0, totalOut = 0, totalCost = 0, totalReason = 0;
+            let totalCacheRead = 0, totalCacheWrite = 0;
             const frag = document.createDocumentFragment();
             steps.forEach(function (s) {
-                const cost = s.tokens_in + s.tokens_out || 1;
+                const cost = costOf(s);
                 totalIn += s.tokens_in || 0;
                 totalOut += s.tokens_out || 0;
                 totalCost += s.cost_usd || 0;
+                totalReason += s.reasoning_tokens || 0;
+                totalCacheRead += s.cache_read_tokens || 0;
+                totalCacheWrite += s.cache_write_tokens || 0;
+                const kind = normalizeKind(s.step_kind);
+                const meta = kindMeta(kind);
                 const seg = document.createElement('div');
                 seg.className = 'step-seg';
-                seg.dataset.kind = s.step_kind || 'act';
-                const h = Math.max(6, Math.round((cost / maxTokens) * 32));
-                seg.style.height = h + 'px';
+                seg.dataset.kind = kind;
+                // Deterministic colour — never the wrong one.
+                seg.style.background = meta.color;
+                // Strictly proportional height: a 2k-token step is clearly
+                // taller than a 500-token step (no artificial floor).
+                seg.style.height = Math.max(1, Math.round((cost / maxTokens) * 34)) + 'px';
+                const extra = [];
+                if (s.reasoning_tokens) extra.push('reason ' + fmtTokens(s.reasoning_tokens));
+                if (s.cache_read_tokens) extra.push('cacheR ' + fmtTokens(s.cache_read_tokens));
+                if (s.cache_write_tokens) extra.push('cacheW ' + fmtTokens(s.cache_write_tokens));
                 seg.title = [
-                    s.step_kind || 'act',
+                    meta.label,
                     'in ' + fmtTokens(s.tokens_in || 0) + ' / out ' + fmtTokens(s.tokens_out || 0),
                     fmtCost(s.cost_usd),
+                    extra.join('  ·  '),
                     (s.model || '') + ''
                 ].filter(Boolean).join('  ·  ');
                 frag.appendChild(seg);
             });
             barsEl.replaceChildren(frag);
+
+            // Token counts + cache read/write/hit-rate on the summary line.
+            const denom = totalCacheRead + totalIn;
+            const hitRate = denom > 0 ? (totalCacheRead / denom) * 100 : null;
             const parts = ['Σ ' + fmtTokens(totalIn) + ' in', fmtTokens(totalOut) + ' out'];
+            if (totalReason) parts.push(fmtTokens(totalReason) + ' reason');
+            if (totalCacheRead || totalCacheWrite) {
+                parts.push('cacheR ' + fmtTokens(totalCacheRead));
+                parts.push('cacheW ' + fmtTokens(totalCacheWrite));
+                if (hitRate != null) parts.push('hit ' + hitRate.toFixed(0) + '%');
+            }
             const c = fmtCost(totalCost);
             if (c) parts.push(c);
             totalEl.textContent = parts.join('   ');
+
+            lastSummary = {
+                model: currentModel || (steps[0].model || ''),
+                steps: steps.length,
+                in: totalIn, out: totalOut, reason: totalReason,
+                cacheRead: totalCacheRead, cacheWrite: totalCacheWrite,
+                hitRate: hitRate, cost: totalCost,
+                sessionId: lastSession || (steps[0].session_id || '')
+            };
         }
 
         let pending = false;
@@ -6914,8 +7054,12 @@ function parseToolCallText(text) {
                 root.classList.add('is-empty');
                 barsEl.replaceChildren();
                 totalEl.textContent = 'No step data yet';
+                lastSummary = null;
+                setDetailOpen(false);
+                renderLegend();
                 return;
             }
+            currentModel = data.model || currentModel || '';
             render(data.steps);
             lastSession = data.session_id || lastSession || '';
         });
@@ -6931,6 +7075,9 @@ function parseToolCallText(text) {
                     root.classList.add('is-empty');
                     barsEl.replaceChildren();
                     totalEl.textContent = 'Telemetry unavailable';
+                    lastSummary = null;
+                    setDetailOpen(false);
+                    renderLegend();
                 }
             }, 4000);
         }
@@ -6944,6 +7091,8 @@ function parseToolCallText(text) {
                 // session changed: clear and refetch immediately
                 barsEl.replaceChildren();
                 lastSession = '';
+                currentModel = '';
+                setDetailOpen(false);
             }
             fetchSteps(sid);
             armTimeout();
@@ -6953,6 +7102,12 @@ function parseToolCallText(text) {
             if (timer) return;
             tick();
             timer = setInterval(tick, POLL_MS);
+        }
+
+        if (toggleBtn) {
+            toggleBtn.addEventListener('click', function () {
+                setDetailOpen(detailEl.hidden);
+            });
         }
 
         // Start polling once the panel is ready (postMessage 'ready' is sent

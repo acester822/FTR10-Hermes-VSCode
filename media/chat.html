@@ -41,20 +41,13 @@
      cosmetic, degrades silently. -->
 <div class="step-graph" id="stepGraph" hidden>
     <div class="step-graph-header">
+        <button type="button" class="step-graph-toggle" id="stepGraphToggle" aria-expanded="false" title="Toggle session summary">Session summary</button>
         <span class="step-graph-title">Step usage</span>
         <span class="step-graph-total" id="stepGraphTotal"></span>
     </div>
     <div class="step-graph-bars" id="stepGraphBars"></div>
-    <div class="step-graph-legend" id="stepGraphLegend">
-        <span class="sl sl-think">think</span>
-        <span class="sl sl-read">read</span>
-        <span class="sl sl-write">write</span>
-        <span class="sl sl-search">search</span>
-        <span class="sl sl-exec">exec</span>
-        <span class="sl sl-act">act</span>
-        <span class="sl sl-todo">todo</span>
-        <span class="sl sl-skill_list">skill_list</span>
-    </div>
+    <div class="step-graph-legend" id="stepGraphLegend"></div>
+    <div class="step-graph-detail" id="stepGraphDetail" hidden></div>
 </div>
 <div id="todoPanel" class="todo-panel" hidden>
     <div class="todo-panel-header">
