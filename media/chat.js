@@ -2084,14 +2084,27 @@
     }
 
     function updateTokenUsage(used, size) {
-        // The single source of truth for token totals is now the step-graph
-        // (cumulative session spend). The old context-usage-num showed a
-        // different metric (live context-window fill %), which caused two
-        // divergent totals to appear. Keep the node hidden so only the
-        // step-graph total is shown.
-        if (contextUsageEl) contextUsageEl.hidden = true;
-        return;
+        // Total CONTEXT length: live context-window fill %. Shown as a bar
+        // graph + the percentage only (no raw numbers), per request. The
+        // step-graph total remains the cumulative session-spend number.
+        const usedTokens = Math.max(0, Number(used) || 0);
+        const totalTokens = Math.max(0, Number(size) || 0);
+        if (!contextUsageEl) return;
+        if (totalTokens <= 0) {
+            contextUsageEl.hidden = true;
+            return;
+        }
+        const pct = Math.min(100, Math.round((usedTokens / totalTokens) * 100));
+        const level = pct >= 90 ? 'high' : pct >= 70 ? 'medium' : 'low';
+        contextUsageEl.hidden = false;
+        contextUsageEl.dataset.level = level;
+        contextUsageEl.title = localeText('tokenUsageLabel', formatTokenCount(usedTokens), formatTokenCount(totalTokens), pct);
+        contextUsageEl.setAttribute('aria-label', contextUsageEl.title);
+        // Bar graph only — numbers are intentionally omitted.
+        if (contextUsageFill) contextUsageFill.style.width = pct + '%';
+        if (contextUsageNum) contextUsageNum.textContent = pct + '%';
     }
+
     let toolCallMap = {};
     let toolAggregateGroupId = null;
     const TOOL_SHORT_MAX_LINES = 3;
@@ -5292,10 +5305,14 @@ function parseToolCallText(text) {
     }
 
     function doCopySession(format) {
-        if (!copySessionBtn || copySessionBtn.disabled) return;
-        requestSessionExport('copy', undefined, undefined, format);
-        flashQuickActionBtn(copySessionBtn);
-        closeCopySessionDropdown();
+        try {
+            if (!copySessionBtn || copySessionBtn.disabled) return;
+            requestSessionExport('copy', undefined, undefined, format);
+            flashQuickActionBtn(copySessionBtn);
+            closeCopySessionDropdown();
+        } catch (err) {
+            console.error('copy session failed:', err);
+        }
     }
 
     if (copySessionBtn) {
@@ -6826,6 +6843,7 @@ function parseToolCallText(text) {
                 break;
 
             case 'sessionExport':
+                try {
                 if (msg.action === 'copy') {
                     if (msg.format === 'json' && msg.json) {
                         copyToClipboard(msg.json);
@@ -6838,6 +6856,9 @@ function parseToolCallText(text) {
                     if (content) {
                         downloadSessionMarkdown(content, msg.filename);
                     }
+                }
+                } catch (err) {
+                    console.error('session export handling failed:', err);
                 }
                 break;
 
@@ -7253,6 +7274,7 @@ function parseToolCallText(text) {
         window.addEventListener('message', function (event) {
             const msg = event.data;
             if (!msg || msg.type !== 'telemetryStepsResult') return;
+            try {
             pending = false;
             const data = msg.data;
             if (!data || !data.steps || !data.steps.length) {
@@ -7269,6 +7291,12 @@ function parseToolCallText(text) {
             currentModel = data.model || currentModel || '';
             render(data.steps);
             lastSession = data.session_id || lastSession || '';
+            } catch (err) {
+                // Never let a telemetry shape surprise blank the whole panel.
+                console.error('step-graph render failed:', err);
+                root.classList.add('is-empty');
+                if (totalEl) totalEl.textContent = 'Step data unavailable';
+            }
         });
 
         // Fallback: if the extension never responds (e.g. dashboard not
