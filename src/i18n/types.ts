@@ -156,6 +156,8 @@ export interface LocaleStrings {
     copySessionAs: string;
     copyAsMarkdown: string;
     copyAsJson: string;
+    downloadAsMarkdown: string;
+    downloadAsJson: string;
     downloadSession: string;
     quickActions: string;
     quickActionsExpand: string;

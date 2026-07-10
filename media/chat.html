@@ -39,10 +39,6 @@
         <span class="session-header-idx" id="sessionHeaderIdx" hidden></span>
     </div>
     <div class="session-header-actions">
-        <div class="context-usage" id="contextUsage" hidden>
-            <span class="context-usage-num" id="contextUsageNum"></span>
-            <span class="context-usage-bar" aria-hidden="true"><span class="context-usage-fill" id="contextUsageFill"></span></span>
-        </div>
         <div class="input-quick-trigger" id="quickActionsTrigger" title="" aria-label="" aria-expanded="false" role="button" tabindex="0">
             <svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M6.5 1a5.5 5.5 0 1 1 0 11 5.5 5.5 0 0 1 0-11zm0 1.2a4 5.5 0 1 0 0 8 4 4.5 0 0 0 0-8z"/></svg>
         </div>
@@ -56,7 +52,13 @@
      cosmetic, degrades silently. -->
 <div class="step-graph" id="stepGraph" hidden>
     <div class="step-graph-header">
-        <button type="button" class="step-graph-toggle" id="stepGraphToggle" aria-expanded="false" title="Toggle session summary">Session summary</button>
+        <div class="step-graph-header-left">
+            <button type="button" class="step-graph-toggle" id="stepGraphToggle" aria-expanded="false" title="Toggle session summary">Session summary</button>
+            <div class="context-usage" id="contextUsage" hidden>
+                <span class="context-usage-num" id="contextUsageNum"></span>
+                <span class="context-usage-bar" aria-hidden="true"><span class="context-usage-fill" id="contextUsageFill"></span></span>
+            </div>
+        </div>
         <span class="step-graph-total" id="stepGraphTotal"></span>
     </div>
     <div class="step-graph-bars" id="stepGraphBars"></div>
@@ -148,11 +150,17 @@
                     </button>
                     <div class="dropdown copy-session-dropdown" id="copySessionDropdown" style="display:none">
                         <div class="dropdown-header" id="copySessionDropdownHeader"></div>
-                        <div class="dropdown-item" data-format="markdown">
+                        <div class="dropdown-item" data-action="copy" data-format="markdown">
                             <span class="model-name" data-locale="copyAsMarkdown"></span>
                         </div>
-                        <div class="dropdown-item" data-format="json">
+                        <div class="dropdown-item" data-action="copy" data-format="json">
                             <span class="model-name" data-locale="copyAsJson"></span>
+                        </div>
+                        <div class="dropdown-item" data-action="download" data-format="markdown">
+                            <span class="model-name" data-locale="downloadAsMarkdown"></span>
+                        </div>
+                        <div class="dropdown-item" data-action="download" data-format="json">
+                            <span class="model-name" data-locale="downloadAsJson"></span>
                         </div>
                     </div>
                 </div>

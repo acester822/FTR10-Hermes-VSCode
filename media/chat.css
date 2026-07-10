@@ -3629,10 +3629,16 @@ body {
 }
 .step-graph-header {
     display: flex;
-    align-items: baseline;
+    align-items: center;
     justify-content: space-between;
     gap: 8px;
     margin-bottom: 6px;
+}
+.step-graph-header-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
 }
 .step-graph-title {
     display: none;
@@ -3756,12 +3762,14 @@ body {
     border-radius: 4px;
 }
 .input-quick-popup {
-    position: absolute;
+    position: fixed;
     left: 0;
-    top: calc(100% + 6px);
-    z-index: 40;
+    top: 0;
+    z-index: 1000;
     min-width: 280px;
     max-width: min(420px, 92vw);
+    max-height: 70vh;
+    overflow-y: auto;
     background: var(--glass-bg-elevated);
     border: 1px solid var(--glass-stroke);
     border-radius: var(--radius-md);
@@ -3770,7 +3778,7 @@ body {
     -webkit-backdrop-filter: var(--glass-blur);
     opacity: 0;
     transform: translateY(-6px) scale(0.98);
-    transform-origin: top left;
+    transform-origin: top right;
     pointer-events: none;
     transition: opacity 0.18s ease, transform 0.18s ease;
 }

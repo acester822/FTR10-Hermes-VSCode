@@ -3419,8 +3419,33 @@ function parseToolCallText(text) {
         inputQuickPanel.setAttribute('aria-hidden', open ? 'false' : 'true');
         quickActionsTrigger.setAttribute('aria-expanded', open ? 'true' : 'false');
         quickActionsTrigger.classList.toggle('is-active', open);
-        if (open && chatSearchInput && !chatSearchInput.disabled) {
-            setTimeout(function() { chatSearchInput.focus(); }, 280);
+        if (open) {
+            // Float the popup next to the trigger icon (fixed positioning, so
+            // it never reflows/shifts the webview — the old absolute anchor
+            // under #input-area pushed the whole panel and clipped the header).
+            const rect = quickActionsTrigger.getBoundingClientRect();
+            inputQuickPanel.style.left = '0px';
+            inputQuickPanel.style.top = '0px';
+            const pw = inputQuickPanel.offsetWidth || 300;
+            const ph = inputQuickPanel.offsetHeight || 200;
+            // Anchor the popup's top-right to the icon's bottom-right, then
+            // flip up / left if it would overflow the viewport.
+            let left = rect.right - pw;
+            if (left < 8) left = 8;
+            let top = rect.bottom + 6;
+            if (top + ph > window.innerHeight - 8) {
+                top = rect.top - ph - 6;
+                if (top < 8) top = 8;
+            }
+            if (left + pw > window.innerWidth - 8) {
+                left = window.innerWidth - pw - 8;
+                if (left < 8) left = 8;
+            }
+            inputQuickPanel.style.left = left + 'px';
+            inputQuickPanel.style.top = top + 'px';
+            if (chatSearchInput && !chatSearchInput.disabled) {
+                setTimeout(function() { chatSearchInput.focus(); }, 280);
+            }
         }
     }
 
@@ -5290,7 +5315,7 @@ function parseToolCallText(text) {
     }
 
     function openCopySessionDropdown() {
-        if (!copySessionDropdown || !copySessionBtn || copySessionBtn.disabled) return;
+        if (!copySessionDropdown || !copySessionCaret || copySessionCaret.disabled) return;
         copySessionDropdown.style.display = 'block';
         if (copySessionPicker) copySessionPicker.classList.add('is-open');
     }
@@ -5333,10 +5358,17 @@ function parseToolCallText(text) {
             e.stopPropagation();
             const item = e.target.closest('.dropdown-item');
             if (!item) return;
+            const action = item.getAttribute('data-action');
             const fmt = item.getAttribute('data-format');
-            if (fmt === 'json' || fmt === 'markdown') {
+            if (fmt !== 'json' && fmt !== 'markdown') return;
+            if (action === 'download') {
+                if (!downloadSessionBtn || downloadSessionBtn.disabled) return;
+                requestSessionExport('export', undefined, undefined, fmt);
+                flashQuickActionBtn(downloadSessionBtn);
+            } else {
                 doCopySession(fmt);
             }
+            closeCopySessionDropdown();
         });
     }
 

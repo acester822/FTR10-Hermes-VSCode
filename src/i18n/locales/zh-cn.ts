@@ -152,6 +152,8 @@ export const zhCn: LocaleStrings = {
     copySessionAs: '复制为',
     copyAsMarkdown: '复制为 Markdown',
     copyAsJson: '复制为 JSON',
+    downloadAsMarkdown: '下载为 Markdown',
+    downloadAsJson: '下载为 JSON',
     downloadSession: '下载当前会话',
     quickActions: '快捷操作',
     quickActionsExpand: '展开快捷操作',
