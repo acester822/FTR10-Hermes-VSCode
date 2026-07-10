@@ -5585,11 +5585,13 @@ function parseToolCallText(text) {
         modelPicker.classList.remove('is-open');
         if (contextAttachPicker) contextAttachPicker.classList.remove('is-open');
         if (permissionModePickerEl) permissionModePickerEl.classList.remove('is-open');
+        if (reasoningEffortPickerEl) reasoningEffortPickerEl.classList.remove('is-open');
         if (inputQuickPanel) setQuickPanelOpen(false);
         if (profileDropdown) profileDropdown.style.display = 'none';
         modelDropdown.style.display = 'none';
         if (contextAttachDropdown) contextAttachDropdown.style.display = 'none';
         if (permissionModeDropdownEl) permissionModeDropdownEl.style.display = 'none';
+        if (reasoningEffortDropdownEl) reasoningEffortDropdownEl.style.display = 'none';
         hideContextAttachTooltip();
         hideContextAttachPreview();
     }
@@ -5759,6 +5761,111 @@ function parseToolCallText(text) {
         }
     });
     updatePermissionModeUI();
+
+    // Reasoning effort picker
+    let reasoningEffort = 'medium'; // 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh'
+    const reasoningEffortPickerEl = document.getElementById('reasoningEffortPicker');
+    const reasoningEffortBtnEl = document.getElementById('reasoningEffortBtn');
+    const reasoningEffortLabelEl = document.getElementById('reasoningEffortLabel');
+    const reasoningEffortHeaderEl = document.getElementById('reasoningEffortHeader');
+    const reasoningEffortDropdownEl = document.getElementById('reasoningEffortDropdown');
+    const reasoningEffortListEl = document.getElementById('reasoningEffortList');
+    const reasoningEffortCaretEl = reasoningEffortPickerEl ? reasoningEffortPickerEl.querySelector('.reasoning-effort-caret') : null;
+    const reasoningEffortOptions = [
+        { id: 'none', labelKey: 'reasoningEffortNone', hint: '' },
+        { id: 'minimal', labelKey: 'reasoningEffortMinimal', hint: '' },
+        { id: 'low', labelKey: 'reasoningEffortLow', hint: '' },
+        { id: 'medium', labelKey: 'reasoningEffortMedium', hint: '' },
+        { id: 'high', labelKey: 'reasoningEffortHigh', hint: '' },
+        { id: 'xhigh', labelKey: 'reasoningEffortXHigh', hint: '' },
+    ];
+
+    function updateReasoningEffortUI() {
+        const opt = reasoningEffortOptions.find(function(o) { return o.id === reasoningEffort; });
+        if (!opt) return;
+        const label = locale[opt.labelKey] || opt.id;
+        if (reasoningEffortLabelEl) reasoningEffortLabelEl.textContent = label;
+        if (reasoningEffortBtnEl) {
+            const hint = opt.hint || '';
+            reasoningEffortBtnEl.setAttribute('title', (locale.reasoningEffortLabel || 'Reasoning') + ': ' + label + (hint ? ' — ' + hint : ''));
+            reasoningEffortBtnEl.setAttribute('aria-label', (locale.reasoningEffortLabel || 'Reasoning') + ': ' + label);
+            reasoningEffortBtnEl.setAttribute('aria-expanded', reasoningEffortDropdownEl && reasoningEffortDropdownEl.style.display !== 'none' ? 'true' : 'false');
+        }
+        if (reasoningEffortPickerEl) {
+            reasoningEffortPickerEl.classList.remove('effort-none', 'effort-minimal', 'effort-low', 'effort-medium', 'effort-high', 'effort-xhigh');
+            reasoningEffortPickerEl.classList.add('effort-' + reasoningEffort);
+        }
+        if (reasoningEffortListEl) {
+            reasoningEffortListEl.querySelectorAll('.reasoning-effort-option').forEach(function(el) {
+                el.classList.toggle('is-active', el.dataset.effort === reasoningEffort);
+            });
+        }
+    }
+
+    function renderReasoningEffortOptions() {
+        if (!reasoningEffortListEl) return;
+        reasoningEffortListEl.innerHTML = '';
+        reasoningEffortOptions.forEach(function(opt) {
+            const item = document.createElement('div');
+            item.className = 'reasoning-effort-option' + (opt.id === reasoningEffort ? ' is-active' : '');
+            item.dataset.effort = opt.id;
+            const label = locale[opt.labelKey] || opt.id;
+            item.innerHTML = '<span class="effort-check">✓</span><span class="effort-label">' + label + '</span>';
+            item.addEventListener('click', function(e) {
+                e.stopPropagation();
+                reasoningEffort = opt.id;
+                updateReasoningEffortUI();
+                closeAllDropdowns();
+                vscode.postMessage({ type: 'reasoningEffortChange', effort: reasoningEffort });
+            });
+            reasoningEffortListEl.appendChild(item);
+        });
+    }
+
+    if (reasoningEffortBtnEl && reasoningEffortDropdownEl) {
+        if (reasoningEffortHeaderEl) reasoningEffortHeaderEl.textContent = locale.reasoningEffortLabel || 'Reasoning effort';
+        reasoningEffortBtnEl.addEventListener('click', function(e) {
+            e.stopPropagation();
+            const open = reasoningEffortDropdownEl.style.display === 'none';
+            closeAllDropdowns();
+            if (open) {
+                reasoningEffortPickerEl.classList.add('is-open');
+                reasoningEffortDropdownEl.style.display = 'block';
+                renderReasoningEffortOptions();
+                positionReasoningEffortDropdown();
+            }
+        });
+        reasoningEffortDropdownEl.addEventListener('click', function(e) { e.stopPropagation(); });
+    }
+
+    function positionReasoningEffortDropdown() {
+        if (!reasoningEffortDropdownEl || !reasoningEffortBtnEl) return;
+        const rect = reasoningEffortBtnEl.getBoundingClientRect();
+        const dropW = reasoningEffortDropdownEl.offsetWidth || 160;
+        const dropH = reasoningEffortDropdownEl.offsetHeight || 240;
+        const margin = 6;
+        let left = rect.right - dropW;
+        if (left < margin) left = margin;
+        if (left + dropW > window.innerWidth - margin) left = window.innerWidth - dropW - margin;
+        let top = rect.bottom + margin;
+        if (top + dropH > window.innerHeight - margin) {
+            const above = rect.top - dropH - margin;
+            top = above >= margin ? above : Math.max(margin, window.innerHeight - dropH - margin);
+        }
+        reasoningEffortDropdownEl.style.position = 'fixed';
+        reasoningEffortDropdownEl.style.left = left + 'px';
+        reasoningEffortDropdownEl.style.top = top + 'px';
+        reasoningEffortDropdownEl.style.bottom = 'auto';
+        reasoningEffortDropdownEl.style.right = 'auto';
+        reasoningEffortDropdownEl.style.zIndex = '1000';
+    }
+
+    window.addEventListener('resize', function() {
+        if (reasoningEffortDropdownEl && reasoningEffortDropdownEl.style.display !== 'none') {
+            positionReasoningEffortDropdown();
+        }
+    });
+    updateReasoningEffortUI();
 
     const switchSessionStayBtn = document.getElementById('switchSessionStayBtn');
     const switchSessionConfirmBtn = document.getElementById('switchSessionConfirmBtn');
@@ -6708,6 +6815,12 @@ function parseToolCallText(text) {
                 if (msg.permissionMode && msg.permissionMode !== permissionMode) {
                     permissionMode = msg.permissionMode;
                     updatePermissionModeUI();
+                }
+                // Apply persisted reasoning effort so a new session restores the
+                // user's last selection instead of always defaulting to 'medium'.
+                if (msg.reasoningEffort && msg.reasoningEffort !== reasoningEffort) {
+                    reasoningEffort = msg.reasoningEffort;
+                    updateReasoningEffortUI();
                 }
                 // Apply to existing messages
                 document.querySelectorAll('.message-group.thought').forEach(function(el) {

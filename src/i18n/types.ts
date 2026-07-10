@@ -274,6 +274,15 @@ export interface LocaleStrings {
     contextAttachSendYes: string;
     contextAttachSendNo: string;
     contextAttachPreviewTitle: string;
+
+    // WebView — reasoning effort picker
+    reasoningEffortLabel: string;
+    reasoningEffortNone: string;
+    reasoningEffortMinimal: string;
+    reasoningEffortLow: string;
+    reasoningEffortMedium: string;
+    reasoningEffortHigh: string;
+    reasoningEffortXHigh: string;
 }
 
 export type LocaleKey = keyof LocaleStrings;
