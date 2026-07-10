@@ -435,10 +435,10 @@ export class AcpClient {
             let stderr = '';
 
             proc.stdout?.on('data', (chunk: Buffer) => {
-                stdout += chunk.toString();
+                stdout += chunk.toString('utf-8');
             });
             proc.stderr?.on('data', (chunk: Buffer) => {
-                stderr += chunk.toString();
+                stderr += chunk.toString('utf-8');
             });
 
             proc.on('error', (err) => {
@@ -494,10 +494,22 @@ export class AcpClient {
             const profile = normalizeHermesCliProfile(hermesProfile);
             const args = ['acp', '--profile', profile];
 
+            // Force UTF-8 on the spawned `hermes acp` child. The child python
+            // process can inherit a non-UTF-8 locale/console encoding from the
+            // OS and mangle UTF-8 assistant text at the stdio layer (mojibake
+            // like '\xc3\x83\xe2\x80\x9e...'). Pinning PYTHONUTF8 + the IO
+            // encoding isolates the stream decode from the ambient locale.
+            const childEnv = {
+                ...process.env,
+                PYTHONUTF8: '1',
+                PYTHONIOENCODING: 'utf-8',
+                LANG: process.env.LANG && /utf-?8/i.test(process.env.LANG) ? process.env.LANG : 'C.UTF-8',
+                LC_ALL: process.env.LC_ALL && /utf-?8/i.test(process.env.LC_ALL) ? process.env.LC_ALL : 'C.UTF-8',
+            };
             this._process = spawn(resolvedPath, args, {
                 cwd,
                 stdio: ['pipe', 'pipe', 'pipe'],
-                env: { ...process.env }
+                env: childEnv
             });
 
             const childInput = new WritableStream<Uint8Array>({
@@ -554,7 +566,7 @@ export class AcpClient {
             });
 
             this._process.stderr?.on('data', (chunk: Buffer) => {
-                const line = chunk.toString().trim();
+                const line = chunk.toString('utf-8').trim();
                 if (line) {
                     this._onLog(line);
                 }
@@ -1119,10 +1131,10 @@ export class AcpClient {
         };
 
         proc.stdout?.on('data', (chunk: Buffer) => {
-            term.stdout += chunk.toString();
+            term.stdout += chunk.toString('utf-8');
         });
         proc.stderr?.on('data', (chunk: Buffer) => {
-            term.stderr += chunk.toString();
+            term.stderr += chunk.toString('utf-8');
         });
         proc.on('exit', (code, sig) => {
             term.exitCode = code;
