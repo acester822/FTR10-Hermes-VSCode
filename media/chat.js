@@ -2084,23 +2084,13 @@
     }
 
     function updateTokenUsage(used, size) {
-        const usedTokens = Math.max(0, Number(used) || 0);
-        const totalTokens = Math.max(0, Number(size) || 0);
-        if (totalTokens <= 0) {
-            if (contextUsageEl) contextUsageEl.hidden = true;
-            return;
-        }
-        const pct = Math.min(100, Math.round((usedTokens / totalTokens) * 100));
-        const level = pct >= 90 ? 'high' : pct >= 70 ? 'medium' : 'low';
-        const label = localeText('tokenUsageLabel', formatTokenCount(usedTokens), formatTokenCount(totalTokens), pct);
-        if (contextUsageEl && contextUsageNum && contextUsageFill) {
-            contextUsageEl.hidden = false;
-            contextUsageNum.textContent = formatTokenCount(usedTokens) + ' / ' + formatTokenCount(totalTokens) + ' (' + pct + '%)';
-            contextUsageFill.style.width = pct + '%';
-            contextUsageEl.dataset.level = level;
-            contextUsageEl.title = label;
-            contextUsageEl.setAttribute('aria-label', label);
-        }
+        // The single source of truth for token totals is now the step-graph
+        // (cumulative session spend). The old context-usage-num showed a
+        // different metric (live context-window fill %), which caused two
+        // divergent totals to appear. Keep the node hidden so only the
+        // step-graph total is shown.
+        if (contextUsageEl) contextUsageEl.hidden = true;
+        return;
     }
     let toolCallMap = {};
     let toolAggregateGroupId = null;
@@ -5665,6 +5655,11 @@ function parseToolCallText(text) {
         if (e.target.closest('.picker')) {
             return;
         }
+        // The quick-actions panel (#inputQuickPanel) and its copy picker are
+        // interactive — never auto-close them from a click inside the panel.
+        if (e.target.closest('#inputQuickPanel')) {
+            return;
+        }
         if (e.target.closest('#contextAttachPreview')) {
             return;
         }
@@ -7189,11 +7184,11 @@ function parseToolCallText(text) {
                 seg.dataset.kind = kind;
                 // Deterministic colour — never the wrong one.
                 seg.style.background = meta.color;
-                // Proportional height but with a taller canvas so steps are
-                // clearly legible. A 2k-token step reads visibly taller than a
-                // 500-token step. When there are more bars than fit, the row
-                // scrolls horizontally (scrollbar hidden in CSS).
-                seg.style.height = Math.max(4, Math.round((cost / maxTokens) * 120)) + 'px';
+                // Proportional height within a 34px canvas. The bars keep a
+                // readable width because the row scrolls horizontally (no
+                // scrollbar) when there are more bars than fit — so height
+                // stays at the known-good 34px and width is never squished.
+                seg.style.height = Math.max(2, Math.round((cost / maxTokens) * 34)) + 'px';
                 const extra = [];
                 if (s.reasoning_tokens) extra.push('reason ' + fmtTokens(s.reasoning_tokens));
                 if (s.cache_read_tokens) extra.push('cacheR ' + fmtTokens(s.cache_read_tokens));
@@ -7210,9 +7205,17 @@ function parseToolCallText(text) {
             barsEl.replaceChildren(frag);
 
             // Token counts + cache read/write/hit-rate on the summary line.
+            // Step-graph totals are the canonical session spend, so this is
+            // the single token number we display (the old context-usage-num
+            // showed a different metric — live context-window fill % — and is
+            // hidden). Format: "Tokens ↑ 85.9k ↓ 1.5k".
             const denom = totalCacheRead + totalIn;
             const hitRate = denom > 0 ? (totalCacheRead / denom) * 100 : null;
-            const parts = ['Σ ' + fmtTokens(totalIn) + ' in', fmtTokens(totalOut) + ' out'];
+            const parts = [
+                'Tokens',
+                '↑ ' + fmtTokens(totalIn),
+                '↓ ' + fmtTokens(totalOut)
+            ];
             if (totalReason) parts.push(fmtTokens(totalReason) + ' reason');
             if (totalCacheRead || totalCacheWrite) {
                 parts.push('cacheR ' + fmtTokens(totalCacheRead));

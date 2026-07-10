@@ -3673,9 +3673,10 @@ body {
     display: flex;
     align-items: flex-end;
     gap: 3px;
-    height: 124px;
+    height: 34px;
     /* Invisible horizontal scroll: when there are more bars than fit, the
-       row scrolls (shift+wheel / trackpad) but no scrollbar is painted. */
+       row scrolls (shift+wheel / trackpad) but no scrollbar is painted, so
+       bars keep a readable width instead of being squished. */
     overflow-x: auto;
     overflow-y: hidden;
     scrollbar-width: none;            /* Firefox */
