@@ -14,6 +14,7 @@
     const clearChatBtn = document.getElementById('clearChatBtn');
     const clearInputBtn = document.getElementById('clearInputBtn');
     const copySessionBtn = document.getElementById('copySessionBtn');
+    const downloadSessionBtn = document.getElementById('downloadSessionBtn');
     const quickActionsTrigger = document.getElementById('quickActionsTrigger');
     const attachImageBtn = document.getElementById('attachImageBtn');
     const imageFileInput = document.getElementById('imageFileInput');
@@ -815,6 +816,10 @@
             copySessionBtn.title = locale.copySession;
             copySessionBtn.setAttribute('aria-label', locale.copySession);
         }
+        if (downloadSessionBtn) {
+            downloadSessionBtn.title = locale.downloadSession;
+            downloadSessionBtn.setAttribute('aria-label', locale.downloadSession);
+        }
         if (multiSelectAllBtn) multiSelectAllBtn.textContent = locale.multiSelectAll;
         if (multiSelectDeleteBtn) multiSelectDeleteBtn.textContent = locale.multiSelectDelete;
         if (multiSelectCopyBtn) multiSelectCopyBtn.textContent = locale.multiSelectCopy;
@@ -1031,6 +1036,8 @@
     let isPrompting = false;
     /** Images queued for the next send. Each: { name, mimeType, data(base64) }. */
     let pendingImages = [];
+    /** Non-image files (code/text) queued for the next send. Each: { name, mimeType, text }. */
+    let pendingFiles = [];
     let pendingSwitchSessionId = null;
     let contextAttachVisible = false;
     let contextAttachMode = 'none';
@@ -1703,9 +1710,11 @@
         hideSlashCommandPicker();
         resetAutoScrollFollow();
         const imagesForSend = pendingImages.slice();
-        addMessage('user', text, { images: imagesForSend });
+        const filesForSend = pendingFiles.slice();
+        addMessage('user', text, { images: imagesForSend, files: filesForSend });
         inputEl.value = '';
         pendingImages = [];
+        pendingFiles = [];
         renderAttachPreview();
         syncInputHeightFromContent();
         updateQuickActionBtns();
@@ -1721,6 +1730,7 @@
             text: text,
             contextAttach: payload,
             images: imagesForSend.map(function (img) { return { name: img.name, mimeType: img.mimeType, data: img.data }; }),
+            files: filesForSend.map(function (f) { return { name: f.name, mimeType: f.mimeType, text: f.text }; }),
         });
     }
 
@@ -1760,15 +1770,63 @@
         });
     }
 
+    // Max bytes of a text file we'll inline as a dropped attachment. Larger
+    // files are skipped (the model can't read them inline anyway).
+    const MAX_FILE_BYTES = 512 * 1024;
+    function readFileAsText(file) {
+        return new Promise(function (resolve, reject) {
+            if (typeof file.size === 'number' && file.size > MAX_FILE_BYTES) {
+                reject(new Error('file too large: ' + file.name));
+                return;
+            }
+            const reader = new FileReader();
+            reader.onload = function () {
+                try {
+                    const text = typeof reader.result === 'string' ? reader.result : '';
+                    resolve({ name: file.name, mimeType: file.type || 'text/plain', text: text });
+                } catch (e) {
+                    reject(e);
+                }
+            };
+            reader.onerror = function () { reject(reader.error || new Error('read error')); };
+            reader.readAsText(file);
+        });
+    }
+
+    // Split a dropped/grabbed list into images (handled as base64) and
+    // non-image files (read as text and inlined into the prompt).
+    function addDroppedFiles(fileList) {
+        const items = Array.prototype.slice.call(fileList || []);
+        const images = items.filter(function (f) {
+            return f && f.type && f.type.indexOf('image/') === 0;
+        });
+        const textFiles = items.filter(function (f) {
+            return f && f.type && f.type.indexOf('image/') !== 0;
+        });
+        if (images.length) addImageFiles(images);
+        if (!textFiles.length) return;
+        Promise.all(textFiles.map(readFileAsText)).then(function (files) {
+            pendingFiles = pendingFiles.concat(files);
+            renderAttachPreview();
+        }).catch(function (err) {
+            console.error('File read failed', err);
+        });
+    }
+
     function removePendingImage(index) {
         pendingImages.splice(index, 1);
+        renderAttachPreview();
+    }
+
+    function removePendingFile(index) {
+        pendingFiles.splice(index, 1);
         renderAttachPreview();
     }
 
     function renderAttachPreview() {
         if (!attachPreviewRow) return;
         attachPreviewRow.innerHTML = '';
-        if (!pendingImages.length) {
+        if (!pendingImages.length && !pendingFiles.length) {
             attachPreviewRow.hidden = true;
             return;
         }
@@ -1799,6 +1857,32 @@
             chip.appendChild(remove);
             attachPreviewRow.appendChild(chip);
         });
+        pendingFiles.forEach(function (f, idx) {
+            const chip = document.createElement('div');
+            chip.className = 'attach-chip file-chip';
+            const icon = document.createElement('span');
+            icon.className = 'file-icon';
+            icon.textContent = '📄';
+            icon.setAttribute('aria-hidden', 'true');
+            const name = document.createElement('span');
+            name.className = 'attach-name';
+            name.textContent = f.name;
+            name.title = f.name;
+            const remove = document.createElement('button');
+            remove.type = 'button';
+            remove.className = 'attach-remove';
+            remove.setAttribute('aria-label', 'Remove file');
+            remove.textContent = '×';
+            remove.addEventListener('click', function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                removePendingFile(idx);
+            });
+            chip.appendChild(icon);
+            chip.appendChild(name);
+            chip.appendChild(remove);
+            attachPreviewRow.appendChild(chip);
+        });
     }
 
     if (attachImageBtn && imageFileInput) {
@@ -1807,7 +1891,7 @@
             imageFileInput.click();
         });
         imageFileInput.addEventListener('change', function () {
-            addImageFiles(imageFileInput.files);
+            addDroppedFiles(imageFileInput.files);
             imageFileInput.value = '';
         });
     }
@@ -1830,54 +1914,51 @@
         });
     }
 
-    // Drag & drop image files onto the composer
-    (function wireImageDropTarget() {
+    // Drag & drop files (any type) from the VS Code Explorer onto the composer.
+    // Images become base64 attachments; other files are read as text and inlined.
+    (function wireFileDropTarget() {
         const target = inputCompositeShellEl || inputCompositeEl || inputAreaEl;
         if (!target) return;
         let dragDepth = 0;
-        function hasImageFiles(dt) {
+        function hasFiles(dt) {
             if (!dt) return false;
             if (dt.items && dt.items.length) {
                 for (let i = 0; i < dt.items.length; i++) {
-                    if (dt.items[i].kind === 'file' && dt.items[i].type && dt.items[i].type.indexOf('image/') === 0) {
+                    if (dt.items[i].kind === 'file') {
                         return true;
                     }
                 }
                 return false;
             }
-            return Array.prototype.some.call(dt.files || [], function (f) {
-                return f.type && f.type.indexOf('image/') === 0;
-            });
+            return (dt.files || []).length > 0;
         }
         target.addEventListener('dragenter', function (e) {
-            if (!hasImageFiles(e.dataTransfer)) return;
+            if (!hasFiles(e.dataTransfer)) return;
             e.preventDefault();
             dragDepth++;
-            target.classList.add('drag-over-image');
+            target.classList.add('drag-over-file');
         });
         target.addEventListener('dragover', function (e) {
-            if (!hasImageFiles(e.dataTransfer)) return;
+            if (!hasFiles(e.dataTransfer)) return;
             e.preventDefault();
             e.dataTransfer.dropEffect = 'copy';
         });
         target.addEventListener('dragleave', function (e) {
-            if (!hasImageFiles(e.dataTransfer) && !target.classList.contains('drag-over-image')) return;
+            if (!hasFiles(e.dataTransfer) && !target.classList.contains('drag-over-file')) return;
             dragDepth = Math.max(0, dragDepth - 1);
             if (dragDepth === 0) {
-                target.classList.remove('drag-over-image');
+                target.classList.remove('drag-over-file');
             }
         });
         target.addEventListener('drop', function (e) {
             const dt = e.dataTransfer;
             if (!dt) return;
-            const files = Array.prototype.slice.call(dt.files || []).filter(function (f) {
-                return f.type && f.type.indexOf('image/') === 0;
-            });
+            const files = Array.prototype.slice.call(dt.files || []);
             if (!files.length) return;
             e.preventDefault();
             dragDepth = 0;
-            target.classList.remove('drag-over-image');
-            addImageFiles(files);
+            target.classList.remove('drag-over-file');
+            addDroppedFiles(files);
         });
     })();
 
@@ -3557,6 +3638,7 @@ function parseToolCallText(text) {
         const hasInput = !!inputEl.value.trim();
         if (clearChatBtn) clearChatBtn.disabled = !hasMessages;
         if (copySessionBtn) copySessionBtn.disabled = !hasMessages;
+        if (downloadSessionBtn) downloadSessionBtn.disabled = !hasMessages;
         if (clearInputBtn) clearInputBtn.disabled = !hasInput;
         if (chatSearchInput) chatSearchInput.disabled = !hasMessages;
         if (!hasMessages) clearChatSearch();
@@ -4232,11 +4314,46 @@ function parseToolCallText(text) {
                         im.className = 'message-image';
                         im.src = 'data:' + img.mimeType + ';base64,' + img.data;
                         im.alt = img.name || 'attached image';
+                        // Magnifying-glass affordance: opening the attachment in
+                        // the main editor gives a full-size, zoomable view.
+                        im.title = locale.openImageInEditor || 'Open in editor';
+                        im.addEventListener('click', function () {
+                            vscode.postMessage({
+                                type: 'openImage',
+                                name: img.name || 'image',
+                                mimeType: img.mimeType,
+                                data: img.data,
+                            });
+                        });
                         wrap.appendChild(im);
                         gallery.appendChild(wrap);
                     });
                     if (gallery.childElementCount) {
                         div.appendChild(gallery);
+                    }
+                }
+                // Render any non-image files attached to this user message as chips.
+                if (options && options.files && options.files.length) {
+                    const fgallery = document.createElement('div');
+                    fgallery.className = 'message-files';
+                    options.files.forEach(function (f) {
+                        if (!f || !f.name) return;
+                        const chip = document.createElement('div');
+                        chip.className = 'message-file-chip';
+                        const icon = document.createElement('span');
+                        icon.className = 'file-icon';
+                        icon.textContent = '📄';
+                        icon.setAttribute('aria-hidden', 'true');
+                        const label = document.createElement('span');
+                        label.className = 'file-name';
+                        label.textContent = f.name;
+                        label.title = f.name;
+                        chip.appendChild(icon);
+                        chip.appendChild(label);
+                        fgallery.appendChild(chip);
+                    });
+                    if (fgallery.childElementCount) {
+                        div.appendChild(fgallery);
                     }
                 }
             }
@@ -4568,10 +4685,11 @@ function parseToolCallText(text) {
         }
     }
 
-    function showFilePreview(path, content, error) {
+    function showFilePreview(path, content, error, isImage, mimeType, data) {
         hideFilePreview();
         previewTooltip = document.createElement('div');
         previewTooltip.className = 'file-preview-tooltip';
+        if (isImage && data) previewTooltip.className += ' fp-image-tip';
         const header = document.createElement('div');
         header.className = 'fp-header';
         header.textContent = path;
@@ -4581,6 +4699,12 @@ function parseToolCallText(text) {
             err.className = 'fp-error';
             err.textContent = error;
             previewTooltip.appendChild(err);
+        } else if (isImage && data) {
+            const img = document.createElement('img');
+            img.className = 'fp-image';
+            img.src = 'data:' + (mimeType || 'image/png') + ';base64,' + data;
+            img.alt = path;
+            previewTooltip.appendChild(img);
         } else {
             const pre = document.createElement('pre');
             pre.textContent = content || locale.emptyFile;
@@ -4899,8 +5023,8 @@ function parseToolCallText(text) {
     function sendMessage() {
         const text = inputEl.value.trim();
         if (!canSend) return;
-        // Allow sending with an attached image even if the text box is empty.
-        if (!text && pendingImages.length === 0) return;
+        // Allow sending with an attached image or file even if the text box is empty.
+        if (!text && pendingImages.length === 0 && pendingFiles.length === 0) return;
 
         executeSendMessage(text);
     }
@@ -5124,6 +5248,7 @@ function parseToolCallText(text) {
             if (clearInputBtn.disabled) return;
             inputEl.value = '';
             pendingImages = [];
+            pendingFiles = [];
             renderAttachPreview();
             syncInputHeightFromContent();
             updateQuickActionBtns();
@@ -6174,6 +6299,27 @@ function parseToolCallText(text) {
         }
     }
 
+    function updateSessionHeader() {
+        const nameEl = document.getElementById('sessionHeaderName');
+        const idxEl = document.getElementById('sessionHeaderIdx');
+        const headerEl = document.getElementById('sessionHeader');
+        if (!nameEl || !idxEl) return;
+        const session = lastSessions.find(function(s) { return s.id === lastActiveSessionId; });
+        const title = session && (session.title || locale.newChat) ? (session.title || locale.newChat) : locale.newChat;
+        nameEl.textContent = title;
+        nameEl.title = title;
+        const idx = lastSessions.findIndex(function(s) { return s.id === lastActiveSessionId; });
+        if (idx >= 0 && lastSessions.length > 0) {
+            idxEl.textContent = '#' + (idx + 1);
+            idxEl.title = (idx + 1) + ' / ' + lastSessions.length;
+            idxEl.hidden = false;
+        } else {
+            idxEl.textContent = '';
+            idxEl.hidden = true;
+        }
+        if (headerEl) headerEl.hidden = false;
+    }
+
     function showPermissionRequest(msg) {
         finalizeAssistantBubble();
         placeholder.style.display = 'none';
@@ -6493,6 +6639,7 @@ function parseToolCallText(text) {
 
             case 'sessionList':
                 renderSessionTabs(msg.sessions, msg.activeSessionId);
+                updateSessionHeader();
                 break;
 
             case 'sessionExport':
@@ -6580,7 +6727,7 @@ function parseToolCallText(text) {
                 if (previewRequests.has(msg.requestId)) {
                     const anchor = previewRequests.get(msg.requestId);
                     previewRequests.delete(msg.requestId);
-                    showFilePreview(msg.path || '', msg.content, msg.error);
+                    showFilePreview(msg.path || '', msg.content, msg.error, msg.isImage, msg.mimeType, msg.data);
                     positionFilePreview(anchor);
                 }
                 break;

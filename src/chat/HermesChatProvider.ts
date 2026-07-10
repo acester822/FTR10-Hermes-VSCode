@@ -1,6 +1,8 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
+import * as os from 'os';
+import * as crypto from 'crypto';
 import * as http from 'http';
 import { AcpClient, AcpStatus, ModelListState, PermissionRequest, TokenUsage } from '../acp/AcpClient';
 import { buildModelListStateFromCatalog, isRuntimeModelSource, encodeHermesModelValueId } from '../acp/modelConfig';
@@ -18,7 +20,7 @@ import type {
     HermesExecutableCandidate,
 } from '../acp/profileDiscovery';
 import { addHermesDirectoryToSystemPath, getHermesExecutableDirectory } from '../acp/hermesPathSetup';
-import { accessExecutable, venvHermesCandidates } from '../acp/hermesPaths';
+import { accessExecutable, resolveDefaultHermesHome, venvHermesCandidates } from '../acp/hermesPaths';
 import {
     activeSessionPathFor,
     loadProfileState,
@@ -79,6 +81,15 @@ interface ChatMessage {
     selectedLabel?: string;
     /** Images attached by the user, forwarded to a vision-capable model. */
     images?: ChatImage[];
+    /** Non-image files (code/text) dropped on the composer, forwarded as ACP resource blocks. */
+    files?: ChatFile[];
+}
+
+/** A non-image file dropped into the composer. text is the (capped) file contents. */
+interface ChatFile {
+    name: string;
+    mimeType: string;
+    text: string;
 }
 
 interface SessionInfo {
@@ -130,6 +141,8 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
     private _acp?: AcpClient;
     private _output: vscode.OutputChannel;
     private _ftr10Watcher?: fs.FSWatcher;
+    private _configWatcher?: fs.FSWatcher;
+    private _configWatchTimer?: ReturnType<typeof setTimeout>;
     private _diffReview?: import('../acp/DiffReviewManager').DiffReviewManager;
 
     public setDiffReviewManager(manager: import('../acp/DiffReviewManager').DiffReviewManager): void {
@@ -229,6 +242,8 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
                 }
             })
         );
+
+        this._startConfigWatcher();
     }
 
     private _restoreActiveSession(): string {
@@ -276,7 +291,7 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
         webviewView.webview.onDidReceiveMessage((message) => {
             switch (message.type) {
                 case 'sendMessage':
-                    this._enqueueChatOp(() => this._handleUserMessage(message.text, message.contextAttach, message.images));
+                    this._enqueueChatOp(() => this._handleUserMessage(message.text, message.contextAttach, message.images, message.files));
                     break;
                 case 'cancel':
                     // Cancel must not wait behind an in-flight sendMessage; AcpClient
@@ -289,11 +304,18 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
                 case 'listFiles':
                     void this._handleListFiles(message.query || '', message.requestId);
                     break;
-                case 'previewFile':
-                    void this._handlePreviewFile(message.path, message.requestId);
+                case 'previewFile': {
+                    const fp = String(message.path || '');
+                    const isImage = /\.(png|jpe?g|gif|webp|bmp|svg|avif)$/i.test(fp.replace(/^@/, '').trim());
+                    if (isImage) {
+                        void this._handlePreviewImageFile(message.path, message.requestId);
+                    } else {
+                        void this._handlePreviewFile(message.path, message.requestId);
+                    }
                     break;
-                case 'newChat':
-                    this._handleNewChat();
+                }
+                case 'openImage':
+                    void this._handleOpenImage(message.name, message.mimeType, message.data);
                     break;
                 case 'clearChat':
                     void this._handleClearChat();
@@ -692,12 +714,17 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
         this._postMessage({ type: 'markSessionReset' });
     }
 
-    private _saveMessage(role: string, text: string, toolCallId?: string, images?: ChatImage[]): void {
+    private _saveMessage(role: string, text: string, toolCallId?: string, images?: ChatImage[], files?: ChatFile[]): void {
         const entry: ChatMessage = { role, text, timestamp: Date.now(), toolCallId };
         if (images && images.length) {
             // Strip the base64 payload for on-disk history to keep the JSON small;
             // we keep name/mime so the UI can still show attachment chips.
             entry.images = images.map(img => ({ name: img.name, mimeType: img.mimeType, data: '' }));
+        }
+        if (files && files.length) {
+            // Persist only name + mime so the UI can show file chips on restore;
+            // the full contents are dropped to keep sessions.json small.
+            entry.files = files.map(f => ({ name: f.name, mimeType: f.mimeType, text: '' }));
         }
         this._sessionMessages.push(entry);
         this._persistMessages();
@@ -2347,7 +2374,7 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
         vscode.window.showWarningMessage(t('hermesNotConnected'));
     }
 
-    private async _handleUserMessage(text: string, contextAttach?: ContextAttachOption, images?: ChatImage[]): Promise<void> {
+    private async _handleUserMessage(text: string, contextAttach?: ContextAttachOption, images?: ChatImage[], files?: ChatFile[]): Promise<void> {
         const epoch = this._sendEpoch;
         await this._awaitSessionReady();
         if (epoch !== this._sendEpoch) {
@@ -2362,7 +2389,7 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
         this._log(`User message: ${text.slice(0, 80)}`);
         this._snapshotSessionModelFromProfile();
         this._promptSessionId = this._sessionId;
-        this._saveMessage('user', text, undefined, images);
+        this._saveMessage('user', text, undefined, images, files);
         this._markSessionAgentEngaged();
         if (this._contextAttachActive) {
             this._contextAttachAwaitingReply = true;
@@ -2375,7 +2402,7 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
         if (epoch !== this._sendEpoch) {
             return;
         }
-        await this._acp?.sendMessage(promptText, images);
+        await this._acp?.sendMessage(promptText, images, files);
     }
 
     private async _handleCancel(): Promise<void> {
@@ -2479,6 +2506,66 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
         }
     }
 
+    /**
+     * Preview an image file on hover. We can't push a data: URL into a
+     * vscode-resource-safe webview directly without CSP gymnastics, so we read
+     * the bytes in the extension host, base64-encode them, and let the webview
+     * render an <img> from a data: URI. Only image MIME types take this path;
+     * everything else falls through to the text preview above.
+     */
+    private async _handlePreviewImageFile(filePath: string, requestId: string): Promise<void> {
+        const normalized = filePath.replace(/^@/, '').trim();
+        try {
+            const uri = this._resolveFileUri(normalized);
+            if (!uri || !this._isPathAllowed(uri.fsPath)) {
+                this._postMessage({
+                    type: 'filePreview',
+                    requestId,
+                    path: normalized,
+                    error: t('fileAccessDenied'),
+                });
+                return;
+            }
+            const mime = this._imageMimeFor(uri.fsPath);
+            if (!mime) {
+                // Not actually an image — let the caller fall back to text.
+                throw new Error('not-an-image');
+            }
+            const raw = fs.readFileSync(uri.fsPath);
+            this._postMessage({
+                type: 'filePreview',
+                requestId,
+                path: this._toDisplayPath(uri),
+                isImage: true,
+                mimeType: mime,
+                data: raw.toString('base64'),
+            });
+        } catch {
+            this._postMessage({
+                type: 'filePreview',
+                requestId,
+                path: normalized,
+                error: t('fileReadError'),
+            });
+        }
+    }
+
+    private _imageMimeFor(filePath: string): string | undefined {
+        const m = /\.([a-zA-Z0-9]+)$/.exec(filePath || '');
+        const ext = m ? m[1].toLowerCase() : '';
+        const byExt: Record<string, string> = {
+            png: 'image/png',
+            jpg: 'image/jpeg',
+            jpeg: 'image/jpeg',
+            gif: 'image/gif',
+            webp: 'image/webp',
+            bmp: 'image/bmp',
+            svg: 'image/svg+xml',
+            avif: 'image/avif',
+        };
+        return byExt[ext];
+    }
+
     private async _handleOpenFile(filePath: string): Promise<void> {
         this._log(`Open file: ${filePath}`);
         try {
@@ -2487,11 +2574,80 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
                 vscode.window.showWarningMessage(t('couldNotOpenFile', filePath));
                 return;
             }
+            // Image files open in the main editor's image viewer (native,
+            // zoomable) rather than as a text document showing binary garbage.
+            if (this._imageMimeFor(uri.fsPath)) {
+                await vscode.commands.executeCommand('vscode.open', uri, { preview: false });
+                return;
+            }
             const doc = await vscode.workspace.openTextDocument(uri);
             await vscode.window.showTextDocument(doc);
         } catch {
             vscode.window.showWarningMessage(t('couldNotOpenFile', filePath));
         }
+    }
+
+    /**
+     * Open an image that lives only as base64 in a chat message (e.g. a user
+     * attachment thumbnail) in the main VS Code editor. We cannot open a
+     * data: URL directly, so we materialize the bytes to a scratch file under
+     * the Hermes cache dir and open that. The file is content-addressed so
+     * repeated opens of the same image reuse the same path (and the editor
+     * just re-shows the existing tab) instead of littering new files.
+     */
+    private async _handleOpenImage(name: string, mimeType: string, data: string): Promise<void> {
+        if (!data) {
+            vscode.window.showWarningMessage(t('imageNoData'));
+            return;
+        }
+        const cleanName = (name && path.basename(name)) || 'image';
+        let buf: Buffer;
+        try {
+            buf = Buffer.from(data, 'base64');
+        } catch {
+            vscode.window.showWarningMessage(t('imageReadError'));
+            return;
+        }
+        const ext = this._imageExtFor(mimeType, cleanName);
+        const home = process.env.HERMES_HOME?.trim() || path.join(os.homedir(), '.hermes');
+        const dir = path.join(home, 'cache', 'hermes-vscode-images');
+        try {
+            fs.mkdirSync(dir, { recursive: true });
+        } catch {
+            vscode.window.showWarningMessage(t('imageWriteError'));
+            return;
+        }
+        const hash = crypto.createHash('sha1').update(buf).digest('hex').slice(0, 16);
+        const baseName = cleanName.replace(/\.[^.]+$/, '') || 'image';
+        const filePath = path.join(dir, `${baseName}-${hash}${ext}`);
+        try {
+            fs.writeFileSync(filePath, buf);
+        } catch {
+            vscode.window.showWarningMessage(t('imageWriteError'));
+            return;
+        }
+        try {
+            const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(filePath));
+            await vscode.window.showTextDocument(doc, { preview: false });
+        } catch {
+            vscode.window.showWarningMessage(t('couldNotOpenFile', filePath));
+        }
+    }
+
+    private _imageExtFor(mimeType: string, name: string): string {
+        const byMime: Record<string, string> = {
+            'image/png': '.png',
+            'image/jpeg': '.jpg',
+            'image/jpg': '.jpg',
+            'image/gif': '.gif',
+            'image/webp': '.webp',
+            'image/bmp': '.bmp',
+            'image/svg+xml': '.svg',
+            'image/avif': '.avif',
+        };
+        if (mimeType && byMime[mimeType.toLowerCase()]) return byMime[mimeType.toLowerCase()];
+        const m = /\.([a-zA-Z0-9]+)$/.exec(name || '');
+        return m ? '.' + m[1].toLowerCase() : '.png';
     }
 
     private async _handleInsertEditor(text: string): Promise<void> {
@@ -3022,6 +3178,42 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
         void this._handleReloadExtension();
     }
 
+    /**
+     * Restart the Hermes backend so it re-reads ~/.hermes/config.yaml.
+     * Disposes the live `hermes acp` child (spawned by this extension) and
+     * respawns a fresh one, which reloads config at init time. Unlike
+     * reloadExtension this does NOT reload the whole VS Code window — the chat
+     * UI stays, only the agent subprocess is recycled.
+     */
+    public reloadConfig(): void {
+        void this._handleReloadConfig();
+    }
+
+    private async _handleReloadConfig(): Promise<void> {
+        this._log('Reload Hermes config requested — restarting backend to re-read config.yaml');
+        this._flushThoughtToHistory();
+        if (this._lastAssistantText.trim()) {
+            this._saveMessage('assistant', this._lastAssistantText);
+            this._lastAssistantText = '';
+        }
+        this._cancelPendingPermissions();
+        this._saveCurrentSession();
+        this._persistMessages();
+
+        this._acp?.dispose();
+        this._acp = undefined;
+        this._modelState = null;
+        this._tokenUsage = null;
+        this._postTokenUsage();
+        this._postMessage({
+            type: 'status',
+            status: 'connecting',
+            message: localizeStatusMessage('Reloading Hermes config (restarting backend)...'),
+        });
+        await this._connect(this._activeSelectionId || undefined);
+        this._restoreMessages();
+    }
+
     public checkForUpdate(): void {
         void this._checkForUpdate();
     }
@@ -3071,6 +3263,8 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
         this._clearViewDetectProgress();
         this._acp?.dispose();
         this._diffReview = undefined;
+        this._stopConfigWatcher();
+        this._ftr10Watcher?.close();
         this._output.dispose();
     }
 
@@ -3298,6 +3492,62 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
             });
         } catch {
             // FTR10 not installed — silently skip
+        }
+    }
+
+    /**
+     * Watch ~/.hermes/config.yaml and automatically restart the Hermes backend
+     * when it changes. The backend (hermes acp, spawned by this extension)
+     * reads config.yaml only at init, so a direct edit to that file requires a
+     * restart to take effect. This makes `config.yaml` edits "just work":
+     * save the file in any editor and the agent subprocess is recycled within
+     * a debounce window, picking up the new configuration.
+     *
+     * A guard prevents re-entrancy while a restart is already in flight, and
+     * the watch is debounced (editors often emit multiple events per save).
+     */
+    private _startConfigWatcher(): void {
+        if (this._configWatcher) return;
+        const home = process.env.HERMES_HOME?.trim() || resolveDefaultHermesHome();
+        const configPath = path.join(home, 'config.yaml');
+        try {
+            if (!fs.existsSync(configPath)) return;
+        } catch {
+            return;
+        }
+
+        let debounce: ReturnType<typeof setTimeout> | undefined;
+        const onChange = (): void => {
+            if (debounce) clearTimeout(debounce);
+            debounce = setTimeout(() => {
+                this._log(`Detected change to ${configPath} — reloading Hermes backend`);
+                void this._handleReloadConfig();
+            }, 800);
+        };
+
+        try {
+            this._configWatcher = fs.watch(configPath, onChange);
+            this._configWatcher.on('error', () => {
+                // Filesystem watch can fail (e.g. file replaced by editor save).
+                // Best-effort: stop watching; a manual "Reload Hermes Config"
+                // command remains available via the Reload submenu.
+                this._stopConfigWatcher();
+            });
+        } catch {
+            // Watch unsupported on this platform/file — manual command still works.
+        }
+    }
+
+    private _stopConfigWatcher(): void {
+        if (this._configWatchTimer) {
+            clearTimeout(this._configWatchTimer);
+            this._configWatchTimer = undefined;
+        }
+        if (this._configWatcher) {
+            try {
+                this._configWatcher.close();
+            } catch { /* ignore */ }
+            this._configWatcher = undefined;
         }
     }
 

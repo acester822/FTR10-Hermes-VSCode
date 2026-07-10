@@ -2180,6 +2180,16 @@ body {
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
     pointer-events: none;
 }
+.file-preview-tooltip.fp-image-tip {
+    max-width: min(560px, 92vw);
+    max-height: 70vh;
+    background: var(--vscode-editor-background, #1e1e1e);
+}
+.file-preview-tooltip .fp-image {
+    display: block;
+    max-width: 100%;
+    height: auto;
+}
 .file-preview-tooltip .fp-header {
     padding: 6px 10px;
     font-size: 11px;
@@ -3178,6 +3188,37 @@ body {
     color: var(--error);
     background: color-mix(in srgb, var(--error) 15%, transparent);
 }
+.file-chip {
+    background: color-mix(in srgb, var(--accent, var(--primary)) 12%, transparent);
+}
+.file-icon {
+    font-size: 14px;
+    line-height: 1;
+    flex: 0 0 auto;
+}
+.message-files {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 8px;
+}
+.message-file-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px;
+    border: 1px solid color-mix(in srgb, var(--border) 50%, transparent);
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--accent, var(--primary)) 10%, transparent);
+}
+.message-file-chip .file-name {
+    font-size: 11px;
+    color: var(--text-dim);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 160px;
+}
 .message-images {
     display: flex;
     flex-wrap: wrap;
@@ -3196,11 +3237,11 @@ body {
     height: auto;
     cursor: zoom-in;
 }
-.input-composite-shell.drag-over-image {
+.input-composite-shell.drag-over-file {
     outline: 2px dashed color-mix(in srgb, var(--primary) 70%, transparent);
     outline-offset: 2px;
     border-radius: 12px;
-    box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary) 18%, transparent);
+    box-shadow:0 0 0 4px color-mix(in srgb, var(--primary) 18%, transparent);
 }
 .input-composite-shell.waiting {
     animation: input-border-glow 1.8s ease-in-out infinite;
@@ -3714,6 +3755,58 @@ mark.search-mark-active {
 }
 .input-quick-actions .icon-btn.copied {
     color: var(--primary);
+}
+
+/* Session header bar (under the title/tab bar): shows session name + #,
+   and hosts the context-usage meter and Quick Actions trigger. */
+.session-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 4px 10px;
+    border-bottom: 1px solid var(--border);
+    background: var(--glass-bg, transparent);
+    min-height: 28px;
+}
+.session-header[hidden] {
+    display: none;
+}
+.session-header-info {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    min-width: 0;
+    overflow: hidden;
+}
+.session-header-name {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--fg);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.session-header-idx {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--dim);
+    font-variant-numeric: tabular-nums;
+    flex-shrink: 0;
+}
+.session-header-idx[hidden] {
+    display: none;
+}
+.session-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+}
+/* Quick Actions trigger lives in the header now; match its sizing there. */
+.session-header .input-quick-trigger {
+    width: 22px;
+    height: 22px;
 }
 .input-quick-actions .icon-btn svg {
     width: 16px;

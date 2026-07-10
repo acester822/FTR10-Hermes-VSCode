@@ -812,7 +812,7 @@ export class AcpClient {
             this._sessionStarting = false;
         }
     }
-    async sendMessage(text: string, images?: { data: string; mimeType: string }[]): Promise<void> {
+    async sendMessage(text: string, images?: { data: string; mimeType: string }[], files?: { name: string; mimeType: string; text: string }[]): Promise<void> {
         if (this._status !== 'ready') {
             this._onMessage('assistant', 'Please wait for connection...');
             return;
@@ -838,6 +838,22 @@ export class AcpClient {
             for (const img of images) {
                 if (img.data && img.mimeType) {
                     blocks.push({ type: 'image', data: img.data, mimeType: img.mimeType });
+                }
+            }
+        }
+        // Non-image files (code/text) dropped on the composer are forwarded as
+        // ACP `resource` (text) blocks so the model can read their contents.
+        if (files && files.length) {
+            for (const f of files) {
+                if (f.text) {
+                    blocks.push({
+                        type: 'resource',
+                        resource: {
+                            uri: 'file:///' + f.name,
+                            text: f.text,
+                            mimeType: f.mimeType || 'text/plain',
+                        },
+                    });
                 }
             }
         }
