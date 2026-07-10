@@ -2627,8 +2627,14 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
             return;
         }
         try {
-            const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(filePath));
-            await vscode.window.showTextDocument(doc, { preview: false });
+            // Open in the main editor's native image viewer (zoomable, like a
+            // double-clicked image) rather than as a text document that would
+            // render the binary bytes as garbage.
+            await vscode.commands.executeCommand(
+                'vscode.open',
+                vscode.Uri.file(filePath),
+                { preview: false }
+            );
         } catch {
             vscode.window.showWarningMessage(t('couldNotOpenFile', filePath));
         }
