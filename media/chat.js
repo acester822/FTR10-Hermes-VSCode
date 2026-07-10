@@ -14,6 +14,9 @@
     const clearChatBtn = document.getElementById('clearChatBtn');
     const clearInputBtn = document.getElementById('clearInputBtn');
     const copySessionBtn = document.getElementById('copySessionBtn');
+    const copySessionCaret = document.getElementById('copySessionCaret');
+    const copySessionPicker = document.getElementById('copySessionPicker');
+    const copySessionDropdown = document.getElementById('copySessionDropdown');
     const downloadSessionBtn = document.getElementById('downloadSessionBtn');
     const quickActionsTrigger = document.getElementById('quickActionsTrigger');
     const attachImageBtn = document.getElementById('attachImageBtn');
@@ -816,6 +819,16 @@
             copySessionBtn.title = locale.copySession;
             copySessionBtn.setAttribute('aria-label', locale.copySession);
         }
+        if (copySessionCaret) {
+            copySessionCaret.title = locale.copySessionOptions || locale.copySession;
+            copySessionCaret.setAttribute('aria-label', locale.copySessionOptions || locale.copySession);
+        }
+        const copySessionDropdownHeader = document.getElementById('copySessionDropdownHeader');
+        if (copySessionDropdownHeader) copySessionDropdownHeader.textContent = locale.copySessionAs || locale.copySession;
+        document.querySelectorAll('#copySessionDropdown [data-locale]').forEach(function(el) {
+            const key = el.getAttribute('data-locale');
+            if (key && locale[key]) el.textContent = locale[key];
+        });
         if (downloadSessionBtn) {
             downloadSessionBtn.title = locale.downloadSession;
             downloadSessionBtn.setAttribute('aria-label', locale.downloadSession);
@@ -3612,25 +3625,13 @@ function parseToolCallText(text) {
     const SELECT_ICON_SVG = '<svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M2 2.5a.5.5 0 0 1 .5-.5h2a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-.5.5h-2a.5.5 0 0 1-.5-.5v-2zm0 4.5a.5.5 0 0 1 .5-.5h2a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-.5.5h-2a.5.5 0 0 1-.5-.5V7zm0 4.5a.5.5 0 0 1 .5-.5h2a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-.5.5h-2a.5.5 0 0 1-.5-.5v-2z"/><path d="M3.15 4.85l.7-.7 1 1 2-2 .7.7-2.7 2.7-1.7-1.7z"/><path d="M3.15 9.35l.7-.7 1 1 2-2 .7.7-2.7 2.7-1.7-1.7z"/><path d="M7.5 3h6a.5.5 0 0 1 0 1h-6a.5.5 0 0 1 0-1zm0 4.5h6a.5.5 0 0 1 0 1h-6a.5.5 0 0 1 0-1zm0 4.5h6a.5.5 0 0 1 0 1h-6a.5.5 0 0 1 0-1z"/></svg>';
     const CHEVRON_DOWN_SVG = '<svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M4.5 6 8 9.5 11.5 6l.7.7L8 10.9l-4.2-4.2.7-.7z"/></svg>';
 
+    // All clipboard writes go through the extension host bridge. VS Code
+    // webviews do not reliably expose navigator.clipboard, so the webview
+    // posts the text to HermesChatProvider, which calls
+    // vscode.env.clipboard.writeText on the extension host.
     function copyToClipboard(text) {
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-            return navigator.clipboard.writeText(text).catch(function() {
-                fallbackCopyToClipboard(text);
-            });
-        }
-        fallbackCopyToClipboard(text);
+        vscode.postMessage({ type: 'clipboardWrite', text: text || '' });
         return Promise.resolve();
-    }
-
-    function fallbackCopyToClipboard(text) {
-        const ta = document.createElement('textarea');
-        ta.value = text;
-        ta.style.position = 'fixed';
-        ta.style.left = '-9999px';
-        document.body.appendChild(ta);
-        ta.select();
-        document.execCommand('copy');
-        document.body.removeChild(ta);
     }
 
     function updateQuickActionBtns() {
@@ -3638,6 +3639,13 @@ function parseToolCallText(text) {
         const hasInput = !!inputEl.value.trim();
         if (clearChatBtn) clearChatBtn.disabled = !hasMessages;
         if (copySessionBtn) copySessionBtn.disabled = !hasMessages;
+        if (copySessionCaret) {
+            copySessionCaret.disabled = !hasMessages;
+            if (!hasMessages && copySessionDropdown) {
+                copySessionDropdown.style.display = 'none';
+                if (copySessionPicker) copySessionPicker.classList.remove('is-open');
+            }
+        }
         if (downloadSessionBtn) downloadSessionBtn.disabled = !hasMessages;
         if (clearInputBtn) clearInputBtn.disabled = !hasInput;
         if (chatSearchInput) chatSearchInput.disabled = !hasMessages;
@@ -4152,13 +4160,14 @@ function parseToolCallText(text) {
         });
     }
 
-    function requestSessionExport(action, indices, sessionId) {
+    function requestSessionExport(action, indices, sessionId, format) {
         const sid = sessionId || lastActiveSessionId;
         if (!sid) return;
         vscode.postMessage({
             type: 'sessionExport',
             sessionId: sid,
             action: action,
+            format: format || 'markdown',
             indices: indices && indices.length ? indices : undefined,
         });
     }
@@ -5270,11 +5279,57 @@ function parseToolCallText(text) {
         });
     }
 
+    // ---- Copy Current Session picker (Markdown / JSON) ----
+    function closeCopySessionDropdown() {
+        if (!copySessionDropdown) return;
+        copySessionDropdown.style.display = 'none';
+        if (copySessionPicker) copySessionPicker.classList.remove('is-open');
+    }
+
+    function openCopySessionDropdown() {
+        if (!copySessionDropdown || !copySessionBtn || copySessionBtn.disabled) return;
+        copySessionDropdown.style.display = 'block';
+        if (copySessionPicker) copySessionPicker.classList.add('is-open');
+    }
+
+    function toggleCopySessionDropdown() {
+        if (!copySessionDropdown) return;
+        if (copySessionDropdown.style.display === 'block') {
+            closeCopySessionDropdown();
+        } else {
+            openCopySessionDropdown();
+        }
+    }
+
+    function doCopySession(format) {
+        if (!copySessionBtn || copySessionBtn.disabled) return;
+        requestSessionExport('copy', undefined, undefined, format);
+        flashQuickActionBtn(copySessionBtn);
+        closeCopySessionDropdown();
+    }
+
     if (copySessionBtn) {
         copySessionBtn.addEventListener('click', function() {
             if (copySessionBtn.disabled) return;
-            requestSessionExport('copy');
-            flashQuickActionBtn(copySessionBtn);
+            doCopySession('markdown');
+        });
+    }
+    if (copySessionCaret) {
+        copySessionCaret.addEventListener('click', function(e) {
+            e.stopPropagation();
+            if (copySessionCaret.disabled) return;
+            toggleCopySessionDropdown();
+        });
+    }
+    if (copySessionDropdown) {
+        copySessionDropdown.addEventListener('click', function(e) {
+            e.stopPropagation();
+            const item = e.target.closest('.dropdown-item');
+            if (!item) return;
+            const fmt = item.getAttribute('data-format');
+            if (fmt === 'json' || fmt === 'markdown') {
+                doCopySession(fmt);
+            }
         });
     }
 
@@ -5592,6 +5647,8 @@ function parseToolCallText(text) {
         if (contextAttachDropdown) contextAttachDropdown.style.display = 'none';
         if (permissionModeDropdownEl) permissionModeDropdownEl.style.display = 'none';
         if (reasoningEffortDropdownEl) reasoningEffortDropdownEl.style.display = 'none';
+        if (copySessionDropdown) copySessionDropdown.style.display = 'none';
+        if (copySessionPicker) copySessionPicker.classList.remove('is-open');
         hideContextAttachTooltip();
         hideContextAttachPreview();
     }
@@ -6764,10 +6821,18 @@ function parseToolCallText(text) {
                 break;
 
             case 'sessionExport':
-                if (msg.action === 'copy' && msg.markdown) {
-                    copyToClipboard(msg.markdown);
-                } else if (msg.action === 'export' && msg.markdown) {
-                    downloadSessionMarkdown(msg.markdown, msg.filename);
+                if (msg.action === 'copy') {
+                    if (msg.format === 'json' && msg.json) {
+                        copyToClipboard(msg.json);
+                    } else if (msg.markdown) {
+                        copyToClipboard(msg.markdown);
+                    }
+                } else if (msg.action === 'export') {
+                    const isJson = msg.format === 'json';
+                    const content = isJson ? (msg.json || '') : (msg.markdown || '');
+                    if (content) {
+                        downloadSessionMarkdown(content, msg.filename);
+                    }
                 }
                 break;
 

@@ -147,6 +147,40 @@
             <button type="button" id="multiSelectExitBtn" class="ms-exit"></button>
         </div>
     </div>
+    <div class="input-quick-popup" id="inputQuickPanel" aria-hidden="true">
+        <div class="input-quick-popup-inner">
+            <div class="input-quick-toolbar">
+                <div class="chat-search">
+                    <svg class="chat-search-icon" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M6.5 1a5.5 5.5 0 1 1 0 11 5.5 5.5 0 0 1 0-11zm0 1.5a4 4 0 1 0 0 8 4 4 0 0 0 0-8zm5.03 8.47 2.5 2.5-.7.7-2.5-2.5.7-.7z"/></svg>
+                    <input type="search" id="chatSearchInput" disabled autocomplete="off" spellcheck="false">
+                    <div class="chat-search-meta">
+                        <span class="chat-search-count" id="chatSearchCount"></span>
+                        <button type="button" class="chat-search-nav" id="chatSearchPrev" disabled>↑</button>
+                        <button type="button" class="chat-search-nav" id="chatSearchNext" disabled>↓</button>
+                    </div>
+                </div>
+                <div class="input-quick-actions">
+                <div class="copy-session-picker" id="copySessionPicker">
+                    <button type="button" id="copySessionBtn" class="icon-btn" disabled>
+                        <svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M4 2h8a1 1 0 0 1 1 1v1h1a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-1H4a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1h0zm1 2v8h8V5H5zm-2 2h1v6h6v1H4a1 1 0 0 1-1-1V6h0z"/></svg>
+                    </button>
+                    <button type="button" id="copySessionCaret" class="icon-btn copy-session-caret" disabled aria-label="Copy options" title="Copy options">
+                        <svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M4.5 6 8 9.5 11.5 6l.7.7L8 10.9l-4.2-4.2.7-.7z"/></svg>
+                    </button>
+                    <div class="dropdown copy-session-dropdown" id="copySessionDropdown" style="display:none">
+                        <div class="dropdown-header" id="copySessionDropdownHeader"></div>
+                        <div class="dropdown-item" data-format="markdown">
+                            <span class="model-name" data-locale="copyAsMarkdown"></span>
+                        </div>
+                        <div class="dropdown-item" data-format="json">
+                            <span class="model-name" data-locale="copyAsJson"></span>
+                        </div>
+                    </div>
+                </div>
+                </div>
+            </div>
+        </div>
+    </div>
      <div class="input-composite-wrap">
          <div class="diff-review-bar" id="diffReviewBar" hidden>
              <div class="diff-review-info">

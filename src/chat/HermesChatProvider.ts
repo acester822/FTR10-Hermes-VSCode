@@ -356,7 +356,10 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
                     this._handleTogglePinSession(message.sessionId);
                     break;
                 case 'sessionExport':
-                    this._handleSessionExport(message.sessionId, message.action, message.indices);
+                    this._handleSessionExport(message.sessionId, message.action, message.indices, message.format);
+                    break;
+                case 'clipboardWrite':
+                    void this._handleClipboardWrite(message.text || '');
                     break;
                 case 'switchAgent':
                     this._handleSwitchAgent(message.agentName);
@@ -3029,7 +3032,7 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
         this._postSessionList();
     }
 
-    private _handleSessionExport(sessionId: string, action: unknown, indices?: unknown): void {
+    private _handleSessionExport(sessionId: string, action: unknown, indices?: unknown, format?: unknown): void {
         if (action !== 'copy' && action !== 'export') {
             return;
         }
@@ -3046,12 +3049,28 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
             );
             messages = messages.filter((_, index) => pick.has(index));
         }
-        const payload = this._buildSessionExportPayload(session, messages);
+        const exportFormat = format === 'json' ? 'json' : 'markdown';
+        const payload = this._buildSessionExportPayload(session, messages, exportFormat);
         this._postMessage({
             type: 'sessionExport',
             action,
             ...payload,
         });
+    }
+
+    /**
+     * Host bridge for clipboard writes. The webview cannot reliably access
+     * `navigator.clipboard` (it is often unavailable inside VS Code webviews),
+     * so all copy operations post a `clipboardWrite` message here and we use
+     * the extension host's `vscode.env.clipboard.writeText`, which works
+     * regardless of webview sandboxing.
+     */
+    private async _handleClipboardWrite(text: string): Promise<void> {
+        try {
+            await vscode.env.clipboard.writeText(text);
+        } catch (err) {
+            this._log('Failed to write to clipboard: ' + (err instanceof Error ? err.message : String(err)));
+        }
     }
 
     private _loadSessionMessagesFromDisk(sessionId: string): ChatMessage[] {
@@ -3067,16 +3086,36 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
         }
     }
 
-    private _buildSessionExportPayload(session: SessionInfo, messages: ChatMessage[]): {
+    private _buildSessionExportPayload(
+        session: SessionInfo,
+        messages: ChatMessage[],
+        format: 'markdown' | 'json' = 'markdown'
+    ): {
         sessionId: string;
         title: string;
         markdown: string;
+        json: string;
+        format: 'markdown' | 'json';
         filename: string;
     } {
         const loc = getWebviewLocale();
         const title = session.title || t('newChat');
         const model = session.modelLabel || session.modelId || this._modelState?.currentLabel || '—';
         const exportedAt = new Date();
+        const exportedMessages = messages
+            .filter(m => (m.text || '').trim().length > 0)
+            .map(m => ({ role: m.role, text: m.text }));
+        const json = JSON.stringify(
+            {
+                sessionId: session.id,
+                title,
+                model,
+                exportedAt: exportedAt.toISOString(),
+                messages: exportedMessages,
+            },
+            null,
+            2
+        );
         const header = [
             `# ${title}`,
             `> ${formatLocaleString(loc.sessionExportSessionId, session.id)}`,
@@ -3089,7 +3128,9 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
             sessionId: session.id,
             title,
             markdown: body ? `${header}\n${body}` : header,
-            filename: `${this._sanitizeExportFilename(title)}-${this._formatExportDateFilename(exportedAt)}.md`,
+            json,
+            format,
+            filename: `${this._sanitizeExportFilename(title)}-${this._formatExportDateFilename(exportedAt)}.${format === 'json' ? 'json' : 'md'}`,
         };
     }
 

@@ -155,6 +155,10 @@ export interface LocaleStrings {
     clearChat: string;
     clearInput: string;
     copySession: string;
+    copySessionOptions: string;
+    copySessionAs: string;
+    copyAsMarkdown: string;
+    copyAsJson: string;
     quickActions: string;
     quickActionsExpand: string;
     quickActionsCollapse: string;
