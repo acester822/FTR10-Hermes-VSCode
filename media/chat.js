@@ -4317,15 +4317,29 @@ function parseToolCallText(text) {
                         // Magnifying-glass affordance: opening the attachment in
                         // the main editor gives a full-size, zoomable view.
                         im.title = locale.openImageInEditor || 'Open in editor';
-                        im.addEventListener('click', function () {
+                        // '+' magnifier overlay shown on hover; clicking it (or the
+                        // image) opens the image in the main VS Code editor window.
+                        const mag = document.createElement('button');
+                        mag.type = 'button';
+                        mag.className = 'image-magnifier';
+                        mag.setAttribute('aria-label', locale.openImageInEditor || 'Open in editor');
+                        mag.textContent = '🔍';
+                        const openInEditor = function () {
                             vscode.postMessage({
                                 type: 'openImage',
                                 name: img.name || 'image',
                                 mimeType: img.mimeType,
                                 data: img.data,
                             });
+                        };
+                        mag.addEventListener('click', function (e) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            openInEditor();
                         });
+                        im.addEventListener('click', openInEditor);
                         wrap.appendChild(im);
+                        wrap.appendChild(mag);
                         gallery.appendChild(wrap);
                     });
                     if (gallery.childElementCount) {

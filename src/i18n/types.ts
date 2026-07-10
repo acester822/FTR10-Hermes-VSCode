@@ -12,6 +12,10 @@ export interface LocaleStrings {
     modelPreferenceSaved: string;
     hermesNotConnected: string;
     couldNotOpenFile: string;
+    openImageInEditor: string;
+    imageNoData: string;
+    imageReadError: string;
+    imageWriteError: string;
     hermesNotConnectedConnecting: string;
     fileAccessDenied: string;
     fileReadError: string;
