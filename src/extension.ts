@@ -146,6 +146,7 @@ export function activate(context: vscode.ExtensionContext) {
 
     bindChatCommand(context, 'hermes.reloadExtension', provider => provider.reloadExtension());
     bindChatCommand(context, 'hermes.reloadSession', provider => provider.reloadSession());
+    bindChatCommand(context, 'hermes.reloadConfig', provider => provider.reloadConfig());
     bindChatCommand(context, 'hermes.openSettings', provider => provider.openSettings());
     bindChatCommand(context, 'hermes.checkUpdate', provider => provider.checkForUpdate());
     bindChatCommand(context, 'hermes.openAbout', provider => provider.openAbout());

@@ -132,6 +132,11 @@
         "icon": "$(refresh)"
       },
       {
+        "command": "hermes.reloadConfig",
+        "title": "%commands.hermes.reloadConfig.title%",
+        "icon": "$(sync)"
+      },
+      {
         "command": "hermes.openSettings",
         "title": "%commands.hermes.openSettings.title%",
         "icon": "$(gear)"
@@ -179,18 +184,8 @@
     ],
     "submenus": [
       {
-        "id": "hermes.reloadMenu",
-        "label": "%submenus.hermes.reloadMenu.label%",
-        "icon": "$(refresh)"
-      },
-      {
-        "id": "hermes.envMenu",
-        "label": "%submenus.hermes.envMenu.label%",
-        "icon": "$(wrench)"
-      },
-      {
-        "id": "hermes.moreMenu",
-        "label": "%submenus.hermes.moreMenu.label%",
+        "id": "hermes.quickActions",
+        "label": "%submenus.hermes.quickActions.label%",
         "icon": "$(ellipsis)"
       }
     ],
@@ -217,56 +212,58 @@
           "group": "navigation@2"
         },
         {
+          "command": "hermes.reloadConfig",
+          "when": "view == hermesChat",
+          "group": "navigation@3"
+        },
+        {
           "command": "hermes.reloadExtension",
           "when": "view == hermesChat",
           "group": "navigation@4"
-        }
-      ],
-      "hermes.envMenu": [
+        },
         {
-          "command": "hermes.configureEnvironment",
-          "when": "!hermesDetectInProgress",
-          "group": "1@2"
+          "submenu": "hermes.quickActions",
+          "when": "view == hermesChat",
+          "group": "navigation@9"
         }
       ],
-      "hermes.reloadMenu": [
+      "hermes.quickActions": [
         {
           "command": "hermes.reloadExtension",
           "group": "1@1"
         },
         {
-          "command": "hermes.reloadSession",
+          "command": "hermes.reloadConfig",
           "group": "1@2"
-        }
-      ],
-      "hermes.moreMenu": [
-        {
-          "command": "hermes.openControlCenter",
-          "group": "0@0"
-        },
-        {
-          "command": "hermes.openSettings",
-          "group": "1@1"
-        },
-        {
-          "command": "hermes.checkUpdate",
-          "group": "1@2"
-        },
-        {
-          "command": "hermes.openAbout",
-          "group": "2@1"
-        },
-        {
-          "command": "hermes.openHelp",
-          "group": "2@2"
-        },
-        {
-          "command": "hermes.openFaq",
-          "group": "2@3"
         },
         {
           "command": "hermes.openLogs",
+          "group": "2@1"
+        },
+        {
+          "command": "hermes.openSettings",
+          "group": "2@2"
+        },
+        {
+          "command": "hermes.checkUpdate",
           "group": "3@1"
+        },
+        {
+          "command": "hermes.configureEnvironment",
+          "when": "!hermesDetectInProgress",
+          "group": "3@2"
+        },
+        {
+          "command": "hermes.openAbout",
+          "group": "4@1"
+        },
+        {
+          "command": "hermes.openHelp",
+          "group": "4@2"
+        },
+        {
+          "command": "hermes.openFaq",
+          "group": "4@3"
         }
       ],
       "editor/context": [

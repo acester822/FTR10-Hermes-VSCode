@@ -13,3 +13,5 @@ yarn.lock
 pnpm-lock.yaml
 bun.lock
 bun.lockb
+# Kanban/worker worktrees (ephemeral, already merged into history)
+.worktrees/

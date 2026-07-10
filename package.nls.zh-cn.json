@@ -8,6 +8,7 @@
   "commands.hermes.sendSelection.title": "Hermes：将选中内容插入聊天",
   "commands.hermes.reloadExtension.title": "重新加载插件",
   "commands.hermes.reloadSession.title": "重新加载当前会话",
+  "commands.hermes.reloadConfig.title": "重新加载 Hermes 配置（重启后端）",
   "commands.hermes.openSettings.title": "配置",
   "commands.hermes.checkUpdate.title": "检查更新",
   "commands.hermes.openAbout.title": "关于",
@@ -17,9 +18,7 @@
   "commands.hermes.detectEnvironment.title": "环境检测",
   "commands.hermes.detectEnvironmentBusy.title": "环境检测中....",
   "commands.hermes.configureEnvironment.title": "环境配置",
-  "submenus.hermes.envMenu.label": "环境",
-  "submenus.hermes.reloadMenu.label": "重载",
-  "submenus.hermes.moreMenu.label": "更多",
+  "submenus.hermes.quickActions.label": "快捷操作",
   "configuration.title": "FTR10 Hermes VSCode",
   "configuration.hermes.path.description": "Hermes 可执行文件路径。留空则自动检测。",
   "configuration.hermes.cwd.description": "Hermes 会话的工作目录。默认为工作区根目录。",
@@ -34,5 +33,12 @@
   "configuration.hermes.models.markdownDescription": "当 Agent 未返回带模型选择器的 `configOptions` 时使用。示例：\n```json\n[\n  { \"id\": \"claude-sonnet\", \"name\": \"Claude Sonnet\" },\n  { \"id\": \"gpt-4o\", \"name\": \"GPT-4o\" }\n]\n```",
   "configuration.hermes.defaultModel.description": "hermes.models 中的默认模型 id（仅备用列表）。",
   "configuration.hermes.agents.description": "用于在聊天界面快速切换的命名 Agent 配置列表。",
-  "configuration.hermes.agents.markdownDescription": "用于快速切换的命名 Agent 配置。每个 Agent 可有不同的 `path`、`profile` 和 `cwd`。示例：\n```json\n[\n  { \"name\": \"Default\", \"profile\": \"\" },\n  { \"name\": \"Fast\", \"path\": \"/path/to/hermes\", \"profile\": \"fast\" }\n]\n```"
+  "configuration.hermes.agents.markdownDescription": "用于快速切换的命名 Agent 配置。每个 Agent 可有不同的 `path`、`profile` 和 `cwd`。示例：\n```json\n[\n  { \"name\": \"Default\", \"profile\": \"\" },\n  { \"name\": \"Fast\", \"path\": \"/path/to/hermes\", \"profile\": \"fast\" }\n]\n```",
+  "configuration.hermes.reasoningEffort.description": "Agent 的推理强度（思考深度），推送到运行中的 Hermes 后端。",
+  "configuration.hermes.reasoningEffort.none.description": "不推理 — 最快，用于简单任务。",
+  "configuration.hermes.reasoningEffort.minimal.description": "最小推理开销。",
+  "configuration.hermes.reasoningEffort.low.description": "较低推理强度。",
+  "configuration.hermes.reasoningEffort.medium.description": "均衡推理（默认）。",
+  "configuration.hermes.reasoningEffort.high.description": "较高推理强度，用于更难的任务。",
+  "configuration.hermes.reasoningEffort.xhigh.description": "最大推理强度 — 最慢，但最深。"
 }
