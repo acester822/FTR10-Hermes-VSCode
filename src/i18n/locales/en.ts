@@ -155,6 +155,7 @@ export const en: LocaleStrings = {
     copySessionAs: 'Copy as',
     copyAsMarkdown: 'Copy as Markdown',
     copyAsJson: 'Copy as JSON',
+    downloadSession: 'Download current session',
     quickActions: 'Quick actions',
     quickActionsExpand: 'Expand quick actions',
     quickActionsCollapse: 'Collapse quick actions',

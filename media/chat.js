@@ -5333,6 +5333,14 @@ function parseToolCallText(text) {
         });
     }
 
+    if (downloadSessionBtn) {
+        downloadSessionBtn.addEventListener('click', function() {
+            if (downloadSessionBtn.disabled) return;
+            requestSessionExport('export');
+            flashQuickActionBtn(downloadSessionBtn);
+        });
+    }
+
     cancelBtn.addEventListener('click', function() {
         vscode.postMessage({ type: 'cancel' });
     });
