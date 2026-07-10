@@ -3122,6 +3122,86 @@ body {
     padding: 3px 4px 3px;
     border-top: 1px solid color-mix(in srgb, var(--border) 40%, transparent);
 }
+.attach-image-btn {
+    margin-right: auto;
+}
+.attach-image-btn svg {
+    width: 16px;
+    height: 16px;
+}
+.attach-preview-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 6px 8px 0;
+}
+.attach-preview-row[hidden] {
+    display: none;
+}
+.attach-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    max-width: 180px;
+    padding: 3px 4px 3px 3px;
+    background: color-mix(in srgb, var(--surface-2) 80%, transparent);
+    border: 1px solid color-mix(in srgb, var(--border) 50%, transparent);
+    border-radius: 8px;
+}
+.attach-thumb {
+    width: 28px;
+    height: 28px;
+    object-fit: cover;
+    border-radius: 5px;
+    flex: 0 0 auto;
+}
+.attach-name {
+    font-size: 11px;
+    color: var(--text-dim);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 110px;
+}
+.attach-remove {
+    flex: 0 0 auto;
+    border: none;
+    background: transparent;
+    color: var(--text-dim);
+    font-size: 15px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0 2px;
+    border-radius: 4px;
+}
+.attach-remove:hover {
+    color: var(--error);
+    background: color-mix(in srgb, var(--error) 15%, transparent);
+}
+.message-images {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 8px;
+}
+.message-image-wrap {
+    max-width: 240px;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid color-mix(in srgb, var(--border) 50%, transparent);
+}
+.message-image {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    cursor: zoom-in;
+}
+.input-composite-shell.drag-over-image {
+    outline: 2px dashed color-mix(in srgb, var(--primary) 70%, transparent);
+    outline-offset: 2px;
+    border-radius: 12px;
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary) 18%, transparent);
+}
 .input-composite-shell.waiting {
     animation: input-border-glow 1.8s ease-in-out infinite;
 }

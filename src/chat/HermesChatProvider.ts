@@ -53,6 +53,16 @@ interface StoredPermissionOption {
     kind?: string;
 }
 
+/** An image attached to a user message (base64-encoded, sent to the model for vision). */
+export interface ChatImage {
+    /** base64-encoded image payload (no data: prefix). */
+    data: string;
+    /** MIME type, e.g. image/png. */
+    mimeType: string;
+    /** Original file name, purely for display. */
+    name: string;
+}
+
 interface ChatMessage {
     role: string;
     text: string;
@@ -67,6 +77,8 @@ interface ChatMessage {
     outcome?: 'selected' | 'cancelled';
     selectedOptionId?: string;
     selectedLabel?: string;
+    /** Images attached by the user, forwarded to a vision-capable model. */
+    images?: ChatImage[];
 }
 
 interface SessionInfo {
@@ -264,7 +276,7 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
         webviewView.webview.onDidReceiveMessage((message) => {
             switch (message.type) {
                 case 'sendMessage':
-                    this._enqueueChatOp(() => this._handleUserMessage(message.text, message.contextAttach));
+                    this._enqueueChatOp(() => this._handleUserMessage(message.text, message.contextAttach, message.images));
                     break;
                 case 'cancel':
                     // Cancel must not wait behind an in-flight sendMessage; AcpClient
@@ -680,8 +692,14 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
         this._postMessage({ type: 'markSessionReset' });
     }
 
-    private _saveMessage(role: string, text: string, toolCallId?: string): void {
-        this._sessionMessages.push({ role, text, timestamp: Date.now(), toolCallId });
+    private _saveMessage(role: string, text: string, toolCallId?: string, images?: ChatImage[]): void {
+        const entry: ChatMessage = { role, text, timestamp: Date.now(), toolCallId };
+        if (images && images.length) {
+            // Strip the base64 payload for on-disk history to keep the JSON small;
+            // we keep name/mime so the UI can still show attachment chips.
+            entry.images = images.map(img => ({ name: img.name, mimeType: img.mimeType, data: '' }));
+        }
+        this._sessionMessages.push(entry);
         this._persistMessages();
     }
 
@@ -2329,7 +2347,7 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
         vscode.window.showWarningMessage(t('hermesNotConnected'));
     }
 
-    private async _handleUserMessage(text: string, contextAttach?: ContextAttachOption): Promise<void> {
+    private async _handleUserMessage(text: string, contextAttach?: ContextAttachOption, images?: ChatImage[]): Promise<void> {
         const epoch = this._sendEpoch;
         await this._awaitSessionReady();
         if (epoch !== this._sendEpoch) {
@@ -2344,7 +2362,7 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
         this._log(`User message: ${text.slice(0, 80)}`);
         this._snapshotSessionModelFromProfile();
         this._promptSessionId = this._sessionId;
-        this._saveMessage('user', text);
+        this._saveMessage('user', text, undefined, images);
         this._markSessionAgentEngaged();
         if (this._contextAttachActive) {
             this._contextAttachAwaitingReply = true;
@@ -2357,7 +2375,7 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
         if (epoch !== this._sendEpoch) {
             return;
         }
-        await this._acp?.sendMessage(promptText);
+        await this._acp?.sendMessage(promptText, images);
     }
 
     private async _handleCancel(): Promise<void> {

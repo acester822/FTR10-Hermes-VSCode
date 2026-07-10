@@ -15,7 +15,10 @@
     const clearInputBtn = document.getElementById('clearInputBtn');
     const copySessionBtn = document.getElementById('copySessionBtn');
     const quickActionsTrigger = document.getElementById('quickActionsTrigger');
-    const inputQuickPanel = document.getElementById('inputQuickPanel');
+    const attachImageBtn = document.getElementById('attachImageBtn');
+    const imageFileInput = document.getElementById('imageFileInput');
+    const attachPreviewRow = document.getElementById('attachPreviewRow');
+    inputQuickPanel = document.getElementById('inputQuickPanel');
     const chatSearchInput = document.getElementById('chatSearchInput');
     const chatSearchCount = document.getElementById('chatSearchCount');
     const chatSearchPrev = document.getElementById('chatSearchPrev');
@@ -1026,6 +1029,8 @@
     let thoughtMsgId = null;
     let canSend = false;
     let isPrompting = false;
+    /** Images queued for the next send. Each: { name, mimeType, data(base64) }. */
+    let pendingImages = [];
     let pendingSwitchSessionId = null;
     let contextAttachVisible = false;
     let contextAttachMode = 'none';
@@ -1697,8 +1702,11 @@
         hideFilePicker();
         hideSlashCommandPicker();
         resetAutoScrollFollow();
-        addMessage('user', text);
+        const imagesForSend = pendingImages.slice();
+        addMessage('user', text, { images: imagesForSend });
         inputEl.value = '';
+        pendingImages = [];
+        renderAttachPreview();
         syncInputHeightFromContent();
         updateQuickActionBtns();
         inputEl.disabled = true;
@@ -1712,8 +1720,167 @@
             type: 'sendMessage',
             text: text,
             contextAttach: payload,
+            images: imagesForSend.map(function (img) { return { name: img.name, mimeType: img.mimeType, data: img.data }; }),
         });
     }
+
+    // ---- Image attachment handling ----
+    function readImageFile(file) {
+        return new Promise(function (resolve, reject) {
+            const reader = new FileReader();
+            reader.onload = function () {
+                try {
+                    const result = reader.result;
+                    const dataUrl = typeof result === 'string' ? result : '';
+                    const comma = dataUrl.indexOf(',');
+                    if (comma === -1) { reject(new Error('bad read')); return; }
+                    const meta = dataUrl.slice(0, comma);
+                    const mimeMatch = /data:([^;]+)/.exec(meta);
+                    const mimeType = mimeMatch ? mimeMatch[1] : (file.type || 'image/png');
+                    resolve({ name: file.name, mimeType: mimeType, data: dataUrl.slice(comma + 1) });
+                } catch (e) {
+                    reject(e);
+                }
+            };
+            reader.onerror = function () { reject(reader.error || new Error('read error')); };
+            reader.readAsDataURL(file);
+        });
+    }
+
+    function addImageFiles(fileList) {
+        const files = Array.prototype.slice.call(fileList || []).filter(function (f) {
+            return f && f.type && f.type.indexOf('image/') === 0;
+        });
+        if (!files.length) return;
+        Promise.all(files.map(readImageFile)).then(function (imgs) {
+            pendingImages = pendingImages.concat(imgs);
+            renderAttachPreview();
+        }).catch(function (err) {
+            console.error('Image read failed', err);
+        });
+    }
+
+    function removePendingImage(index) {
+        pendingImages.splice(index, 1);
+        renderAttachPreview();
+    }
+
+    function renderAttachPreview() {
+        if (!attachPreviewRow) return;
+        attachPreviewRow.innerHTML = '';
+        if (!pendingImages.length) {
+            attachPreviewRow.hidden = true;
+            return;
+        }
+        attachPreviewRow.hidden = false;
+        pendingImages.forEach(function (img, idx) {
+            const chip = document.createElement('div');
+            chip.className = 'attach-chip';
+            const thumb = document.createElement('img');
+            thumb.className = 'attach-thumb';
+            thumb.src = 'data:' + img.mimeType + ';base64,' + img.data;
+            thumb.alt = img.name;
+            const name = document.createElement('span');
+            name.className = 'attach-name';
+            name.textContent = img.name;
+            name.title = img.name;
+            const remove = document.createElement('button');
+            remove.type = 'button';
+            remove.className = 'attach-remove';
+            remove.setAttribute('aria-label', 'Remove image');
+            remove.textContent = '×';
+            remove.addEventListener('click', function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                removePendingImage(idx);
+            });
+            chip.appendChild(thumb);
+            chip.appendChild(name);
+            chip.appendChild(remove);
+            attachPreviewRow.appendChild(chip);
+        });
+    }
+
+    if (attachImageBtn && imageFileInput) {
+        attachImageBtn.addEventListener('click', function (e) {
+            e.preventDefault();
+            imageFileInput.click();
+        });
+        imageFileInput.addEventListener('change', function () {
+            addImageFiles(imageFileInput.files);
+            imageFileInput.value = '';
+        });
+    }
+
+    // Paste image from clipboard
+    if (inputEl) {
+        inputEl.addEventListener('paste', function (e) {
+            const items = (e.clipboardData && e.clipboardData.items) || [];
+            const imageItems = [];
+            for (let i = 0; i < items.length; i++) {
+                if (items[i].type && items[i].type.indexOf('image/') === 0) {
+                    const f = items[i].getAsFile();
+                    if (f) imageItems.push(f);
+                }
+            }
+            if (imageItems.length) {
+                e.preventDefault();
+                addImageFiles(imageItems);
+            }
+        });
+    }
+
+    // Drag & drop image files onto the composer
+    (function wireImageDropTarget() {
+        const target = inputCompositeShellEl || inputCompositeEl || inputAreaEl;
+        if (!target) return;
+        let dragDepth = 0;
+        function hasImageFiles(dt) {
+            if (!dt) return false;
+            if (dt.items && dt.items.length) {
+                for (let i = 0; i < dt.items.length; i++) {
+                    if (dt.items[i].kind === 'file' && dt.items[i].type && dt.items[i].type.indexOf('image/') === 0) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+            return Array.prototype.some.call(dt.files || [], function (f) {
+                return f.type && f.type.indexOf('image/') === 0;
+            });
+        }
+        target.addEventListener('dragenter', function (e) {
+            if (!hasImageFiles(e.dataTransfer)) return;
+            e.preventDefault();
+            dragDepth++;
+            target.classList.add('drag-over-image');
+        });
+        target.addEventListener('dragover', function (e) {
+            if (!hasImageFiles(e.dataTransfer)) return;
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'copy';
+        });
+        target.addEventListener('dragleave', function (e) {
+            if (!hasImageFiles(e.dataTransfer) && !target.classList.contains('drag-over-image')) return;
+            dragDepth = Math.max(0, dragDepth - 1);
+            if (dragDepth === 0) {
+                target.classList.remove('drag-over-image');
+            }
+        });
+        target.addEventListener('drop', function (e) {
+            const dt = e.dataTransfer;
+            if (!dt) return;
+            const files = Array.prototype.slice.call(dt.files || []).filter(function (f) {
+                return f.type && f.type.indexOf('image/') === 0;
+            });
+            if (!files.length) return;
+            e.preventDefault();
+            dragDepth = 0;
+            target.classList.remove('drag-over-image');
+            addImageFiles(files);
+        });
+    })();
+
 
     function openSwitchSessionModal(sessionId) {
         pendingSwitchSessionId = sessionId;
@@ -4053,6 +4220,25 @@ function parseToolCallText(text) {
             group._rawText = text;
             if (role === 'user') {
                 processFileRefs(content);
+                // Render any images attached to this user message as thumbnails.
+                if (options && options.images && options.images.length) {
+                    const gallery = document.createElement('div');
+                    gallery.className = 'message-images';
+                    options.images.forEach(function (img) {
+                        if (!img || !img.mimeType || !img.data) return;
+                        const wrap = document.createElement('div');
+                        wrap.className = 'message-image-wrap';
+                        const im = document.createElement('img');
+                        im.className = 'message-image';
+                        im.src = 'data:' + img.mimeType + ';base64,' + img.data;
+                        im.alt = img.name || 'attached image';
+                        wrap.appendChild(im);
+                        gallery.appendChild(wrap);
+                    });
+                    if (gallery.childElementCount) {
+                        div.appendChild(gallery);
+                    }
+                }
             }
         }
 
@@ -4712,7 +4898,9 @@ function parseToolCallText(text) {
 
     function sendMessage() {
         const text = inputEl.value.trim();
-        if (!text || !canSend) return;
+        if (!canSend) return;
+        // Allow sending with an attached image even if the text box is empty.
+        if (!text && pendingImages.length === 0) return;
 
         executeSendMessage(text);
     }
@@ -4935,6 +5123,8 @@ function parseToolCallText(text) {
         clearInputBtn.addEventListener('click', function() {
             if (clearInputBtn.disabled) return;
             inputEl.value = '';
+            pendingImages = [];
+            renderAttachPreview();
             syncInputHeightFromContent();
             updateQuickActionBtns();
             inputEl.focus();

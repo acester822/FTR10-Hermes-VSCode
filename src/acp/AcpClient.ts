@@ -12,6 +12,7 @@ import type {
     ClientConnection
 } from '@agentclientprotocol/sdk';
 import { PROTOCOL_VERSION } from '@agentclientprotocol/sdk';
+import type { ContentBlock } from '@agentclientprotocol/sdk';
 import {
     buildModelListState,
     buildModelListStateFromHermesModels,
@@ -811,7 +812,7 @@ export class AcpClient {
             this._sessionStarting = false;
         }
     }
-    async sendMessage(text: string): Promise<void> {
+    async sendMessage(text: string, images?: { data: string; mimeType: string }[]): Promise<void> {
         if (this._status !== 'ready') {
             this._onMessage('assistant', 'Please wait for connection...');
             return;
@@ -830,9 +831,20 @@ export class AcpClient {
             return;
         }
 
+        // Build multimodal content blocks. ACP supports text + image blocks in a
+        // single prompt; vision-capable models receive the image bytes this way.
+        const blocks: Array<ContentBlock> = [{ type: 'text', text }];
+        if (images && images.length) {
+            for (const img of images) {
+                if (img.data && img.mimeType) {
+                    blocks.push({ type: 'image', data: img.data, mimeType: img.mimeType });
+                }
+            }
+        }
+
         let promptPromise: Promise<unknown>;
         try {
-            promptPromise = this._session!.prompt(text);
+            promptPromise = this._session!.prompt(blocks);
         } catch (err) {
             if (promptId === this._activePromptId) {
                 const msg = err instanceof Error ? err.message : String(err);
