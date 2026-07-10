@@ -145,8 +145,8 @@ function execCommand(
             (error, stdout, stderr) => {
                 resolve({
                     code: typeof error?.code === 'number' ? error.code : error ? 1 : 0,
-                    stdout: stdout?.toString() ?? '',
-                    stderr: stderr?.toString() ?? '',
+                    stdout: stdout ?? '',
+                    stderr: stderr ?? '',
                 });
             },
         );
@@ -202,10 +202,10 @@ export async function checkHermesAcp(
         }, ACP_CHECK_TIMEOUT_MS);
 
         proc.stdout?.on('data', (chunk: Buffer) => {
-            stdout += chunk.toString();
+            stdout += chunk.toString('utf-8');
         });
         proc.stderr?.on('data', (chunk: Buffer) => {
-            stderr += chunk.toString();
+            stderr += chunk.toString('utf-8');
         });
         proc.on('error', () => {
             clearTimeout(timer);
@@ -303,7 +303,7 @@ async function probePathLookup(
         });
         let stdout = '';
         proc.stdout?.on('data', (chunk: Buffer) => {
-            stdout += chunk.toString();
+            stdout += chunk.toString('utf-8');
         });
         proc.on('exit', (code) => {
             if (code !== 0) {
@@ -437,10 +437,10 @@ async function verifyExecutable(executable: string): Promise<{ verified: boolean
         }, VERIFY_TIMEOUT_MS);
 
         proc.stdout?.on('data', (chunk: Buffer) => {
-            stdout += chunk.toString();
+            stdout += chunk.toString('utf-8');
         });
         proc.stderr?.on('data', (chunk: Buffer) => {
-            stderr += chunk.toString();
+            stderr += chunk.toString('utf-8');
         });
         proc.on('error', () => {
             clearTimeout(timer);
@@ -791,7 +791,7 @@ async function findVerifiedHermesOnPath(): Promise<string | undefined> {
         });
         let stdout = '';
         proc.stdout?.on('data', (chunk: Buffer) => {
-            stdout += chunk.toString();
+            stdout += chunk.toString('utf-8');
         });
         proc.on('exit', (code) => {
             if (code !== 0) {

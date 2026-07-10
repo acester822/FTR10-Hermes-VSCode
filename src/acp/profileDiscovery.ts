@@ -83,10 +83,10 @@ export function runHermesCommand(executable: string, args: string[]): Promise<st
         }, 15_000);
 
         proc.stdout?.on('data', (chunk: Buffer) => {
-            stdout += chunk.toString();
+            stdout += chunk.toString('utf-8');
         });
         proc.stderr?.on('data', (chunk: Buffer) => {
-            stderr += chunk.toString();
+            stderr += chunk.toString('utf-8');
         });
         proc.on('error', (err) => {
             clearTimeout(timer);
