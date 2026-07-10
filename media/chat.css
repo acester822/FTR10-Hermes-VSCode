@@ -3757,6 +3757,83 @@ mark.search-mark-active {
     color: var(--primary);
 }
 
+.copy-session-picker {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
+}
+.copy-session-picker .icon-btn {
+    background: none;
+    border: none;
+    color: var(--dim);
+    padding: 4px;
+    border-radius: 4px;
+    cursor: pointer;
+    min-width: 28px;
+    min-height: 28px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: normal;
+}
+.copy-session-picker .icon-btn:hover:not(:disabled) {
+    color: var(--fg);
+    background: var(--text-block);
+}
+.copy-session-picker .icon-btn:disabled {
+    opacity: 0.35;
+    cursor: default;
+}
+.copy-session-picker .icon-btn.copied {
+    color: var(--primary);
+}
+.copy-session-caret {
+    min-width: 20px;
+    padding: 2px;
+}
+.copy-session-caret svg {
+    width: 12px;
+    height: 12px;
+}
+.copy-session-dropdown {
+    position: absolute;
+    top: calc(100% + 4px);
+    right: 0;
+    left: auto;
+    z-index: 100;
+    background: var(--glass-bg-elevated);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--glass-stroke);
+    box-shadow: var(--glass-shadow-md);
+    border-radius: var(--radius-md);
+    min-width: 168px;
+    overflow: hidden;
+}
+.copy-session-dropdown .dropdown-header {
+    padding: 6px 10px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    color: var(--dim);
+    border-bottom: 1px solid var(--border);
+}
+.copy-session-dropdown .dropdown-item {
+    padding: 6px 10px;
+    cursor: pointer;
+    font-size: 12px;
+    border-bottom: 1px solid var(--border);
+}
+.copy-session-dropdown .dropdown-item:last-child {
+    border-bottom: none;
+}
+.copy-session-dropdown .dropdown-item:hover {
+    background: var(--text-block);
+}
+
+
 /* Session header bar (under the title/tab bar): shows session name + #,
    and hosts the context-usage meter and Quick Actions trigger. */
 .session-header {
