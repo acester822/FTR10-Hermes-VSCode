@@ -3634,6 +3634,9 @@ body {
     gap: 8px;
     margin-bottom: 6px;
 }
+.step-graph-title {
+    display: none;
+}
 .step-graph-toggle {
     font: inherit;
     font-size: 10px;
@@ -3670,10 +3673,9 @@ body {
     display: flex;
     align-items: flex-end;
     gap: 3px;
-    height: 34px;
-    /* (d) Keep the graph portion itself scrollable, but hide the scrollbar
-       so there is no visible track. Mouse users scroll via shift+wheel or
-       the visible overflow once there are more bars than fit. */
+    height: 124px;
+    /* Invisible horizontal scroll: when there are more bars than fit, the
+       row scrolls (shift+wheel / trackpad) but no scrollbar is painted. */
     overflow-x: auto;
     overflow-y: hidden;
     scrollbar-width: none;            /* Firefox */

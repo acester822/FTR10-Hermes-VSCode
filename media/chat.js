@@ -6490,14 +6490,16 @@ function parseToolCallText(text) {
         const idxEl = document.getElementById('sessionHeaderIdx');
         const headerEl = document.getElementById('sessionHeader');
         if (!nameEl || !idxEl) return;
-        const session = lastSessions.find(function(s) { return s.id === lastActiveSessionId; });
+        const session = lastSessions.find(function(s) { return (s.sessionId || s.id) === lastActiveSessionId; });
         const title = session && (session.title || locale.newChat) ? (session.title || locale.newChat) : locale.newChat;
         nameEl.textContent = title;
         nameEl.title = title;
-        const idx = lastSessions.findIndex(function(s) { return s.id === lastActiveSessionId; });
-        if (idx >= 0 && lastSessions.length > 0) {
-            idxEl.textContent = '#' + (idx + 1);
-            idxEl.title = (idx + 1) + ' / ' + lastSessions.length;
+        // Show the real Hermes session ID (short form), not the list index.
+        const sid = (session && (session.sessionId || session.id)) || lastActiveSessionId || '';
+        if (sid) {
+            const short = sid.length > 8 ? sid.slice(0, 8) : sid;
+            idxEl.textContent = short;
+            idxEl.title = sid;
             idxEl.hidden = false;
         } else {
             idxEl.textContent = '';
@@ -7187,9 +7189,11 @@ function parseToolCallText(text) {
                 seg.dataset.kind = kind;
                 // Deterministic colour — never the wrong one.
                 seg.style.background = meta.color;
-                // Strictly proportional height: a 2k-token step is clearly
-                // taller than a 500-token step (no artificial floor).
-                seg.style.height = Math.max(1, Math.round((cost / maxTokens) * 34)) + 'px';
+                // Proportional height but with a taller canvas so steps are
+                // clearly legible. A 2k-token step reads visibly taller than a
+                // 500-token step. When there are more bars than fit, the row
+                // scrolls horizontally (scrollbar hidden in CSS).
+                seg.style.height = Math.max(4, Math.round((cost / maxTokens) * 120)) + 'px';
                 const extra = [];
                 if (s.reasoning_tokens) extra.push('reason ' + fmtTokens(s.reasoning_tokens));
                 if (s.cache_read_tokens) extra.push('cacheR ' + fmtTokens(s.cache_read_tokens));
