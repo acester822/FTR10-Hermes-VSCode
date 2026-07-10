@@ -33,6 +33,41 @@
 </script>
     <div id="tab-bar"></div>
     <div id="tabContextMenu" class="tab-context-menu" hidden></div>
+<div id="sessionHeader" class="session-header" hidden>
+    <div class="session-header-info">
+        <span class="session-header-name" id="sessionHeaderName"></span>
+        <span class="session-header-idx" id="sessionHeaderIdx" hidden></span>
+    </div>
+    <div class="session-header-actions">
+        <div class="context-usage" id="contextUsage" hidden>
+            <span class="context-usage-num" id="contextUsageNum"></span>
+            <span class="context-usage-bar" aria-hidden="true"><span class="context-usage-fill" id="contextUsageFill"></span></span>
+        </div>
+        <div class="input-quick-trigger" id="quickActionsTrigger" title="" aria-label="" aria-expanded="false" role="button" tabindex="0">
+            <svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M6.5 1a5.5 5.5 0 1 1 0 11 5.5 5.5 0 0 1 0-11zm0 1.2a4 5.5 0 1 0 0 8 4 4.5 0 0 0 0-8z"/></svg>
+        </div>
+    </div>
+    <div class="input-quick-popup" id="inputQuickPanel" aria-hidden="true">
+        <div class="input-quick-popup-inner">
+            <div class="input-quick-toolbar">
+                <div class="chat-search">
+                    <svg class="chat-search-icon" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M6.5 1a5.5 5.5 0 1 1 0 11 5.5 5.5 0 0 1 0-11zm0 1.5a4 4 0 1 0 0 8 4 4 0 0 0 0-8zm5.03 8.47 2.5 2.5-.7.7-2.5-2.5.7-.7z"/></svg>
+                    <input type="search" id="chatSearchInput" disabled autocomplete="off" spellcheck="false">
+                    <div class="chat-search-meta">
+                        <span class="chat-search-count" id="chatSearchCount"></span>
+                        <button type="button" class="chat-search-nav" id="chatSearchPrev" disabled>↑</button>
+                        <button type="button" class="chat-search-nav" id="chatSearchNext" disabled>↓</button>
+                    </div>
+                </div>
+                <div class="input-quick-actions">
+                <button type="button" id="copySessionBtn" class="icon-btn" disabled>
+                    <svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M4 2h8a1 1 0 0 1 1 1v1h1a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-1H4a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1h0zm1 2v8h8V5H5zm-2 2h1v6h6v1H4a1 1 0 0 1-1-1V6h0z"/></svg>
+                </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 <div id="chat-body" class="chat-body">
 <!-- Per-step usage bar graph (Kilo/Kline-style). Lives OUTSIDE #messages on
      purpose: #messages is wiped/rebuilt on every session switch, which would
@@ -119,26 +154,6 @@
             <button type="button" id="multiSelectExitBtn" class="ms-exit"></button>
         </div>
     </div>
-    <div class="input-quick-popup" id="inputQuickPanel" aria-hidden="true">
-        <div class="input-quick-popup-inner">
-            <div class="input-quick-toolbar">
-                <div class="chat-search">
-                    <svg class="chat-search-icon" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M6.5 1a5.5 5.5 0 1 1 0 11 5.5 5.5 0 0 1 0-11zm0 1.5a4 4 0 1 0 0 8 4 4 0 0 0 0-8zm5.03 8.47 2.5 2.5-.7.7-2.5-2.5.7-.7z"/></svg>
-                    <input type="search" id="chatSearchInput" disabled autocomplete="off" spellcheck="false">
-                    <div class="chat-search-meta">
-                        <span class="chat-search-count" id="chatSearchCount"></span>
-                        <button type="button" class="chat-search-nav" id="chatSearchPrev" disabled>↑</button>
-                        <button type="button" class="chat-search-nav" id="chatSearchNext" disabled>↓</button>
-                    </div>
-                </div>
-                <div class="input-quick-actions">
-                <button type="button" id="copySessionBtn" class="icon-btn" disabled>
-                    <svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M4 2h8a1 1 0 0 1 1 1v1h1a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-1H4a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1h0zm1 2v8h8V5H5zm-2 2h1v6h6v1H4a1 1 0 0 1-1-1V6h0z"/></svg>
-                </button>
-                </div>
-            </div>
-        </div>
-    </div>
      <div class="input-composite-wrap">
          <div class="diff-review-bar" id="diffReviewBar" hidden>
              <div class="diff-review-info">
@@ -194,10 +209,6 @@
             <textarea id="input" rows="1" disabled></textarea>
             <div class="input-composite-bar">
                 <div class="input-action">
-                    <div class="context-usage" id="contextUsage" hidden>
-                        <span class="context-usage-num" id="contextUsageNum"></span>
-                        <span class="context-usage-bar" aria-hidden="true"><span class="context-usage-fill" id="contextUsageFill"></span></span>
-                    </div>
                     <div class="picker permission-mode-picker icon-only" id="permissionModePicker">
                         <button type="button" class="permission-mode-btn" id="permissionModeBtn" title="Permission mode" aria-label="Permission mode">
                             <img class="input-picker-icon" id="permissionModeIcon" src="accelerate-svgrepo-com.svg" alt="" aria-hidden="true">
@@ -206,9 +217,6 @@
                             <div class="dropdown-header">Permission mode</div>
                             <div class="permission-mode-options" id="permissionModeList"></div>
                         </div>
-                    </div>
-                    <div class="input-quick-trigger" id="quickActionsTrigger" title="Quick actions" aria-label="Quick actions" aria-expanded="false" role="button" tabindex="0">
-                        <svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M6.5 1a5.5 5.5 0 1 1 0 11 5.5 5.5 0 0 1 0-11zm0 1.2a4 4 0.5 0 1 0 0 8 4 4.5 0 0 0 0-8z"/></svg>
                     </div>
                     <button type="button" id="attachImageBtn" class="icon-btn attach-image-btn" title="Attach image" aria-label="Attach image">
                         <svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M9.5 2.5 13 6l-7 7a2 2 0 0 1-2.83-2.83l7-7 1.41 1.41-6.3 6.3a.5.5 0 0 0 .71.71l7-7-1.99-1.99zM3 11l1-1 .5.5L3.5 12a1.5 1.5 0 0 1-2-2L8 3.5 9 4.5 4 9.5l-1 1z"/></svg>
