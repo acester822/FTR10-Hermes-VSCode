@@ -144,6 +144,7 @@ export const en: LocaleStrings = {
     clearChat: 'Clear current conversation',
     clearInput: 'Clear input',
     copySession: 'Copy current session',
+    downloadSession: 'Download current session',
     quickActions: 'Quick actions',
     quickActionsExpand: 'Expand quick actions',
     quickActionsCollapse: 'Collapse quick actions',

@@ -148,6 +148,7 @@ export interface LocaleStrings {
     clearChat: string;
     clearInput: string;
     copySession: string;
+    downloadSession: string;
     quickActions: string;
     quickActionsExpand: string;
     quickActionsCollapse: string;

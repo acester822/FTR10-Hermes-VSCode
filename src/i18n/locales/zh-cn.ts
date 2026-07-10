@@ -144,6 +144,7 @@ export const zhCn: LocaleStrings = {
     clearChat: '清空当前对话',
     clearInput: '清空输入框',
     copySession: '复制当前会话',
+    downloadSession: '下载当前会话',
     quickActions: '快捷操作',
     quickActionsExpand: '展开快捷操作',
     quickActionsCollapse: '收起快捷操作',
