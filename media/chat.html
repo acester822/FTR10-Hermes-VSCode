@@ -141,32 +141,24 @@
                     </div>
                 </div>
                 <div class="input-quick-actions">
-                <div class="copy-session-picker" id="copySessionPicker">
-                    <button type="button" id="copySessionBtn" class="icon-btn" disabled>
+                <div class="copy-session-actions">
+                    <button type="button" id="copyJsonBtn" class="icon-btn" disabled title="Copy as JSON" aria-label="Copy as JSON">
                         <svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M4 2h8a1 1 0 0 1 1 1v1h1a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-1H4a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1h0zm1 2v8h8V5H5zm-2 2h1v6h6v1H4a1 1 0 0 1-1-1V6h0z"/></svg>
+                        <span class="icon-tag">JSON</span>
                     </button>
-                    <button type="button" id="copySessionCaret" class="icon-btn copy-session-caret" disabled aria-label="Copy options" title="Copy options">
-                        <svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M4.5 6 8 9.5 11.5 6l.7.7L8 10.9l-4.2-4.2.7-.7z"/></svg>
+                    <button type="button" id="copyMdBtn" class="icon-btn" disabled title="Copy as Markdown" aria-label="Copy as Markdown">
+                        <svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M4 2h8a1 1 0 0 1 1 1v1h1a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-1H4a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1h0zm1 2v8h8V5H5zm-2 2h1v6h6v1H4a1 1 0 0 1-1-1V6h0z"/></svg>
+                        <span class="icon-tag">MD</span>
                     </button>
-                    <div class="dropdown copy-session-dropdown" id="copySessionDropdown" style="display:none">
-                        <div class="dropdown-header" id="copySessionDropdownHeader"></div>
-                        <div class="dropdown-item" data-action="copy" data-format="markdown">
-                            <span class="model-name" data-locale="copyAsMarkdown"></span>
-                        </div>
-                        <div class="dropdown-item" data-action="copy" data-format="json">
-                            <span class="model-name" data-locale="copyAsJson"></span>
-                        </div>
-                        <div class="dropdown-item" data-action="download" data-format="markdown">
-                            <span class="model-name" data-locale="downloadAsMarkdown"></span>
-                        </div>
-                        <div class="dropdown-item" data-action="download" data-format="json">
-                            <span class="model-name" data-locale="downloadAsJson"></span>
-                        </div>
-                    </div>
+                    <button type="button" id="downloadJsonBtn" class="icon-btn" disabled title="Download as JSON" aria-label="Download as JSON">
+                        <svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M8 1a1 1 0 0 1 1 1v6.59l2.3-2.3a1 1 0 1 1 1.4 1.42l-4 4a1 1 0 0 1-1.4 0l-4-4a1 1 0 1 1 1.4-1.42L7 8.59V2a1 1 0 0 1 1-1zM2 12h12v2H2z"/></svg>
+                        <span class="icon-tag">JSON</span>
+                    </button>
+                    <button type="button" id="downloadMdBtn" class="icon-btn" disabled title="Download as Markdown" aria-label="Download as Markdown">
+                        <svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M8 1a1 1 0 0 1 1 1v6.59l2.3-2.3a1 1 0 1 1 1.4 1.42l-4 4a1 1 0 0 1-1.4 0l-4-4a1 1 0 1 1 1.4-1.42L7 8.59V2a1 1 0 0 1 1-1zM2 12h12v2H2z"/></svg>
+                        <span class="icon-tag">MD</span>
+                    </button>
                 </div>
-                <button type="button" id="downloadSessionBtn" class="icon-btn" disabled>
-                    <svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M8 1a1 1 0 0 1 1 1v6.59l2.3-2.3a1 1 0 1 1 1.4 1.42l-4 4a1 1 0 0 1-1.4 0l-4-4a1 1 0 1 1 1.4-1.42L7 8.59V2a1 1 0 0 1 1-1zM2 12h12v2H2z"/></svg>
-                </button>
                 </div>
             </div>
         </div>

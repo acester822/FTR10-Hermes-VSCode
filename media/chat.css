@@ -3765,9 +3765,13 @@ body {
     position: fixed;
     left: 0;
     top: 0;
+    right: auto;
     z-index: 1000;
-    min-width: 280px;
-    max-width: min(420px, 92vw);
+    /* Span the full width of the extension, left of the trigger icon. The
+       JS positions it; this min/max just keeps it readable. */
+    min-width: 320px;
+    max-width: calc(100vw - 16px);
+    width: auto;
     max-height: 70vh;
     overflow-y: auto;
     background: var(--glass-bg-elevated);
@@ -3914,6 +3918,49 @@ mark.search-mark-active {
 .input-quick-actions .icon-btn:disabled {
     opacity: 0.35;
     cursor: default;
+}
+.copy-session-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+.copy-session-actions .icon-btn {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1px;
+    min-width: 40px;
+    min-height: 40px;
+    padding: 4px 6px;
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--dim);
+    cursor: pointer;
+}
+.copy-session-actions .icon-btn:hover:not(:disabled) {
+    color: var(--fg);
+    background: var(--text-block);
+    border-color: var(--primary);
+}
+.copy-session-actions .icon-btn:disabled {
+    opacity: 0.35;
+    cursor: default;
+}
+.copy-session-actions .icon-btn.copied {
+    color: var(--primary);
+    border-color: var(--primary);
+}
+.copy-session-actions .icon-btn svg {
+    width: 16px;
+    height: 16px;
+}
+.copy-session-actions .icon-tag {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    line-height: 1;
 }
 .input-quick-actions .icon-btn.copied {
     color: var(--primary);

@@ -13,11 +13,10 @@
     const contextUsageFill = document.getElementById('contextUsageFill');
     const clearChatBtn = document.getElementById('clearChatBtn');
     const clearInputBtn = document.getElementById('clearInputBtn');
-    const copySessionBtn = document.getElementById('copySessionBtn');
-    const copySessionCaret = document.getElementById('copySessionCaret');
-    const copySessionPicker = document.getElementById('copySessionPicker');
-    const copySessionDropdown = document.getElementById('copySessionDropdown');
-    const downloadSessionBtn = document.getElementById('downloadSessionBtn');
+    const copyJsonBtn = document.getElementById('copyJsonBtn');
+    const copyMdBtn = document.getElementById('copyMdBtn');
+    const downloadJsonBtn = document.getElementById('downloadJsonBtn');
+    const downloadMdBtn = document.getElementById('downloadMdBtn');
     const quickActionsTrigger = document.getElementById('quickActionsTrigger');
     const attachImageBtn = document.getElementById('attachImageBtn');
     const imageFileInput = document.getElementById('imageFileInput');
@@ -815,23 +814,21 @@
             clearInputBtn.title = locale.clearInput;
             clearInputBtn.setAttribute('aria-label', locale.clearInput);
         }
-        if (copySessionBtn) {
-            copySessionBtn.title = locale.copySession;
-            copySessionBtn.setAttribute('aria-label', locale.copySession);
+        if (copyJsonBtn) {
+            copyJsonBtn.title = locale.copyAsJson;
+            copyJsonBtn.setAttribute('aria-label', locale.copyAsJson);
         }
-        if (copySessionCaret) {
-            copySessionCaret.title = locale.copySessionOptions || locale.copySession;
-            copySessionCaret.setAttribute('aria-label', locale.copySessionOptions || locale.copySession);
+        if (copyMdBtn) {
+            copyMdBtn.title = locale.copyAsMarkdown;
+            copyMdBtn.setAttribute('aria-label', locale.copyAsMarkdown);
         }
-        const copySessionDropdownHeader = document.getElementById('copySessionDropdownHeader');
-        if (copySessionDropdownHeader) copySessionDropdownHeader.textContent = locale.copySessionAs || locale.copySession;
-        document.querySelectorAll('#copySessionDropdown [data-locale]').forEach(function(el) {
-            const key = el.getAttribute('data-locale');
-            if (key && locale[key]) el.textContent = locale[key];
-        });
-        if (downloadSessionBtn) {
-            downloadSessionBtn.title = locale.downloadSession;
-            downloadSessionBtn.setAttribute('aria-label', locale.downloadSession);
+        if (downloadJsonBtn) {
+            downloadJsonBtn.title = locale.downloadAsJson;
+            downloadJsonBtn.setAttribute('aria-label', locale.downloadAsJson);
+        }
+        if (downloadMdBtn) {
+            downloadMdBtn.title = locale.downloadAsMarkdown;
+            downloadMdBtn.setAttribute('aria-label', locale.downloadAsMarkdown);
         }
         if (multiSelectAllBtn) multiSelectAllBtn.textContent = locale.multiSelectAll;
         if (multiSelectDeleteBtn) multiSelectDeleteBtn.textContent = locale.multiSelectDelete;
@@ -3420,29 +3417,32 @@ function parseToolCallText(text) {
         quickActionsTrigger.setAttribute('aria-expanded', open ? 'true' : 'false');
         quickActionsTrigger.classList.toggle('is-active', open);
         if (open) {
-            // Float the popup next to the trigger icon (fixed positioning, so
-            // it never reflows/shifts the webview — the old absolute anchor
-            // under #input-area pushed the whole panel and clipped the header).
+            // Float the popup to span the full width of the extension, ending
+            // at the trigger icon's right edge (fixed positioning so it never
+            // reflows/shifts the webview).
             const rect = quickActionsTrigger.getBoundingClientRect();
             inputQuickPanel.style.left = '0px';
             inputQuickPanel.style.top = '0px';
-            const pw = inputQuickPanel.offsetWidth || 300;
+            // Force a measurable layout, then size to the viewport width minus
+            // a small gutter, anchored so its right edge sits at the icon.
+            const gutter = 8;
+            const pw = Math.min(window.innerWidth - gutter * 2, Math.max(320, window.innerWidth - gutter * 2));
             const ph = inputQuickPanel.offsetHeight || 200;
-            // Anchor the popup's top-right to the icon's bottom-right, then
-            // flip up / left if it would overflow the viewport.
             let left = rect.right - pw;
-            if (left < 8) left = 8;
-            let top = rect.bottom + 6;
-            if (top + ph > window.innerHeight - 8) {
-                top = rect.top - ph - 6;
-                if (top < 8) top = 8;
+            if (left < gutter) left = gutter;
+            const right = left + pw;
+            // If it would overflow the right edge, clamp and shrink to fit.
+            if (right > window.innerWidth - gutter) {
+                left = Math.max(gutter, window.innerWidth - gutter - pw);
             }
-            if (left + pw > window.innerWidth - 8) {
-                left = window.innerWidth - pw - 8;
-                if (left < 8) left = 8;
+            let top = rect.bottom + 6;
+            if (top + ph > window.innerHeight - gutter) {
+                top = rect.top - ph - 6;
+                if (top < gutter) top = gutter;
             }
             inputQuickPanel.style.left = left + 'px';
             inputQuickPanel.style.top = top + 'px';
+            inputQuickPanel.style.width = pw + 'px';
             if (chatSearchInput && !chatSearchInput.disabled) {
                 setTimeout(function() { chatSearchInput.focus(); }, 280);
             }
@@ -3666,15 +3666,10 @@ function parseToolCallText(text) {
         const hasMessages = messagesEl.querySelectorAll('.message-group').length > 0;
         const hasInput = !!inputEl.value.trim();
         if (clearChatBtn) clearChatBtn.disabled = !hasMessages;
-        if (copySessionBtn) copySessionBtn.disabled = !hasMessages;
-        if (copySessionCaret) {
-            copySessionCaret.disabled = !hasMessages;
-            if (!hasMessages && copySessionDropdown) {
-                copySessionDropdown.style.display = 'none';
-                if (copySessionPicker) copySessionPicker.classList.remove('is-open');
-            }
-        }
-        if (downloadSessionBtn) downloadSessionBtn.disabled = !hasMessages;
+        if (copyJsonBtn) copyJsonBtn.disabled = !hasMessages;
+        if (copyMdBtn) copyMdBtn.disabled = !hasMessages;
+        if (downloadJsonBtn) downloadJsonBtn.disabled = !hasMessages;
+        if (downloadMdBtn) downloadMdBtn.disabled = !hasMessages;
         if (clearInputBtn) clearInputBtn.disabled = !hasInput;
         if (chatSearchInput) chatSearchInput.disabled = !hasMessages;
         if (!hasMessages) clearChatSearch();
@@ -5307,76 +5302,49 @@ function parseToolCallText(text) {
         });
     }
 
-    // ---- Copy Current Session picker (Markdown / JSON) ----
-    function closeCopySessionDropdown() {
-        if (!copySessionDropdown) return;
-        copySessionDropdown.style.display = 'none';
-        if (copySessionPicker) copySessionPicker.classList.remove('is-open');
-    }
-
-    function openCopySessionDropdown() {
-        if (!copySessionDropdown || !copySessionCaret || copySessionCaret.disabled) return;
-        copySessionDropdown.style.display = 'block';
-        if (copySessionPicker) copySessionPicker.classList.add('is-open');
-    }
-
-    function toggleCopySessionDropdown() {
-        if (!copySessionDropdown) return;
-        if (copySessionDropdown.style.display === 'block') {
-            closeCopySessionDropdown();
-        } else {
-            openCopySessionDropdown();
-        }
-    }
-
+    // ---- Copy / Download Current Session (4 icon buttons) ----
     function doCopySession(format) {
         try {
-            if (!copySessionBtn || copySessionBtn.disabled) return;
             requestSessionExport('copy', undefined, undefined, format);
-            flashQuickActionBtn(copySessionBtn);
-            closeCopySessionDropdown();
+            if (format === 'json') flashQuickActionBtn(copyJsonBtn);
+            else flashQuickActionBtn(copyMdBtn);
         } catch (err) {
             console.error('copy session failed:', err);
         }
     }
 
-    if (copySessionBtn) {
-        copySessionBtn.addEventListener('click', function() {
-            if (copySessionBtn.disabled) return;
+    function doDownloadSession(format) {
+        try {
+            requestSessionExport('export', undefined, undefined, format);
+            if (format === 'json') flashQuickActionBtn(downloadJsonBtn);
+            else flashQuickActionBtn(downloadMdBtn);
+        } catch (err) {
+            console.error('download session failed:', err);
+        }
+    }
+
+    if (copyJsonBtn) {
+        copyJsonBtn.addEventListener('click', function() {
+            if (copyJsonBtn.disabled) return;
+            doCopySession('json');
+        });
+    }
+    if (copyMdBtn) {
+        copyMdBtn.addEventListener('click', function() {
+            if (copyMdBtn.disabled) return;
             doCopySession('markdown');
         });
     }
-    if (copySessionCaret) {
-        copySessionCaret.addEventListener('click', function(e) {
-            e.stopPropagation();
-            if (copySessionCaret.disabled) return;
-            toggleCopySessionDropdown();
+    if (downloadJsonBtn) {
+        downloadJsonBtn.addEventListener('click', function() {
+            if (downloadJsonBtn.disabled) return;
+            doDownloadSession('json');
         });
     }
-    if (copySessionDropdown) {
-        copySessionDropdown.addEventListener('click', function(e) {
-            e.stopPropagation();
-            const item = e.target.closest('.dropdown-item');
-            if (!item) return;
-            const action = item.getAttribute('data-action');
-            const fmt = item.getAttribute('data-format');
-            if (fmt !== 'json' && fmt !== 'markdown') return;
-            if (action === 'download') {
-                if (!downloadSessionBtn || downloadSessionBtn.disabled) return;
-                requestSessionExport('export', undefined, undefined, fmt);
-                flashQuickActionBtn(downloadSessionBtn);
-            } else {
-                doCopySession(fmt);
-            }
-            closeCopySessionDropdown();
-        });
-    }
-
-    if (downloadSessionBtn) {
-        downloadSessionBtn.addEventListener('click', function() {
-            if (downloadSessionBtn.disabled) return;
-            requestSessionExport('export');
-            flashQuickActionBtn(downloadSessionBtn);
+    if (downloadMdBtn) {
+        downloadMdBtn.addEventListener('click', function() {
+            if (downloadMdBtn.disabled) return;
+            doDownloadSession('markdown');
         });
     }
 
@@ -5694,8 +5662,6 @@ function parseToolCallText(text) {
         if (contextAttachDropdown) contextAttachDropdown.style.display = 'none';
         if (permissionModeDropdownEl) permissionModeDropdownEl.style.display = 'none';
         if (reasoningEffortDropdownEl) reasoningEffortDropdownEl.style.display = 'none';
-        if (copySessionDropdown) copySessionDropdown.style.display = 'none';
-        if (copySessionPicker) copySessionPicker.classList.remove('is-open');
         hideContextAttachTooltip();
         hideContextAttachPreview();
     }
