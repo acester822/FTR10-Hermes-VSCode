@@ -15,6 +15,9 @@ export interface LocaleStrings {
     hermesNotConnectedConnecting: string;
     fileAccessDenied: string;
     fileReadError: string;
+    imageNoData: string;
+    imageReadError: string;
+    imageWriteError: string;
     newChat: string;
     defaultAgent: string;
     statusStartingAcp: string;
