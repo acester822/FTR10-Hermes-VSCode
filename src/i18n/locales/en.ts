@@ -352,4 +352,11 @@ hermes --profile &lt;name&gt; acp</code></pre>
     contextAttachSendYes: 'Attach',
     contextAttachSendNo: 'Do not attach',
     contextAttachPreviewTitle: 'Memory to attach ({0} selected / ~{1} input tokens)',
+    reasoningEffortLabel: 'Reasoning',
+    reasoningEffortNone: 'None',
+    reasoningEffortMinimal: 'Minimal',
+    reasoningEffortLow: 'Low',
+    reasoningEffortMedium: 'Medium',
+    reasoningEffortHigh: 'High',
+    reasoningEffortXHigh: 'X-High',
 };

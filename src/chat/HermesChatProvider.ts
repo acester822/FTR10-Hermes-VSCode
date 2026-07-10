@@ -10,7 +10,7 @@ import { resolveModelCatalog } from '../acp/acpModelCatalog';
 import type { AcpModelOptionsResponse } from '../acp/acpModelCatalog';
 import { resolveMcpServersForSession } from '../acp/mcpConfig';
 import { normalizeHermesCliProfile, scopeKeyForCliProfile } from '../acp/hermesProfile';
-import { discoverHermesProfiles, detectHermesEnvironment, tryResolveHermesQuick } from '../acp/profileDiscovery';
+import { discoverHermesProfiles, detectHermesEnvironment, tryResolveHermesQuick, findHermesExecutable } from '../acp/profileDiscovery';
 import type {
     HermesDetectProgressEvent,
     HermesDetectSource,
@@ -412,6 +412,9 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
                     break;
                 case 'permissionModeChange':
                     this._handlePermissionModeChange(message.mode);
+                    break;
+                case 'reasoningEffortChange':
+                    this._handleReasoningEffortChange(message.effort);
                     break;
                 case 'acceptDiff':
                     void this._handleAcceptDiff();
@@ -1545,6 +1548,39 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
         this._log(`Permission mode changed: ${resolved}`);
         const config = vscode.workspace.getConfiguration('hermes');
         void config.update('permissionMode', resolved, vscode.ConfigurationTarget.Global);
+    }
+
+    private async _handleReasoningEffortChange(effort: string | undefined): Promise<void> {
+        const validEfforts = ['none', 'minimal', 'low', 'medium', 'high', 'xhigh'];
+        const resolved = validEfforts.includes(effort ?? '') ? effort! : 'medium';
+        this._log(`Reasoning effort changed: ${resolved}`);
+        const config = vscode.workspace.getConfiguration('hermes');
+        void config.update('reasoningEffort', resolved, vscode.ConfigurationTarget.Global);
+        // Push to the running hermes acp backend so it picks up the new effort
+        // without a full restart. `hermes config set agent.reasoning_effort`
+        // writes the live config.yaml key the backend reads on the next turn.
+        try {
+            const executable = await findHermesExecutable(config.get<string>('path') || undefined);
+            if (!executable) {
+                this._log('Reasoning effort set locally; hermes executable not found to push live config');
+                return;
+            }
+            const { spawn } = await import('child_process');
+            await new Promise<void>((resolve) => {
+                const proc = spawn(executable, ['config', 'set', 'agent.reasoning_effort', resolved], {
+                    stdio: ['ignore', 'pipe', 'pipe'],
+                    shell: process.platform === 'win32',
+                });
+                let stderr = '';
+                proc.stderr?.on('data', (c: Buffer) => { stderr += c.toString(); });
+                proc.on('error', () => resolve());
+                proc.on('exit', () => resolve());
+                void stderr;
+            });
+            this._log(`Pushed reasoning effort to backend: agent.reasoning_effort=${resolved}`);
+        } catch (err) {
+            this._log(`Failed to push reasoning effort to backend: ${err instanceof Error ? err.message : String(err)}`);
+        }
     }
 
     private async _handleRetry(): Promise<void> {
@@ -3319,6 +3355,7 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
             showThoughts: config.get<boolean>('showThoughts', true),
             showToolCalls: config.get<boolean>('showToolCalls', true),
             permissionMode: config.get<string>('permissionMode', 'manual'),
+            reasoningEffort: config.get<string>('reasoningEffort', 'medium'),
         });
     }
 
@@ -3425,7 +3462,7 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
     }
 
     private async _onConfigurationChanged(e: vscode.ConfigurationChangeEvent): Promise<void> {
-        if (e.affectsConfiguration('hermes.showThoughts') || e.affectsConfiguration('hermes.showToolCalls') || e.affectsConfiguration('hermes.permissionMode')) {
+        if (e.affectsConfiguration('hermes.showThoughts') || e.affectsConfiguration('hermes.showToolCalls') || e.affectsConfiguration('hermes.permissionMode') || e.affectsConfiguration('hermes.reasoningEffort')) {
             this._postConfig();
         }
         if (e.affectsConfiguration('hermes.contextAttachVisibility')) {

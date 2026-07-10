@@ -321,6 +321,27 @@
           ],
           "description": "%configuration.hermes.permissionMode.description%"
         },
+        "hermes.reasoningEffort": {
+          "type": "string",
+          "default": "medium",
+          "enum": [
+            "none",
+            "minimal",
+            "low",
+            "medium",
+            "high",
+            "xhigh"
+          ],
+          "enumDescriptions": [
+            "%configuration.hermes.reasoningEffort.none.description%",
+            "%configuration.hermes.reasoningEffort.minimal.description%",
+            "%configuration.hermes.reasoningEffort.low.description%",
+            "%configuration.hermes.reasoningEffort.medium.description%",
+            "%configuration.hermes.reasoningEffort.high.description%",
+            "%configuration.hermes.reasoningEffort.xhigh.description%"
+          ],
+          "description": "%configuration.hermes.reasoningEffort.description%"
+        },
         "hermes.contextAttachVisibility": {
           "type": "string",
           "default": "onNewSession",
