@@ -69,6 +69,16 @@ export function activate(context: vscode.ExtensionContext) {
         })
     );
 
+    // Host-side drag-and-drop: a WebviewView can't receive native drops, so
+    // VS Code routes file drops to the `vscode.drop` command with a
+    // DataTransfer. We read the files on the host and forward them to the
+    // webview as attachments.
+    context.subscriptions.push(
+        vscode.commands.registerCommand('vscode.drop', (dataTransfer: vscode.DataTransfer) => {
+            void chatProvider?.handleDrop(dataTransfer);
+        })
+    );
+
     // Session Menu: re-open the Hermes session picker from the view title bar.
     context.subscriptions.push(
         vscode.commands.registerCommand('hermes.openSessionMenu', () => {

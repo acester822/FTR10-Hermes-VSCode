@@ -6869,6 +6869,29 @@ function parseToolCallText(text) {
                 renderModelList(msg);
                 break;
 
+            case 'droppedFiles':
+                // Host-side drop (VS Code WebviewView can't receive native
+                // drops), so the extension read the files and forwards them.
+                try {
+                    const imgs = Array.isArray(msg.images) ? msg.images : [];
+                    const files = Array.isArray(msg.files) ? msg.files : [];
+                    if (imgs.length) {
+                        pendingImages = pendingImages.concat(imgs.map(function (i) {
+                            return { name: i.name, mimeType: i.mimeType, data: i.data };
+                        }));
+                    }
+                    if (files.length) {
+                        pendingFiles = pendingFiles.concat(files.map(function (f) {
+                            return { name: f.name, mimeType: f.mimeType, text: f.text };
+                        }));
+                    }
+                    renderAttachPreview();
+                    updateQuickActionBtns();
+                } catch (err) {
+                    console.error('droppedFiles handling failed:', err);
+                }
+                break;
+
             case 'log':
                 if (msg.level === 'error' || msg.level === 'warning') {
                     logs.push({ line: msg.line, level: msg.level });

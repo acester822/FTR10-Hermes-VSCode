@@ -3073,6 +3073,86 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
         }
     }
 
+    /** Public entry point for the `vscode.drop` command (host-side file drop). */
+    public async handleDrop(dataTransfer: vscode.DataTransfer): Promise<void> {
+        await this._handleDrop(dataTransfer);
+    }
+
+    /**
+     * Host-side handler for files dropped onto the chat WebviewView. A
+     * WebviewView cannot receive native drag-and-drop (enableDragAndDrop is
+     * WebviewPanel-only), so VS Code routes the drop to the `vscode.drop`
+     * command with a DataTransfer. We read the files here and forward their
+     * parsed contents to the webview, which queues them as attachments.
+     */
+    private async _handleDrop(dataTransfer: vscode.DataTransfer): Promise<void> {
+        try {
+            const MAX_FILE_BYTES = 512 * 1024;
+            const uris: vscode.Uri[] = [];
+            // Files from the Explorer arrive as vscode.Uri entries under common
+            // mime types; fall back to iterating every entry.
+            const tryKeys = ['text/uri-list', 'application/vnd.code.tree.hermesChat', 'uri-list'];
+            for (const key of tryKeys) {
+                const item = dataTransfer.get(key);
+                if (!item) continue;
+                try {
+                    const val = await item.asString();
+                    if (!val) continue;
+                    val.split(/\r?\n/).forEach((line) => {
+                        const trimmed = line.trim();
+                        if (trimmed && !trimmed.startsWith('#')) {
+                            try { uris.push(vscode.Uri.parse(trimmed)); } catch { /* ignore */ }
+                        }
+                    });
+                } catch { /* ignore */ }
+            }
+            // Also collect any Uri-typed entries directly.
+            dataTransfer.forEach((_name, item) => {
+                const v = (item as unknown as { value?: vscode.Uri }).value;
+                if (v && typeof v.fsPath === 'string' && !uris.some((u) => u.fsPath === v.fsPath)) {
+                    uris.push(v);
+                }
+            });
+
+            if (!uris.length) {
+                this._log('Drop: no file URIs found in DataTransfer');
+                return;
+            }
+
+            const images: Array<{ name: string; mimeType: string; data: string }> = [];
+            const files: Array<{ name: string; mimeType: string; text: string }> = [];
+            for (const uri of uris) {
+                try {
+                    const stat = await vscode.workspace.fs.stat(uri);
+                    if (stat.size > MAX_FILE_BYTES) {
+                        this._log(`Drop: skipping large file ${uri.fsPath} (${stat.size} bytes)`);
+                        continue;
+                    }
+                    const bytes = await vscode.workspace.fs.readFile(uri);
+                    const ext = uri.fsPath.split('.').pop()?.toLowerCase() ?? '';
+                    const imageExts = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg'];
+                    if (imageExts.includes(ext)) {
+                        const mime = `image/${ext === 'jpg' ? 'jpeg' : ext}`;
+                        const base64 = Buffer.from(bytes).toString('base64');
+                        images.push({ name: uri.fsPath.split(/[\\/]/).pop() ?? 'image', mimeType: mime, data: base64 });
+                    } else if (stat.type === vscode.FileType.File) {
+                        const text = Buffer.from(bytes).toString('utf8');
+                        files.push({ name: uri.fsPath.split(/[\\/]/).pop() ?? 'file', mimeType: 'text/plain', text });
+                    } else {
+                        this._log(`Drop: skipping non-file entry ${uri.fsPath} (type ${stat.type})`);
+                        continue;
+                    }
+                } catch (err) {
+                    this._log('Drop: failed to read ' + uri.fsPath + ': ' + (err instanceof Error ? err.message : String(err)));
+                }
+            }
+
+            this._postMessage({ type: 'droppedFiles', images, files });
+        } catch (err) {
+            this._log('Drop handling failed: ' + (err instanceof Error ? err.message : String(err)));
+        }
+    }
+
     private _loadSessionMessagesFromDisk(sessionId: string): ChatMessage[] {
         try {
             const p = this._msgPath(sessionId);

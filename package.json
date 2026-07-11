@@ -79,7 +79,8 @@
           "type": "webview",
           "id": "hermesChat",
           "name": "%views.hermesChat.name%",
-          "icon": "media/icon.svg"
+          "icon": "media/icon.svg",
+          "dropMimeTypes": ["text/uri-list", "application/vnd.code.tree.hermesChat", "files"]
         }
       ]
     },
