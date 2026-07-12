@@ -324,7 +324,6 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
                     this._log('WebView ready');
                     this._syncWebviewLocale();
                     this._postPluginInfo();
-                    this._postSessionList();
                     this._postProfileList();
                     this._postConfig();
                     this._postTokenUsage();
@@ -332,6 +331,13 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
                     // messages before the session picker is resolved. Instead,
                     // the connect flow will restore messages after the user
                     // picks a session.
+                    //
+                    // Also defer _postSessionList() until after a session is
+                    // picked: posting it now would make the webview render the
+                    // *previous* session's name in the header before the picker
+                    // is even resolved, leaving stale UI visible on first load.
+                    // The connect flow posts the session list (and reveals the
+                    // header) only once a session is actually active.
                     this._connect();
                     break;
                 case 'getSessions':
@@ -1356,6 +1362,7 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
                 this._loadHistory();
                 this._postMessage({ type: 'newChat' });
                 this._restoreMessages();
+                this._postSessionList();
                 sessionReady = true;
             } else {
                 this._log('No session chosen — creating a new one');

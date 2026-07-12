@@ -135,8 +135,6 @@ body {
     flex-direction: column;
     overflow: hidden;
     padding: 4px 6px;
-    container-type: inline-size;
-    container-name: app;
 }
 
 /* Toolbar */
@@ -1663,14 +1661,29 @@ body {
 /* Code blocks */
 .message pre {
     background: var(--ftr10-code-bg, var(--vscode-textCodeBlock-background, #882727));
-    border: 1px solid var(--border);
-    border: 2px solid var(--ftr10-code-border-l, var(--primary));
     border-radius: var(--radius-sm);
     padding: 8px;
     overflow: auto;
     font-size: 12px;
     line-height: 1.4;
     margin: 0;
+}
+/* Keep the code-block frame on the non-scrolling wrapper (.block-actions-wrap)
+   instead of on the <pre> itself. The <pre> is the scroll container, so a
+   border drawn on it reads as if the frame were attached to the text and
+   scrolled along with it. Putting the 2px frame on the static wrapper keeps it
+   pinned to the box while the code inside scrolls. */
+.message .block-actions-wrap:has(pre) {
+    border: 2px solid var(--ftr10-code-border-l, var(--primary));
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+}
+/* Nested blocks inside reasoning/tool messages keep their quieter treatment. */
+.message.thought .block-actions-wrap:has(pre),
+.message.tool .block-actions-wrap:has(pre) {
+    border: none;
+    border-radius: 0;
+    overflow: visible;
 }
 .message pre code {
     background: none;

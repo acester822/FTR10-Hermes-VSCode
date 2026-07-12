@@ -10,5 +10,19 @@ CODE_REVIEW*.md
 .sessions.json
 .chat-history.json
 out/tests/
+out/**/*.map
+out/**/*.d.ts
 docs/**
 media/icon.svg
+.env
+
+# Dev-only artifacts that should never ship in the vsix
+logs/**
+scripts/**
+.github/**
+restart-hermes.sh
+.mocharc.yml
+.env.example
+KANBAN_CHANGES_SUMMARY.md
+changelog.md
+CHANGELOG.md

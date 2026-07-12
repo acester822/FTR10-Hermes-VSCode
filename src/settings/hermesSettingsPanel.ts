@@ -1,4 +1,6 @@
 import * as vscode from 'vscode';
+import * as path from 'path';
+import * as fs from 'fs';
 
 export class HermesSettingsPanel {
   public static currentPanel: HermesSettingsPanel | undefined;
@@ -32,8 +34,40 @@ export class HermesSettingsPanel {
     HermesSettingsPanel.currentPanel = new HermesSettingsPanel(panel);
   }
 
+  /**
+   * Resolve the dashboard URL from (in order of priority):
+   *   1. HERMES_DASHBOARD_URL env var (set by the user's local dashboard
+   *      service, e.g. http://127.0.0.1:PORT/config)
+   *   2. a `dashboard.url` entry in the extension's .env file at the repo root
+   *   3. a sane loopback default (http://127.0.0.1:8080/config)
+   *
+   * We never hard-code a public hostname in the source — the dashboard is a
+   * local, loopback-only service.
+   */
+  private _resolveDashboardUrl(): string {
+    const fromEnv = process.env.HERMES_DASHBOARD_URL?.trim();
+    if (fromEnv) {
+      return fromEnv;
+    }
+
+    try {
+      const envPath = path.join(__dirname, '..', '..', '.env');
+      if (fs.existsSync(envPath)) {
+        const contents = fs.readFileSync(envPath, 'utf8');
+        const match = contents.match(/^\s*DASHBOARD_URL\s*=\s*(\S+)\s*$/m);
+        if (match && match[1]) {
+          return match[1];
+        }
+      }
+    } catch {
+      // ignore — fall through to default
+    }
+
+    return 'http://127.0.0.1:9119/config';
+  }
+
   private _getHtmlForWebview(): string {
-    const dashboardUrl = 'https://hermes_na.ftr10.dev/config';
+    const dashboardUrl = this._resolveDashboardUrl();
     const webview = this._panel.webview;
     return `<!DOCTYPE html>
 <html lang="en">

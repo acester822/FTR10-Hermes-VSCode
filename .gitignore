@@ -8,6 +8,10 @@ out/
 docs/**
 logs/**
 
+# Local config / secrets — never commit
+.env
+.env.local
+
 # npm only — ignore other package manager lock files
 yarn.lock
 pnpm-lock.yaml
