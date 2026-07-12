@@ -7366,10 +7366,23 @@ function parseToolCallText(text) {
             });
         }
 
-        // Start polling once the panel is ready (postMessage 'ready' is sent
-        // just after this IIFE). Refresh immediately on window focus too, so
-        // bars never go stale while the webview is backgrounded.
-        start();
+        // Start polling only once a real active session has been established.
+        // At startup lastActiveSessionId is '' (no session chosen yet — the
+        // session picker is still open), so fetching 'latest' would surface the
+        // previous session's cached telemetry. Keep the graph hidden until the
+        // provider tells us which session we're actually in.
+        if (typeof lastActiveSessionId !== 'undefined' && lastActiveSessionId) {
+            start();
+        }
+        // When the active session is finally set, start polling and immediately
+        // fetch. Track it so we only kick off once.
+        window.addEventListener('message', function (event) {
+            const m = event.data;
+            if (!m || m.type !== 'sessionList') return;
+            if ((typeof lastActiveSessionId !== 'undefined' && lastActiveSessionId) && !timer) {
+                start();
+            }
+        });
         window.addEventListener('focus', function () { if (timer) tick(); });
     })();
     // -----------------------------------------------------------------------

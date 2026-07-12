@@ -4781,24 +4781,32 @@ mark.search-mark-active {
     100% { opacity: 1; }
 }
 
-/* Session Picker Overlay */
+/* Session Picker Overlay -- covers the entire webview (not a popup). */
 .session-picker-modal {
+    position: fixed;
+    inset: 0;
     display: flex;
-    align-items: center;
-    justify-content: center;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
     z-index: 100;
+    background: var(--bg-solid, #0e0e12);
+    padding: 0;
+    margin: 0;
+    box-sizing: border-box;
 }
 .session-picker-modal[hidden] {
     display: none;
 }
 .session-picker-panel {
-    background: var(--bg-solid);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
-    max-width: 420px;
-    width: 90%;
-    max-height: 80vh;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    max-width: none;
+    width: 100%;
+    max-height: none;
+    height: 100%;
     display: flex;
     flex-direction: column;
     overflow: hidden;

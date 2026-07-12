@@ -150,6 +150,7 @@ Open **Settings** (`Ctrl+,` / `Cmd+,`) and search **Hermes**, or use **More opti
 | `hermes.cwd` | Working directory for sessions | workspace root |
 | `hermes.profile` | Hermes profile name | default |
 | `hermes.permissionMode` | `manual` / `autoApprove` / `yolo` / `denyAll` | `manual` |
+| `hermes.reasoningEffort` | Reasoning depth: `none` / `minimal` / `low` / `medium` / `high` / `xhigh` | `medium` |
 | `hermes.showThoughts` | Show agent thinking process | `true` |
 | `hermes.showToolCalls` | Show tool call notifications | `true` |
 | `hermes.contextAttachVisibility` | When to show context attachment picker | `onNewSession` |
