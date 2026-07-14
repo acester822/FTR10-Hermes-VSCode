@@ -4177,6 +4177,33 @@ mark.search-mark-active {
     flex-shrink: 0;
 }
 
+/* Live (during-run) command bar — buttons surface commands that can be used
+   while a turn is streaming, shown to the LEFT of the send/stop button. */
+.live-command-bar {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+}
+.live-command-bar[hidden] {
+    display: none;
+}
+.live-command-btn {
+    background: var(--ftr10-glass-bg, rgba(255, 255, 255, 0.08));
+    color: var(--ftr10-accent-1, var(--primary));
+    border: 1px solid var(--ftr10-glass-border, rgba(255, 255, 255, 0.18));
+    box-shadow: none;
+    padding: 5px 9px;
+    min-width: 0;
+}
+.live-command-btn:hover:not(:disabled) {
+    background: var(--ftr10-glass-bg-strong, rgba(255, 255, 255, 0.14));
+}
+.live-command-btn:disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+
 /* Modals -- responsive shell */
 .modal-overlay {
     display: none;

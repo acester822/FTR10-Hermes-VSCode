@@ -31,6 +31,7 @@ import {
     ToolCallTracker,
     formatToolCallDisplay,
     parseToolCallSessionUpdate,
+    formatToolCallRawValue,
 } from './toolCallUpdate';
 import {
     VSCODE_MCP_SERVER_ID,
@@ -151,6 +152,16 @@ export interface HermesSessionSummary {
     updatedAt?: string | null;
     _meta?: Record<string, unknown>;
 }
+
+/** A single message captured from a session/load history replay. */
+export interface ReplayMessage {
+    role: string;
+    text: string;
+    toolCallId?: string;
+    /** Internal: marks a coalesced message as closed (no further chunk merging). */
+    _replayClosed?: boolean;
+}
+
 export type { ModelListState } from './modelConfig';
 export type ModelsChangedHandler = (models: ModelListState | null) => void;
 
@@ -290,6 +301,13 @@ export class AcpClient {
     private _sessionStarting = false;
     /** Local HTTP server exposing editor tools as an MCP server to the agent. */
     private _editorToolsMcpServer: EditorToolsMcpServer | null = null;
+    /** When set, incoming session/update notifications belong to a session/load
+     *  history replay (not live streaming) and are buffered here instead of dropped. */
+    private _replayingHistory = false;
+    /** Buffer of messages replayed during a session/load. Consumed on completion. */
+    private _historyReplayBuffer: ReplayMessage[] = [];
+    /** Resolves with the captured replay messages once the load completes. */
+    private _historyReplayResolve: ((messages: ReplayMessage[]) => void) | null = null;
 
     private static readonly VALID: Record<AcpStatus, AcpStatus[]> = {
         idle:        ['connecting'],
@@ -727,11 +745,7 @@ export class AcpClient {
         }
     }
 
-    /**
-     * Load an existing Hermes session by ID and create an ActiveSession wrapper.
-     * After this call, the session is ready for prompting.
-     */
-    async loadSession(sessionId: string, cwd: string): Promise<void> {
+    async loadSession(sessionId: string, cwd: string): Promise<ReplayMessage[]> {
         if (!this._conn) {
             throw new Error('Not connected');
         }
@@ -745,6 +759,16 @@ export class AcpClient {
         this._responseBuffer = '';
         this._thoughtBuffer = '';
         this._toolCallTracker.clear();
+
+        // Begin buffering history replay notifications (session/load streams the
+        // remote transcript back via session/update before responding). We must
+        // capture these — they are the authoritative remote history, not the
+        // extension's stale on-disk cache.
+        this._replayingHistory = true;
+        this._historyReplayBuffer = [];
+        const replayPromise = new Promise<ReplayMessage[]>((resolve) => {
+            this._historyReplayResolve = resolve;
+        });
 
         const request = this._buildNewSessionRequest(cwd);
         try {
@@ -772,8 +796,43 @@ export class AcpClient {
             const msg = err instanceof Error ? err.message : String(err);
             logToFile(`[Hermes ACP] Session load failed: ${msg}`);
             this._transitionTo('error', `Failed to load session: ${msg}`);
+            // Abort any in-flight replay capture so we don't leak the promise.
+            this._finishHistoryReplay();
             throw err;
+        } finally {
+            // Stop buffering; resolve with whatever was captured.
+            const replayed = this._finishHistoryReplay();
+            // If the load threw before we could read the buffer, surface it anyway.
+            if (replayed.length === 0) {
+                // best-effort: nothing to await
+            }
+            void replayPromise.catch(() => {});
         }
+        return this._drainReplay(replayPromise);
+    }
+
+    /** Resolves the replay promise with captured messages and clears replay state. */
+    private _finishHistoryReplay(): ReplayMessage[] {
+        this._replayingHistory = false;
+        const captured = this._historyReplayBuffer;
+        if (this._historyReplayResolve) {
+            this._historyReplayResolve(captured);
+            this._historyReplayResolve = null;
+        }
+        return captured;
+    }
+
+    /** Awaits the replay buffer captured during session/load (best-effort). */
+    private async _drainReplay(promise: Promise<ReplayMessage[]>): Promise<ReplayMessage[]> {
+        // The replay notifications arrive synchronously during the awaited
+        // session/load request, so the promise is normally already resolved by
+        // the time we get here. Add a small safety window to catch any that
+        // straggle after the response.
+        const settled = await Promise.race([
+            promise,
+            new Promise<ReplayMessage[]>((resolve) => setTimeout(() => resolve(this._historyReplayBuffer), 500)),
+        ]);
+        return settled;
     }
 
     /**
@@ -909,6 +968,36 @@ export class AcpClient {
             if (promptId === this._activePromptId) {
                 this._acceptStreamOutput = false;
             }
+        }
+    }
+
+    /**
+     * Send a follow-up (steering) message while a turn is already running.
+     * Hermes accepts steering through a `prompt` whose text begins with `/steer`
+     * (its prompt handler detects the running session and injects the guidance
+     * into the live turn via `_cmd_steer`). A bare `session/update` notification
+     * is not handled inbound, so we issue a steer prompt on the same session.
+     * We call `_session.prompt` directly (not sendMessage) so we don't reset the
+     * in-flight turn's streaming buffers or re-transition status.
+     */
+    async sendSteerMessage(text: string): Promise<boolean> {
+        if (this._status !== 'prompting' || !this._session) {
+            return false;
+        }
+        const trimmed = text.trim();
+        if (!trimmed) {
+            return false;
+        }
+        const steerText = trimmed.startsWith('/steer')
+            ? trimmed
+            : `/steer ${trimmed}`;
+        try {
+            await this._session.prompt([{ type: 'text', text: steerText }]);
+            return true;
+        } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            logToFile(`[Hermes ACP] steer message failed: ${msg}`);
+            return false;
         }
     }
 
@@ -1195,6 +1284,20 @@ export class AcpClient {
         const update = notification.update;
         const kind = update.sessionUpdate;
 
+        // During a session/load history replay, the session/update notifications
+        // carry the authoritative remote transcript. Capture them into the replay
+        // buffer (they are gated off from live streaming via _acceptStreamOutput).
+        // We snapshot the accumulated text per role so each captured message holds
+        // its full content rather than an incremental fragment.
+        if (this._replayingHistory) {
+            // Buffer every replay notification (user/assistant/tool/thought) so the
+            // full authoritative transcript can be rendered once by the provider via
+            // _restoreMessages(). We deliberately do NOT post live here — doing so
+            // would duplicate the buffered messages when history is restored.
+            this._captureReplayMessage(kind, update);
+            return;
+        }
+
         switch (kind) {
             case 'agent_message_chunk': {
                 if (!this._acceptStreamOutput) {
@@ -1270,6 +1373,84 @@ export class AcpClient {
                 break;
             }
         }
+    }
+
+    /**
+     * Capture one session/update notification into the history replay buffer.
+     * Replay notifications are incremental (chunked), so we coalesce consecutive
+     * chunks of the same role into a single message holding the accumulated text.
+     * `user_message_chunk` / `agent_message_chunk` / `agent_thought_chunk` map to
+     * roles; `tool_call` + `tool_call_update` reconstruct a tool message.
+     */
+    private _captureReplayMessage(kind: string, update: any): void {
+        if (kind === 'user_message_chunk') {
+            const text = extractTextFromContentBlock(update.content);
+            if (!text) return;
+            const last = this._historyReplayBuffer[this._historyReplayBuffer.length - 1];
+            if (last && last.role === 'user' && !last._replayClosed) {
+                last.text += text;
+            } else {
+                this._historyReplayBuffer.push({ role: 'user', text });
+            }
+            return;
+        }
+        if (kind === 'agent_message_chunk') {
+            const text = extractTextFromContentBlock(update.content);
+            if (!text) return;
+            const last = this._historyReplayBuffer[this._historyReplayBuffer.length - 1];
+            if (last && last.role === 'assistant' && !last._replayClosed) {
+                last.text += text;
+            } else {
+                this._historyReplayBuffer.push({ role: 'assistant', text });
+            }
+            return;
+        }
+        if (kind === 'agent_thought_chunk') {
+            const text = extractTextFromContentBlock(update.content);
+            if (!text) return;
+            const last = this._historyReplayBuffer[this._historyReplayBuffer.length - 1];
+            if (last && last.role === 'thought' && !last._replayClosed) {
+                last.text += text;
+            } else {
+                this._historyReplayBuffer.push({ role: 'thought', text });
+            }
+            return;
+        }
+        if (kind === 'tool_call' || kind === 'tool_call_update') {
+            const toolCallId = typeof update.toolCallId === 'string' ? update.toolCallId : undefined;
+            const body = this._toolCallReplayBody(update);
+            if (!body) return;
+            const existing = toolCallId
+                ? this._historyReplayBuffer.find(m => m.role === 'tool' && m.toolCallId === toolCallId)
+                : undefined;
+            if (existing) {
+                existing.text = body;
+            } else {
+                this._historyReplayBuffer.push({
+                    role: 'tool',
+                    text: body,
+                    toolCallId,
+                    _replayClosed: true,
+                });
+            }
+            return;
+        }
+        // Unknown kinds are intentionally ignored for the replay buffer.
+    }
+
+    /** Build a display string for a tool_call replay notification. */
+    private _toolCallReplayBody(update: any): string | undefined {
+        const parts: string[] = [];
+        const title = typeof update.title === 'string' && update.title ? update.title : undefined;
+        if (title) parts.push(title);
+        const text = extractTextFromContentBlock(update.content);
+        if (text.trim()) parts.push(text.trim());
+        const rawInput = formatToolCallRawValue(update.rawInput ?? update.raw_input);
+        if (rawInput && !parts.includes(rawInput)) parts.push(rawInput);
+        const rawOutput = formatToolCallRawValue(update.rawOutput ?? update.raw_output);
+        if (rawOutput && !parts.includes(rawOutput)) parts.push(rawOutput);
+        if (parts.length === 0) return undefined;
+        return parts.join('\n\n');
     }
 
     private _syncSessionModels(source: unknown): void {

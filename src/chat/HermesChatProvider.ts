@@ -4,7 +4,7 @@ import * as path from 'path';
 import * as os from 'os';
 import * as crypto from 'crypto';
 import * as http from 'http';
-import { AcpClient, AcpStatus, ModelListState, PermissionRequest, TokenUsage } from '../acp/AcpClient';
+import { AcpClient, AcpStatus, ModelListState, PermissionRequest, TokenUsage, ReplayMessage } from '../acp/AcpClient';
 import { buildModelListStateFromCatalog, isRuntimeModelSource, encodeHermesModelValueId } from '../acp/modelConfig';
 import { resolveModelCatalog } from '../acp/acpModelCatalog';
 import type { AcpModelOptionsResponse } from '../acp/acpModelCatalog';
@@ -292,6 +292,11 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
             switch (message.type) {
                 case 'sendMessage':
                     this._enqueueChatOp(() => this._handleUserMessage(message.text, message.contextAttach, message.images, message.files));
+                    break;
+                case 'steerMessage':
+                    // Follow-up sent while a turn is already running — re-steer
+                    // the active Hermes turn instead of starting a new one.
+                    void this._handleSteerMessage(message.text);
                     break;
                 case 'cancel':
                     // Cancel must not wait behind an in-flight sendMessage; AcpClient
@@ -641,6 +646,29 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
             totalCount,
             loadedCount,
             headerText: `Prior Session Loaded Successfully!`,
+        });
+    }
+
+    /**
+     * Convert the remote transcript that Hermes streams back during session/load
+     * into local ChatMessages. This is the authoritative history pulled fresh
+     * from Hermes — the extension never treats its on-disk cache as the source
+     * of truth for a resumed session.
+     */
+    private _replayToChatMessages(replayed: ReplayMessage[]): ChatMessage[] {
+        if (!replayed || replayed.length === 0) {
+            return [];
+        }
+        return replayed.map((m, i) => {
+            const entry: ChatMessage = {
+                role: m.role,
+                text: m.text || '',
+                timestamp: Date.now() + i,
+            };
+            if (m.toolCallId) {
+                entry.toolCallId = m.toolCallId;
+            }
+            return entry;
         });
     }
 
@@ -1352,14 +1380,17 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
             const pickedId = await this._openSessionMenu();
             if (pickedId) {
                 this._log(`User picked Hermes session: ${pickedId.slice(0, 8)}...`);
-                await this._acp.loadSession(pickedId, cwd);
+                const replayed = await this._acp.loadSession(pickedId, cwd);
                 // Adopt the picked session id so history/model resolve against
                 // the resumed session, not a stale/empty local id.
                 this._sessionId = pickedId;
                 this._acpBoundSessionId = pickedId;
                 this._saveActiveSession();
-                this._sessionMessages = [];
-                this._loadHistory();
+                // Use the authoritative remote transcript streamed by Hermes
+                // during session/load — NOT the stale on-disk cache. The
+                // extension never owns session history; it always pulls fresh.
+                this._sessionMessages = this._replayToChatMessages(replayed);
+                this._persistMessages();
                 this._postMessage({ type: 'newChat' });
                 this._restoreMessages();
                 this._postSessionList();
@@ -1472,12 +1503,13 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
         }
         try {
             this._log(`Switching to Hermes session: ${pickedId.slice(0, 8)}...`);
-            await this._acp.loadSession(pickedId, cwd);
+            const replayed = await this._acp.loadSession(pickedId, cwd);
             this._sessionId = pickedId;
             this._acpBoundSessionId = pickedId;
             this._saveActiveSession();
-            this._sessionMessages = [];
-            this._loadHistory();
+            // Fresh pull from Hermes — not the stale on-disk cache.
+            this._sessionMessages = this._replayToChatMessages(replayed);
+            this._persistMessages();
             this._postMessage({ type: 'newChat' });
             this._restoreMessages();
             // Trust the resumed session's actual runtime model, not the local pref.
@@ -2451,6 +2483,34 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
         await this._acp?.sendMessage(promptText, images, files);
     }
 
+    /**
+     * Re-steer a turn that is already streaming. The host forwards the text to
+     * Hermes as an in-flight session/update so the running generation absorbs
+     * the correction. The user message is also echoed into the chat UI so the
+     * user can see what they injected.
+     */
+    private async _handleSteerMessage(text: string): Promise<void> {
+        const trimmed = (text || '').trim();
+        if (!trimmed) {
+            return;
+        }
+        if (this._acp?.status !== 'prompting') {
+            // Not mid-turn; fall back to a normal new message.
+            await this._handleUserMessage(text);
+            return;
+        }
+        this._log(`Steer message (mid-turn): ${trimmed.slice(0, 80)}`);
+        const ok = await this._acp.sendSteerMessage(trimmed);
+        if (ok) {
+            // Echo the steering message into the UI as a user bubble.
+            this._saveMessage('user', trimmed);
+            this._postMessage({ type: 'steerEcho', text: trimmed, sessionId: this._sessionId });
+        } else {
+            // Steering failed (e.g. Hermes rejected the update) — send normally.
+            await this._handleUserMessage(text);
+        }
+    }
+
     private async _handleCancel(): Promise<void> {
         this._sendEpoch++;
         this._clearPromptStallTimer();
@@ -3271,6 +3331,10 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
             return;
         }
         this._log(`Switch profile/agent: ${target.displayName}`);
+        // The extension never owns session history — drop the on-disk cache for
+        // the session we're leaving so no stale transcript lingers. On resume the
+        // authoritative transcript is pulled fresh from Hermes.
+        const leavingSessionId = this._sessionId;
         if (this._promptSessionId) {
             await this._detachActivePrompt(this._promptSessionId, { savePartial: true });
         }
@@ -3282,6 +3346,9 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
         this._promptSessionId = undefined;
         this._acpBoundSessionId = '';
         this._postTokenUsage();
+        try {
+            fs.unlinkSync(this._msgPath(leavingSessionId));
+        } catch { /* already gone or none */ }
         this._bindProfileScope(target.scopeKey);
         this._activeSelectionId = target.selectionId;
         this._activeAgentName = target.displayName;

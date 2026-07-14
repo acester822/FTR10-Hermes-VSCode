@@ -206,6 +206,43 @@ export class EditorToolsMcpServer {
                     throw new Error(`Unknown tool: ${name}`);
                 }
                 const result = await tool.handler(args);
+
+                // NEW (Phase 1): if a tool returns the Hermes multimodal
+                // envelope ({_multimodal:true, content:[...]}) — e.g.
+                // `capture_view` in pixel mode — forward it as STRUCTURED
+                // MCP content (text + image_url blocks) so the agent's
+                // runtime turns it into a real vision block. Stringifying
+                // it would flatten the image into text and break vision.
+                if (
+                    result &&
+                    typeof result === 'object' &&
+                    (result as any)._multimodal === true &&
+                    Array.isArray((result as any).content)
+                ) {
+                    const env = result as { content: Array<any>; text_summary?: string; meta?: any };
+                    const contentBlocks = env.content.map((part: any) => {
+                        if (part && part.type === 'image_url' && part.image_url?.url) {
+                            // MCP protocol requires image blocks as
+                            // {type:"image", data:<base64>, mimeType:...}
+                            // — NOT the OpenAI/Anthropic image_url shape.
+                            // (Hermes' own mcp_serve.py later re-wraps this
+                            // into image_url for its internal vision routing.)
+                            const m = /^data:([^;]+);base64,(.*)$/.exec(part.image_url.url);
+                            const mimeType = m ? m[1] : 'image/png';
+                            const data = m ? m[2] : part.image_url.url.replace(/^data:[^;]+;base64,/, '');
+                            return { type: 'image', data, mimeType };
+                        }
+                        return { type: 'text', text: String(part?.text ?? '') };
+                    });
+                    // Surface a short text_summary as a companion text block
+                    // when the first block is an image, so the model also
+                    // gets a textual caption it can reason over.
+                    if (env.text_summary && contentBlocks[0]?.type === 'image') {
+                        contentBlocks.push({ type: 'text', text: env.text_summary });
+                    }
+                    return { content: contentBlocks };
+                }
+
                 const text = result === undefined || result === null
                     ? 'ok'
                     : typeof result === 'string'

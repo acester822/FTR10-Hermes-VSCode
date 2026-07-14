@@ -1044,6 +1044,7 @@
     let thoughtMsgId = null;
     let canSend = false;
     let isPrompting = false;
+    let steeringMode = false;
     /** Images queued for the next send. Each: { name, mimeType, data(base64) }. */
     let pendingImages = [];
     /** Non-image files (code/text) queued for the next send. Each: { name, mimeType, text }. */
@@ -3273,6 +3274,66 @@ function parseToolCallText(text) {
     let slashCommandIndex = 0;
     let slashCommandVisible = false;
 
+    // ---- Live (during-run) command bar ----
+    // Commands from the advertised slash-command list that are meaningful while a
+    // turn is actively streaming. These render as buttons to the left of the
+    // send/stop button so the user can invoke them without knowing the exact
+    // slash syntax. Clicking prefills the composer; pressing send then steers.
+    const LIVE_COMMAND_NAMES = ['steer', 'queue'];
+    const liveCommandBarEl = document.getElementById('liveCommandBar');
+    let liveCommandButtons = [];
+
+    function renderLiveCommandBar() {
+        if (!liveCommandBarEl) {
+            return;
+        }
+        const live = slashCommands.filter(function (c) {
+            return LIVE_COMMAND_NAMES.indexOf(c.name) !== -1;
+        });
+        liveCommandBarEl.innerHTML = '';
+        liveCommandButtons = [];
+        if (live.length === 0) {
+            liveCommandBarEl.hidden = true;
+            return;
+        }
+        live.forEach(function (cmd) {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'live-command-btn input-action button';
+            btn.textContent = '/' + cmd.name;
+            btn.title = cmd.description || ('Use /' + cmd.name);
+            btn.setAttribute('aria-label', '/' + cmd.name);
+            btn.addEventListener('click', function () {
+                const token = '/' + cmd.name + ' ';
+                const cur = inputEl.value;
+                // Replace a leading /command token, else insert at cursor.
+                if (/^\/[A-Za-z-]*$/.test(cur.trim())) {
+                    inputEl.value = token;
+                } else if (cur && cur.length > 0) {
+                    const pos = inputEl.selectionStart || cur.length;
+                    inputEl.value = cur.slice(0, pos) + token + cur.slice(pos);
+                } else {
+                    inputEl.value = token;
+                }
+                syncInputHeightFromContent();
+                inputEl.focus();
+                renderSlashCommandPicker();
+                updateQuickActionBtns();
+            });
+            liveCommandBarEl.appendChild(btn);
+            liveCommandButtons.push(btn);
+        });
+        liveCommandBarEl.hidden = false;
+    }
+
+    function hideLiveCommandBar() {
+        if (liveCommandBarEl) {
+            liveCommandBarEl.hidden = true;
+            liveCommandBarEl.innerHTML = '';
+        }
+        liveCommandButtons = [];
+    }
+
     function hideSlashCommandPicker() {
         slashCommandVisible = false;
         slashCommandItems = [];
@@ -3392,18 +3453,31 @@ function parseToolCallText(text) {
             inputCompositeShellEl.classList.toggle('waiting', waiting);
         }
         if (mode === 'stop') {
-            sendBtn.classList.add('hidden');
+            // While a turn is running, the input and send button stay live so the
+            // user can steer the active generation (the send becomes a steer). The
+            // cancel button remains the abort control, and the live-command bar
+            // (left of send/stop) surfaces the in-progress commands they can use.
+            sendBtn.classList.remove('hidden');
             cancelBtn.classList.remove('hidden');
-            sendBtn.disabled = true;
+            sendBtn.disabled = false;
+            inputEl.disabled = false;
+            steeringMode = true;
+            renderLiveCommandBar();
         } else if (mode === 'waiting') {
+            steeringMode = false;
+            hideLiveCommandBar();
             cancelBtn.classList.add('hidden');
             sendBtn.classList.remove('hidden');
             sendBtn.disabled = true;
         } else if (mode === 'send') {
+            steeringMode = false;
+            hideLiveCommandBar();
             cancelBtn.classList.add('hidden');
             sendBtn.classList.remove('hidden');
             sendBtn.disabled = !canSend;
         } else {
+            steeringMode = false;
+            hideLiveCommandBar();
             cancelBtn.classList.add('hidden');
             sendBtn.classList.remove('hidden');
             sendBtn.disabled = true;
@@ -5068,9 +5142,25 @@ function parseToolCallText(text) {
 
     function sendMessage() {
         const text = inputEl.value.trim();
-        if (!canSend) return;
+        // Allow steering the active turn even though canSend is false while the
+        // agent is running (see setInputMode 'stop'). In that state the send
+        // button is intentionally live and routes to a steer message.
+        if (!canSend && !(steeringMode && isPrompting)) return;
         // Allow sending with an attached image or file even if the text box is empty.
         if (!text && pendingImages.length === 0 && pendingFiles.length === 0) return;
+
+        // While a turn is already running, the send becomes a steer (re-steer the
+        // in-flight Hermes generation) rather than a brand new prompt.
+        if (steeringMode && isPrompting) {
+            vscode.postMessage({ type: 'steerMessage', text: text });
+            inputEl.value = '';
+            pendingImages = [];
+            pendingFiles = [];
+            renderAttachPreview();
+            syncInputHeightFromContent();
+            updateQuickActionBtns();
+            return;
+        }
 
         executeSendMessage(text);
     }
@@ -6746,6 +6836,15 @@ function parseToolCallText(text) {
 
             case 'insertInput':
                 insertIntoInput(msg.text || '');
+                break;
+
+            case 'steerEcho':
+                if (!isMessageForActiveSession(msg)) {
+                    break;
+                }
+                // Echo the mid-turn steering message the user injected.
+                addMessage('user', msg.text || '', { steer: true });
+                maybeScrollToBottom();
                 break;
 
             case 'restoreHistory':

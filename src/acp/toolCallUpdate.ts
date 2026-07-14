@@ -197,6 +197,8 @@ function formatToolCallRawValue(value: unknown): string | undefined {
     }
 }
 
+export { formatToolCallRawValue };
+
 export function formatToolCallSummary(status: ToolCallStatus, title: string | undefined, state?: ToolCallState): string {
     const stateTag = state ? ` [${state}]` : '';
     return `${TOOL_CALL_ICONS[status]}${stateTag} ${title || 'Tool'}`;
