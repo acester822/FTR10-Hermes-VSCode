@@ -33,6 +33,7 @@ import {
     parseToolCallSessionUpdate,
     formatToolCallRawValue,
 } from './toolCallUpdate';
+import { followAlong } from './followAlong';
 import {
     VSCODE_MCP_SERVER_ID,
     VSCODE_MCP_SERVER_NAME,
@@ -1522,6 +1523,9 @@ export class AcpClient {
             return;
         }
         const merged = this._toolCallTracker.apply(parsed);
+        // Phase 3: paint the follow-along overlay for editor see/act tools.
+        // Fail-soft; never affects the chat message pipeline below.
+        try { followAlong.onToolCall(merged); } catch { /* ignore */ }
         this._onMessage('tool', formatToolCallDisplay(merged), merged.toolCallId);
     }
 

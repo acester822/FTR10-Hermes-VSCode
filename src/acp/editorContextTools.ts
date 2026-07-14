@@ -4,6 +4,7 @@ import * as zlib from 'zlib';
 import type { DiffReviewManager } from './DiffReviewManager';
 import { resolveDiff } from './unifiedDiff';
 import { getFocusedWindowContext, pinFocus } from './acpToolRegistration';
+import { followAlong } from './followAlong';
 
 // Diff content provider (hermes-diff:// scheme) is registered via DiffReviewManager.
 // See src/acp/DiffReviewManager.ts → registerDiffContentProvider().
@@ -829,6 +830,7 @@ async function scrollView(direction: string, amount: number, focusTo?: string): 
   if (ok === 0) {
     return { status: 'error', message: `Scroll command '${cmd}' did not execute (no editor focus or command unavailable).`, actualFilePath: target.actualFilePath, followedFocus: target.followedFocus, focusMismatch: target.focusMismatch };
   }
+  followAlong.flashVisible(editor, 'act');
   return { status: 'ok', scrolled: direction, units: ok, actualFilePath: target.actualFilePath, followedFocus: target.followedFocus, focusMismatch: target.focusMismatch };
 }
 
@@ -841,6 +843,7 @@ async function revealLine(line: number, focusTo?: string): Promise<any> {
     new vscode.Range(pos, pos),
     vscode.TextEditorRevealType.InCenter,
   );
+  followAlong.flashLine(editor, pos.line, 'act');
   const text = editor.document.lineAt(pos.line).text;
   return { status: 'ok', revealedLine: pos.line, text, filePath: editor.document.uri.fsPath, followedFocus: target.followedFocus, focusMismatch: target.focusMismatch };
 }
@@ -852,6 +855,7 @@ async function focusEditor(focusTo: string): Promise<any> {
   const doc = target.editor.document;
   // Pin this file as the session's focus target so subsequent see/act calls follow it.
   pinFocus(doc.uri.fsPath, doc.languageId);
+  followAlong.flashLine(target.editor, 0, 'act');
   return { status: 'ok', focused: doc.uri.fsPath, languageId: doc.languageId, lineCount: doc.lineCount, followedFocus: true, focusMismatch: false };
 }
 
@@ -1145,10 +1149,12 @@ async function captureView(mode: string, includeFullFile: boolean, focusTo?: str
     result.actualFilePath = target.actualFilePath;
     result.followedFocus = target.followedFocus;
     result.focusMismatch = target.focusMismatch;
+    followAlong.flashVisible(editor, 'see');
     return result;
   }
 
   // Pixel path — render the visible editor to an image.
+  followAlong.flashVisible(editor, 'see');
   const shot = await _captureEditorScreenshot();
   if (!shot) {
     return { status: 'error', message: 'Could not capture the active editor (no active text editor?).', actualFilePath: target.actualFilePath, followedFocus: target.followedFocus, focusMismatch: target.focusMismatch };

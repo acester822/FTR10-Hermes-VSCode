@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { registerEditorContextTools, type AcpToolDef } from './editorContextTools';
 import { DiffReviewManager } from './DiffReviewManager';
 import { logToFile } from './fileLogger';
+import { followAlong } from './followAlong';
 
 export type { AcpToolDef } from './editorContextTools';
 
@@ -194,6 +195,9 @@ export function getEventsSubscriptions(): Array<vscode.Disposable> {
       vscode.commands.executeCommand('hermes-agent.internal.diagnosticsChanged');
     }),
   );
+
+  // Phase 3: dispose follow-along decorations on teardown.
+  disposables.push({ dispose: () => followAlong.dispose() });
 
   return disposables;
 }
