@@ -159,6 +159,13 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
     private _scopeKey: string;
     private _sessionsPath: string;
     private _activeIdPath: string;
+    /**
+     * Stable per-window key used to scope the ACTIVE-session pointer so that
+     * multiple code-server windows (each its own extension host + `hermes acp`
+     * child + MCP server) do not share one "live session" pointer. Derived from
+     * the window's first workspace folder; falls back to a machine/session id.
+     */
+    private _windowKey: string;
     private _sessionMessages: ChatMessage[] = [];
     private _sessionId: string = '';
     private _sessions: SessionInfo[] = [];
@@ -229,7 +236,11 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
         this._activeSelectionId = initialTarget.selectionId;
         this._activeAgentName = initialTarget.displayName;
         this._sessionsPath = sessionsPathFor(this._historyDir, this._scopeKey);
-        this._activeIdPath = activeSessionPathFor(this._historyDir, this._scopeKey);
+        // Per-window key: the first workspace folder path is stable across
+        // reloads and distinct per code-server window. Fall back to a stable
+        // per-machine id if no folder is open (rare for this extension).
+        this._windowKey = HermesChatProvider._computeWindowKey();
+        this._activeIdPath = activeSessionPathFor(this._historyDir, this._scopeKey, this._windowKey);
         this._loadSessions();
         this._sessionId = this._restoreActiveSession();
         this._ensureSessionRegistered();
@@ -247,14 +258,41 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
     }
 
     private _restoreActiveSession(): string {
-        // Try restoring last active session
+        // Try restoring last active session (per-window pointer first)
         try {
             if (fs.existsSync(this._activeIdPath)) {
                 const id = fs.readFileSync(this._activeIdPath, 'utf-8').trim();
                 if (this._sessions.some(s => s.id === id)) return id;
             }
         } catch { /* ignore */ }
+        // One-time fallback: inherit the LEGACY shared pointer on first run
+        // after upgrade, so an in-flight session is not lost. This is only a
+        // seed — the next _saveActiveSession() writes the per-window pointer.
+        try {
+            const legacy = activeSessionPathFor(this._historyDir, this._scopeKey);
+            if (legacy !== this._activeIdPath && fs.existsSync(legacy)) {
+                const id = fs.readFileSync(legacy, 'utf-8').trim();
+                if (this._sessions.some(s => s.id === id)) return id;
+            }
+        } catch { /* ignore */ }
         return Date.now().toString(36);
+    }
+
+    /**
+     * Stable, per-window key for scoping the active-session pointer. Uses the
+     * first workspace folder path (distinct per code-server window, stable
+     * across reloads). Falls back to the machine id when no folder is open.
+     */
+    private static _computeWindowKey(): string {
+        const folder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+        if (folder && folder.trim()) {
+            return folder.trim();
+        }
+        try {
+            return `machine-${vscode.env.machineId}`;
+        } catch {
+            return 'no-folder';
+        }
     }
 
     private _saveActiveSession(): void {
@@ -1069,7 +1107,7 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
         this._saveCurrentSession();
         this._scopeKey = scopeKey;
         this._sessionsPath = sessionsPathFor(this._historyDir, scopeKey);
-        this._activeIdPath = activeSessionPathFor(this._historyDir, scopeKey);
+        this._activeIdPath = activeSessionPathFor(this._historyDir, scopeKey, this._windowKey);
         this._sessions = [];
         this._loadSessions();
         this._sessionId = this._restoreActiveSession();

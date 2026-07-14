@@ -25,8 +25,11 @@ export function sessionsPathFor(historyDir: string, scopeKey: string): string {
     return path.join(profileDir(historyDir, scopeKey), 'sessions.json');
 }
 
-export function activeSessionPathFor(historyDir: string, scopeKey: string): string {
-    return path.join(profileDir(historyDir, scopeKey), 'active-session.txt');
+export function activeSessionPathFor(historyDir: string, scopeKey: string, windowKey?: string): string {
+    const file = windowKey
+        ? `active-session-${sanitizeProfileScopeKey(windowKey)}.txt`
+        : 'active-session.txt';
+    return path.join(profileDir(historyDir, scopeKey), file);
 }
 
 export function profileStatePathFor(historyDir: string, scopeKey: string): string {

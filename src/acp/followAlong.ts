@@ -119,26 +119,20 @@ class FollowAlongController {
     }
 
     /**
-     * Single entry point for AcpClient._emitToolCallUpdate to call (one line).
-     * Given a parsed tool-call view, if it's one of the editor see/act tools,
-     * paint the follow-along overlay on the relevant editor. Best-effort.
+     * Optional echo entry point for AcpClient._emitToolCallUpdate.
+     *
+     * NOTE: the editor see/act tools (capture_view, scroll_view, reveal_line,
+     * focus_editor) ALREADY flash directly from their own handlers with the
+     * precise resolved editor + line. Flashing again here — off the imprecise
+     * global activeTextEditor, and once per tool_call AND tool_call_update —
+     * caused a double/triple flash across multiple editor groups. So this is
+     * intentionally a NO-OP for those tools; kept as a hook point for future
+     * non-editor tool echoes only.
      */
-    onToolCall(view: { title?: string; toolType?: string; status?: string }): void {
-        if (!this._enabled() || !view) return;
-        const name = (view.title || '').toLowerCase();
-        const editor = vscode.window.activeTextEditor;
-        if (!editor) return;
-        try {
-            if (name.includes('capture_view')) {
-                this.flashVisible(editor, 'see');
-            } else if (name.includes('scroll_view')) {
-                this.flashVisible(editor, 'act');
-            } else if (name.includes('reveal_line') || name.includes('focus_editor')) {
-                this.flashLine(editor, editor.selection.active.line, 'act');
-            }
-        } catch {
-            /* ignore */
-        }
+    onToolCall(_view: { title?: string; toolType?: string; status?: string }): void {
+        // Intentionally does nothing: direct handlers own the overlay to avoid
+        // duplicate flashes. See note above.
+        return;
     }
 
     dispose(): void {
