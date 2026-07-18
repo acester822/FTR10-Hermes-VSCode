@@ -2704,7 +2704,7 @@ body {
     color: var(--fg);
 }
 .slash-command-menu-picker .slash-command-menu-btn .input-picker-icon {
-    color: var(--dim);
+    color: var(--fg);
     filter: none;
     transition: color 0.15s;
 }
@@ -4412,10 +4412,16 @@ mark.search-mark-active {
     background: color-mix(in srgb, var(--primary) 34%, transparent);
     box-shadow: 0 0 14px color-mix(in srgb, var(--primary) 26%, transparent);
 }
-/* Slow ready-pulse on the Send button when it is enabled, mirroring the
-   gentle breathing glow the input area uses while the agent is active. */
-#sendBtn.ftr10-apply-btn:not(:disabled) {
+/* Send-button breathing pulse.
+   - Armed / ready: you're typing but haven't sent yet (input is enabled).
+     Uses the accent so it reads "ready to receive".
+   - Active turn: the conversation is live (agent running). Uses the warm
+     accent-2 (orange) so the pulse color changes to signal "active". */
+#sendBtn.ftr10-apply-btn:not(:disabled):not(.is-active-turn) {
     animation: send-ready-pulse 1.8s ease-in-out infinite;
+}
+#sendBtn.ftr10-apply-btn.is-active-turn {
+    animation: send-active-pulse 1.8s ease-in-out infinite;
 }
 @keyframes send-ready-pulse {
     0%, 100% {
@@ -4423,6 +4429,14 @@ mark.search-mark-active {
     }
     50% {
         box-shadow: 0 0 16px color-mix(in srgb, var(--primary) 42%, transparent);
+    }
+}
+@keyframes send-active-pulse {
+    0%, 100% {
+        box-shadow: 0 0 6px color-mix(in srgb, var(--accent-2) 22%, transparent);
+    }
+    50% {
+        box-shadow: 0 0 18px color-mix(in srgb, var(--accent-2) 50%, transparent);
     }
 }
 

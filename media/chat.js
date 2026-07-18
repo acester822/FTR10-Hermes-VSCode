@@ -3556,11 +3556,15 @@ function parseToolCallText(text) {
 
     function setInputMode(mode) {
         const waiting = mode === 'stop' || mode === 'waiting';
+        const activeTurn = mode === 'stop' || mode === 'waiting';
         if (inputCompositeEl) {
             inputCompositeEl.classList.toggle('waiting', waiting);
         }
         if (inputCompositeShellEl) {
             inputCompositeShellEl.classList.toggle('waiting', waiting);
+        }
+        if (sendBtn) {
+            sendBtn.classList.toggle('is-active-turn', activeTurn);
         }
         if (mode === 'stop') {
             // While a turn is running, the input and send button stay live so the
