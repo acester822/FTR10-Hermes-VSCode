@@ -3293,6 +3293,30 @@ function parseToolCallText(text) {
     const slashCommandMenuSearchEl = document.getElementById('slashCommandMenuSearchInput');
     let slashCommandMenuFilter = '';
 
+    // Commands the UI always surfaces even when the agent doesn't advertise them
+    // in `available_commands_update` (the old steer/queue quick-buttons hardcoded
+    // these two). If the host DOES advertise one, its description wins.
+    const GUARANTEED_COMMANDS = [
+        { name: 'steer', description: 'Redirect the response while it is generating' },
+        { name: 'queue', description: 'Queue a message to send after the current turn' },
+    ];
+
+    // Union of advertised commands + guaranteed ones, deduped by name (advertised
+    // entries override the guaranteed stubs so host descriptions/hints survive).
+    function getMenuCommands() {
+        const byName = Object.create(null);
+        const order = [];
+        GUARANTEED_COMMANDS.forEach(function (c) {
+            byName[c.name] = { name: c.name, description: c.description, inputHint: null };
+            order.push(c.name);
+        });
+        slashCommands.forEach(function (c) {
+            if (!byName[c.name]) order.push(c.name);
+            byName[c.name] = c;
+        });
+        return order.map(function (n) { return byName[n]; });
+    }
+
     function insertSlashCommandToken(name) {
         const token = '/' + name + ' ';
         const cur = inputEl.value;
@@ -3313,8 +3337,9 @@ function parseToolCallText(text) {
     function renderSlashCommandMenuOptions() {
         if (!slashCommandMenuListEl) return;
         slashCommandMenuListEl.innerHTML = '';
+        const all = getMenuCommands();
         const q = slashCommandMenuFilter.trim().toLowerCase();
-        const list = slashCommands.filter(function (c) {
+        const list = all.filter(function (c) {
             if (!q) return true;
             return c.name.toLowerCase().indexOf(q) !== -1
                 || (c.description || '').toLowerCase().indexOf(q) !== -1;
@@ -3322,7 +3347,7 @@ function parseToolCallText(text) {
         if (list.length === 0) {
             const empty = document.createElement('div');
             empty.className = 'slash-command-menu-empty';
-            empty.textContent = (slashCommands.length === 0)
+            empty.textContent = (all.length === 0)
                 ? (locale.noCommandsAvailable || 'No commands available')
                 : (locale.noMatchingCommands || 'No matching commands');
             slashCommandMenuListEl.appendChild(empty);
