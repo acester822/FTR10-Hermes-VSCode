@@ -3274,56 +3274,142 @@ function parseToolCallText(text) {
     let slashCommandIndex = 0;
     let slashCommandVisible = false;
 
-    // ---- Live (during-run) command bar ----
-    // Commands from the advertised slash-command list that are meaningful while a
-    // turn is actively streaming. These render as buttons to the left of the
-    // send/stop button so the user can invoke them without knowing the exact
-    // slash syntax. Clicking prefills the composer; pressing send then steers.
-    const LIVE_COMMAND_NAMES = ['steer', 'queue'];
+    // ---- Legacy live-command bar (retired) ----
+    // The old steer/queue quick-buttons that rendered here are replaced by the
+    // always-available slash-command menu below. The element ref is kept only so
+    // the retired render/hide helpers can ensure the bar stays hidden.
     const liveCommandBarEl = document.getElementById('liveCommandBar');
-    let liveCommandButtons = [];
 
-    function renderLiveCommandBar() {
-        if (!liveCommandBarEl) {
-            return;
+    // ---- Slash-command menu (always available) ----
+    // A dropdown, styled like the reasoning-effort menu, that lists every
+    // advertised /command. Replaces the old steer/queue quick-buttons. Clicking
+    // an item prefills the composer with "/name " so the user can add args and
+    // send (which steers when a turn is already running).
+    const slashCommandMenuPickerEl = document.getElementById('slashCommandMenuPicker');
+    const slashCommandMenuBtnEl = document.getElementById('slashCommandMenuBtn');
+    const slashCommandMenuDropdownEl = document.getElementById('slashCommandMenuDropdown');
+    const slashCommandMenuListEl = document.getElementById('slashCommandMenuList');
+    const slashCommandMenuHeaderEl = document.getElementById('slashCommandMenuHeader');
+    const slashCommandMenuSearchEl = document.getElementById('slashCommandMenuSearchInput');
+    let slashCommandMenuFilter = '';
+
+    function insertSlashCommandToken(name) {
+        const token = '/' + name + ' ';
+        const cur = inputEl.value;
+        if (/^\/[A-Za-z-]*$/.test(cur.trim())) {
+            inputEl.value = token;
+        } else if (cur && cur.length > 0) {
+            const pos = inputEl.selectionStart || cur.length;
+            inputEl.value = cur.slice(0, pos) + token + cur.slice(pos);
+        } else {
+            inputEl.value = token;
         }
-        const live = slashCommands.filter(function (c) {
-            return LIVE_COMMAND_NAMES.indexOf(c.name) !== -1;
+        syncInputHeightFromContent();
+        inputEl.focus();
+        renderSlashCommandPicker();
+        if (typeof updateQuickActionBtns === 'function') { try { updateQuickActionBtns(); } catch (_) {} }
+    }
+
+    function renderSlashCommandMenuOptions() {
+        if (!slashCommandMenuListEl) return;
+        slashCommandMenuListEl.innerHTML = '';
+        const q = slashCommandMenuFilter.trim().toLowerCase();
+        const list = slashCommands.filter(function (c) {
+            if (!q) return true;
+            return c.name.toLowerCase().indexOf(q) !== -1
+                || (c.description || '').toLowerCase().indexOf(q) !== -1;
         });
-        liveCommandBarEl.innerHTML = '';
-        liveCommandButtons = [];
-        if (live.length === 0) {
-            liveCommandBarEl.hidden = true;
+        if (list.length === 0) {
+            const empty = document.createElement('div');
+            empty.className = 'slash-command-menu-empty';
+            empty.textContent = (slashCommands.length === 0)
+                ? (locale.noCommandsAvailable || 'No commands available')
+                : (locale.noMatchingCommands || 'No matching commands');
+            slashCommandMenuListEl.appendChild(empty);
             return;
         }
-        live.forEach(function (cmd) {
-            const btn = document.createElement('button');
-            btn.type = 'button';
-            btn.className = 'live-command-btn input-action button ftr10-apply-btn';
-            btn.textContent = '/' + cmd.name;
-            btn.title = cmd.description || ('Use /' + cmd.name);
-            btn.setAttribute('aria-label', '/' + cmd.name);
-            btn.addEventListener('click', function () {
-                const token = '/' + cmd.name + ' ';
-                const cur = inputEl.value;
-                // Replace a leading /command token, else insert at cursor.
-                if (/^\/[A-Za-z-]*$/.test(cur.trim())) {
-                    inputEl.value = token;
-                } else if (cur && cur.length > 0) {
-                    const pos = inputEl.selectionStart || cur.length;
-                    inputEl.value = cur.slice(0, pos) + token + cur.slice(pos);
-                } else {
-                    inputEl.value = token;
-                }
-                syncInputHeightFromContent();
-                inputEl.focus();
-                renderSlashCommandPicker();
-                updateQuickActionBtns();
+        list.forEach(function (cmd) {
+            const item = document.createElement('div');
+            item.className = 'slash-command-menu-option';
+            item.dataset.name = cmd.name;
+            const name = document.createElement('div');
+            name.className = 'slash-command-menu-name';
+            name.textContent = '/' + cmd.name;
+            const desc = document.createElement('div');
+            desc.className = 'slash-command-menu-desc';
+            desc.textContent = cmd.description || (cmd.inputHint || '');
+            item.appendChild(name);
+            if (desc.textContent) item.appendChild(desc);
+            item.addEventListener('click', function (e) {
+                e.stopPropagation();
+                insertSlashCommandToken(cmd.name);
+                closeAllDropdowns();
             });
-            liveCommandBarEl.appendChild(btn);
-            liveCommandButtons.push(btn);
+            slashCommandMenuListEl.appendChild(item);
         });
-        liveCommandBarEl.hidden = false;
+    }
+
+    function positionSlashCommandMenuDropdown() {
+        if (!slashCommandMenuDropdownEl || !slashCommandMenuBtnEl) return;
+        const rect = slashCommandMenuBtnEl.getBoundingClientRect();
+        const dropW = slashCommandMenuDropdownEl.offsetWidth || 260;
+        const dropH = slashCommandMenuDropdownEl.offsetHeight || 280;
+        const margin = 6;
+        let left = rect.left;
+        if (left < margin) left = margin;
+        if (left + dropW > window.innerWidth - margin) left = window.innerWidth - dropW - margin;
+        let top = rect.top - dropH - margin;
+        if (top < margin) {
+            const below = rect.bottom + margin;
+            top = (below + dropH <= window.innerHeight - margin) ? below : Math.max(margin, window.innerHeight - dropH - margin);
+        }
+        slashCommandMenuDropdownEl.style.position = 'fixed';
+        slashCommandMenuDropdownEl.style.left = left + 'px';
+        slashCommandMenuDropdownEl.style.top = top + 'px';
+        slashCommandMenuDropdownEl.style.bottom = 'auto';
+        slashCommandMenuDropdownEl.style.right = 'auto';
+        slashCommandMenuDropdownEl.style.zIndex = '1000';
+    }
+
+    if (slashCommandMenuBtnEl && slashCommandMenuDropdownEl) {
+        if (slashCommandMenuHeaderEl) slashCommandMenuHeaderEl.textContent = locale.slashCommandsTitle || 'Commands';
+        slashCommandMenuBtnEl.addEventListener('click', function (e) {
+            e.stopPropagation();
+            const open = slashCommandMenuDropdownEl.style.display === 'none';
+            closeAllDropdowns();
+            if (open) {
+                slashCommandMenuFilter = '';
+                if (slashCommandMenuSearchEl) slashCommandMenuSearchEl.value = '';
+                if (slashCommandMenuPickerEl) slashCommandMenuPickerEl.classList.add('is-open');
+                slashCommandMenuDropdownEl.style.display = 'block';
+                renderSlashCommandMenuOptions();
+                positionSlashCommandMenuDropdown();
+                if (slashCommandMenuSearchEl) { try { slashCommandMenuSearchEl.focus(); } catch (_) {} }
+            }
+        });
+        slashCommandMenuDropdownEl.addEventListener('click', function (e) { e.stopPropagation(); });
+        if (slashCommandMenuSearchEl) {
+            slashCommandMenuSearchEl.addEventListener('input', function () {
+                slashCommandMenuFilter = slashCommandMenuSearchEl.value || '';
+                renderSlashCommandMenuOptions();
+                positionSlashCommandMenuDropdown();
+            });
+        }
+    }
+
+    window.addEventListener('resize', function () {
+        if (slashCommandMenuDropdownEl && slashCommandMenuDropdownEl.style.display !== 'none') {
+            positionSlashCommandMenuDropdown();
+        }
+    });
+
+    // Kept for backward compatibility with existing callers in setInputMode().
+    // The steer/queue quick-buttons are gone; the always-available slash-command
+    // menu covers those now, so these become no-ops (the old bar stays hidden).
+    function renderLiveCommandBar() {
+        if (slashCommandMenuDropdownEl && slashCommandMenuDropdownEl.style.display !== 'none') {
+            renderSlashCommandMenuOptions();
+        }
     }
 
     function hideLiveCommandBar() {
@@ -3331,7 +3417,6 @@ function parseToolCallText(text) {
             liveCommandBarEl.hidden = true;
             liveCommandBarEl.innerHTML = '';
         }
-        liveCommandButtons = [];
     }
 
     function hideSlashCommandPicker() {
@@ -5757,12 +5842,14 @@ function parseToolCallText(text) {
         if (contextAttachPicker) contextAttachPicker.classList.remove('is-open');
         if (permissionModePickerEl) permissionModePickerEl.classList.remove('is-open');
         if (reasoningEffortPickerEl) reasoningEffortPickerEl.classList.remove('is-open');
+        if (slashCommandMenuPickerEl) slashCommandMenuPickerEl.classList.remove('is-open');
         if (inputQuickPanel) setQuickPanelOpen(false);
         if (profileDropdown) profileDropdown.style.display = 'none';
         modelDropdown.style.display = 'none';
         if (contextAttachDropdown) contextAttachDropdown.style.display = 'none';
         if (permissionModeDropdownEl) permissionModeDropdownEl.style.display = 'none';
         if (reasoningEffortDropdownEl) reasoningEffortDropdownEl.style.display = 'none';
+        if (slashCommandMenuDropdownEl) slashCommandMenuDropdownEl.style.display = 'none';
         hideContextAttachTooltip();
         hideContextAttachPreview();
     }
@@ -5943,24 +6030,50 @@ function parseToolCallText(text) {
     const reasoningEffortPickerEl = document.getElementById('reasoningEffortPicker');
     const reasoningEffortBtnEl = document.getElementById('reasoningEffortBtn');
     const reasoningEffortLabelEl = document.getElementById('reasoningEffortLabel');
+    const reasoningEffortIconEl = document.getElementById('reasoningEffortIcon');
     const reasoningEffortHeaderEl = document.getElementById('reasoningEffortHeader');
     const reasoningEffortDropdownEl = document.getElementById('reasoningEffortDropdown');
     const reasoningEffortListEl = document.getElementById('reasoningEffortList');
     const reasoningEffortCaretEl = reasoningEffortPickerEl ? reasoningEffortPickerEl.querySelector('.reasoning-effort-caret') : null;
     const reasoningEffortOptions = [
-        { id: 'none', labelKey: 'reasoningEffortNone', hint: '' },
-        { id: 'minimal', labelKey: 'reasoningEffortMinimal', hint: '' },
-        { id: 'low', labelKey: 'reasoningEffortLow', hint: '' },
-        { id: 'medium', labelKey: 'reasoningEffortMedium', hint: '' },
-        { id: 'high', labelKey: 'reasoningEffortHigh', hint: '' },
-        { id: 'xhigh', labelKey: 'reasoningEffortXHigh', hint: '' },
+        { id: 'none', labelKey: 'reasoningEffortNone', hint: '', bars: 0 },
+        { id: 'minimal', labelKey: 'reasoningEffortMinimal', hint: '', bars: 1 },
+        { id: 'low', labelKey: 'reasoningEffortLow', hint: '', bars: 2 },
+        { id: 'medium', labelKey: 'reasoningEffortMedium', hint: '', bars: 3 },
+        { id: 'high', labelKey: 'reasoningEffortHigh', hint: '', bars: 4 },
+        { id: 'xhigh', labelKey: 'reasoningEffortXHigh', hint: '', bars: 5 },
     ];
+
+    // Build a "brainmeter" SVG: a small brain glyph with a 5-segment gauge whose
+    // filled bars grow with the reasoning level (0..5). Filled bars use the
+    // accent color; empty bars are dimmed. Rendered inline so it recolors with
+    // the theme's --primary.
+    function brainmeterSvg(bars, size) {
+        const px = size || 18;
+        const total = 5;
+        const filled = Math.max(0, Math.min(total, bars || 0));
+        let rects = '';
+        for (let i = 0; i < total; i++) {
+            const x = 3.2 + i * 2.3;
+            const h = 3 + i * 1.7;           // rising bar heights
+            const y = 14.5 - h;
+            const on = i < filled;
+            const fill = on ? 'currentColor' : 'currentColor';
+            const op = on ? '1' : '0.28';
+            rects += '<rect x="' + x.toFixed(2) + '" y="' + y.toFixed(2) + '" width="1.5" height="' + h.toFixed(2) + '" rx="0.5" fill="' + fill + '" opacity="' + op + '"/>';
+        }
+        // small brain arc at the top-left as an identity cue
+        const brain = '<path d="M2.2 5.4a2 2 0 0 1 3.4-1.4 2 2 0 0 1 1.2 3.5 2 2 0 0 1-3.9.3A2 2 0 0 1 2.2 5.4z" fill="none" stroke="currentColor" stroke-width="0.9" opacity="0.55"/>';
+        return '<svg viewBox="0 0 16 16" width="' + px + '" height="' + px + '" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">' + brain + rects + '</svg>';
+    }
 
     function updateReasoningEffortUI() {
         const opt = reasoningEffortOptions.find(function(o) { return o.id === reasoningEffort; });
         if (!opt) return;
         const label = locale[opt.labelKey] || opt.id;
-        if (reasoningEffortLabelEl) reasoningEffortLabelEl.textContent = label;
+        if (reasoningEffortIconEl) {
+            reasoningEffortIconEl.innerHTML = brainmeterSvg(opt.bars, 18);
+        }
         if (reasoningEffortBtnEl) {
             const hint = opt.hint || '';
             reasoningEffortBtnEl.setAttribute('title', (locale.reasoningEffortLabel || 'Reasoning') + ': ' + label + (hint ? ' — ' + hint : ''));
@@ -5986,7 +6099,9 @@ function parseToolCallText(text) {
             item.className = 'reasoning-effort-option' + (opt.id === reasoningEffort ? ' is-active' : '');
             item.dataset.effort = opt.id;
             const label = locale[opt.labelKey] || opt.id;
-            item.innerHTML = '<span class="effort-check">✓</span><span class="effort-label">' + label + '</span>';
+            item.innerHTML = '<span class="effort-check">✓</span>'
+                + '<span class="effort-meter" aria-hidden="true">' + brainmeterSvg(opt.bars, 16) + '</span>'
+                + '<span class="effort-label">' + label + '</span>';
             item.addEventListener('click', function(e) {
                 e.stopPropagation();
                 reasoningEffort = opt.id;
@@ -6750,6 +6865,10 @@ function parseToolCallText(text) {
                         };
                     }).filter(function (c) { return c.name.length > 0; });
                     renderSlashCommandPicker();
+                    if (typeof renderSlashCommandMenuOptions === 'function'
+                        && slashCommandMenuDropdownEl && slashCommandMenuDropdownEl.style.display !== 'none') {
+                        renderSlashCommandMenuOptions();
+                    }
                 }
                 break;
 

@@ -2624,6 +2624,118 @@ body {
     flex: 1;
     min-width: 0;
 }
+/* Reasoning picker is now icon-only: a brainmeter gauge that pops the menu. */
+.reasoning-effort-picker.icon-only .reasoning-effort-btn {
+    max-width: none;
+    gap: 0;
+    padding: 3px;
+}
+.brainmeter-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    color: var(--primary);
+}
+/* Beat the generic .input-picker-icon greyscale filter so the gauge keeps its
+   accent color (it draws with currentColor = --primary). Specificity 0,3,0
+   matches the washing rule and wins by source order. */
+.reasoning-effort-picker .reasoning-effort-btn .brainmeter-icon {
+    filter: none;
+}
+.brainmeter-icon svg { display: block; }
+.reasoning-effort-picker .reasoning-effort-btn:hover .brainmeter-icon,
+.reasoning-effort-picker.is-open .reasoning-effort-btn .brainmeter-icon {
+    color: var(--primary);
+    filter: drop-shadow(0 0 4px color-mix(in srgb, var(--primary) 45%, transparent));
+}
+/* Per-option mini brainmeter in the dropdown */
+.reasoning-effort-option .effort-meter {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    color: var(--primary);
+}
+.reasoning-effort-option .effort-meter svg { display: block; }
+
+/* Slash-command menu — always-available, styled like the reasoning menu.
+   Replaces the old steer/queue quick-buttons. */
+.slash-command-menu-picker.icon-only .slash-command-menu-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 3px;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 3px;
+    color: var(--dim);
+    cursor: pointer;
+    transition: color 0.15s, background 0.15s;
+}
+.slash-command-menu-picker .slash-command-menu-btn:hover {
+    color: var(--fg);
+    background: color-mix(in srgb, var(--fg) 7%, transparent);
+}
+.slash-command-menu-picker.is-open .slash-command-menu-btn {
+    color: var(--fg);
+}
+.slash-command-menu-picker .slash-command-menu-btn .input-picker-icon {
+    filter: var(--picker-icon-filter, brightness(0) invert(0.85));
+}
+.slash-command-menu-picker .dropdown {
+    top: auto;
+    bottom: calc(100% + 6px);
+    left: 0;
+    min-width: 240px;
+    max-width: min(320px, 94vw);
+    border-radius: var(--radius-md);
+    padding-bottom: 4px;
+}
+.slash-command-menu-search {
+    padding: 6px 8px 4px;
+}
+.slash-command-menu-search .dropdown-search-input {
+    width: 100%;
+}
+.slash-command-menu-options {
+    max-height: 300px;
+    overflow-y: auto;
+}
+.slash-command-menu-option {
+    padding: 6px 10px;
+    cursor: pointer;
+    border-left: 2px solid transparent;
+    transition: background 0.1s, border-color 0.1s;
+}
+.slash-command-menu-option:hover {
+    background: color-mix(in srgb, var(--primary) 8%, transparent);
+    border-left-color: var(--primary);
+}
+.slash-command-menu-name {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--fg);
+    font-family: var(--vscode-editor-font-family, ui-monospace, monospace);
+}
+.slash-command-menu-desc {
+    font-size: 11px;
+    color: var(--dim);
+    line-height: 1.35;
+    margin-top: 1px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.slash-command-menu-empty {
+    padding: 10px;
+    font-size: 11px;
+    color: var(--dim);
+    text-align: center;
+}
 /* Quick-actions popup trigger (magnifier) next to the permission icon */
 .input-quick-trigger {
     display: inline-flex;

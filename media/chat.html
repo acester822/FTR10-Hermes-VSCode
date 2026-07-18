@@ -227,11 +227,21 @@
             <textarea id="input" rows="1" disabled></textarea>
             <div class="input-composite-bar">
                 <div class="input-action">
-                    <div class="picker reasoning-effort-picker" id="reasoningEffortPicker">
+                    <div class="picker slash-command-menu-picker icon-only" id="slashCommandMenuPicker">
+                        <button type="button" class="slash-command-menu-btn" id="slashCommandMenuBtn" title="Commands" aria-label="Commands" aria-haspopup="true" aria-expanded="false">
+                            <span class="input-picker-icon" aria-hidden="true"><svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M6.4 2.3a.75.75 0 0 1 .53 1.28L4.6 5.9l2.33 2.33a.75.75 0 0 1-1.06 1.06L2.48 6.9a.75.75 0 0 1 0-1.06l2.86-2.86a.75.75 0 0 1 .53-.22 .75.75 0 0 1 .53.22zM8.9 11.5h4.35a.75.75 0 0 1 0 1.5H8.9a.75.75 0 0 1 0-1.5z"/></svg></span>
+                        </button>
+                        <div class="dropdown" id="slashCommandMenuDropdown" style="display:none">
+                            <div class="dropdown-header" id="slashCommandMenuHeader">Commands</div>
+                            <div class="slash-command-menu-search" id="slashCommandMenuSearchWrap">
+                                <input type="text" class="dropdown-search-input" id="slashCommandMenuSearchInput" placeholder="Filter commands…" spellcheck="false">
+                            </div>
+                            <div class="slash-command-menu-options" id="slashCommandMenuList"></div>
+                        </div>
+                    </div>
+                    <div class="picker reasoning-effort-picker icon-only" id="reasoningEffortPicker">
                         <button type="button" class="reasoning-effort-btn" id="reasoningEffortBtn" title="Reasoning effort" aria-label="Reasoning effort" aria-haspopup="true" aria-expanded="false">
-                            <span class="input-picker-icon" aria-hidden="true" id="reasoningEffortIcon">🧠</span>
-                            <span class="input-picker-label" id="reasoningEffortLabel"></span>
-                            <span class="reasoning-effort-caret" aria-hidden="true">▾</span>
+                            <span class="input-picker-icon brainmeter-icon" aria-hidden="true" id="reasoningEffortIcon"></span>
                         </button>
                         <div class="dropdown" id="reasoningEffortDropdown" style="display:none">
                             <div class="dropdown-header" id="reasoningEffortHeader">Reasoning effort</div>
