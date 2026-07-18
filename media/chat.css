@@ -4221,7 +4221,7 @@ mark.search-mark-active {
 }
 .ftr10-apply-btn:hover:not(:disabled) {
     background: color-mix(in srgb, var(--primary) 22%, transparent);
-    box-shadow: 0 0 20px color-mix(in srgb, var(--primary) 40%, transparent);
+    box-shadow: 0 0 14px color-mix(in srgb, var(--primary) 22%, transparent);
 }
 .ftr10-apply-btn:active:not(:disabled) {
     transform: scale(0.97);
@@ -4257,7 +4257,7 @@ mark.search-mark-active {
 }
 #cancelBtn.ftr10-apply-btn:hover:not(:disabled) {
     background: color-mix(in srgb, var(--error) 22%, transparent);
-    box-shadow: 0 0 20px color-mix(in srgb, var(--error) 40%, transparent);
+    box-shadow: 0 0 14px color-mix(in srgb, var(--error) 22%, transparent);
 }
 #sessionPickerRefreshBtn.ftr10-apply-btn,
 #sessionPickerNewBtn.ftr10-apply-btn {
@@ -4275,7 +4275,7 @@ mark.search-mark-active {
 }
 #sessionPickerNewBtn.ftr10-apply-btn.primary:hover:not(:disabled) {
     background: color-mix(in srgb, var(--primary) 34%, transparent);
-    box-shadow: 0 0 20px color-mix(in srgb, var(--primary) 45%, transparent);
+    box-shadow: 0 0 14px color-mix(in srgb, var(--primary) 26%, transparent);
 }
 
 /* Live (during-run) command bar — buttons surface commands that can be used
