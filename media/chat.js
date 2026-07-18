@@ -3299,7 +3299,7 @@ function parseToolCallText(text) {
         live.forEach(function (cmd) {
             const btn = document.createElement('button');
             btn.type = 'button';
-            btn.className = 'live-command-btn input-action button';
+            btn.className = 'live-command-btn input-action button ftr10-apply-btn';
             btn.textContent = '/' + cmd.name;
             btn.title = cmd.description || ('Use /' + cmd.name);
             btn.setAttribute('aria-label', '/' + cmd.name);
@@ -5708,10 +5708,21 @@ function parseToolCallText(text) {
         }
 
         sessionPickerModal.hidden = false;
+        setSessionPickerTransparency(true);
+    }
+
+    // Method that makes the picker overlay fully transparent (with a blurred
+    // view of the session behind it) while the picker is open, and restores
+    // the opaque baseline when closed.
+    function setSessionPickerTransparency(open) {
+        if (!sessionPickerModal) return;
+        sessionPickerModal.classList.toggle('is-transparent', !!open);
+        document.body.classList.toggle('session-picker-open', !!open);
     }
 
     function hideHermesSessionPicker() {
         sessionPickerModal.hidden = true;
+        setSessionPickerTransparency(false);
     }
 
     function formatSessionTime(isoStr) {

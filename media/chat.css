@@ -1693,12 +1693,14 @@ body {
     color: var(--ftr10-text, inherit);
 }
 .message code {
-    background: var(--ftr10-code-bg, var(--vscode-textCodeBlock-background, #2d2d2d));
+    background: var(--ftr10-accent-1-50);
     padding: 1px 4px;
-    border-radius: 3px;
+    border-radius: 6px;
     /* font-size: 0.9em; */
-    font-family: var(--ftr10-font-auxiliarybar);
-    color: var(--ftr10-accent-3);
+    font-family: var(
+    --ftr10-font-auxiliarybar);
+    color: var(
+    --ftr10-text);
 }
 
 /* --- Nested code blocks -----------------------------------------------
@@ -1735,7 +1737,7 @@ body {
     color: var(--ftr10-h1-color, var(--fg));
 }
 .message h2 { color: var(--ftr10-h2-color, var(--fg)); }
-.message h3 { color: var(--ftr10-h3-color, var(--fg)); }
+.message h3 { color: var(--ftr10-h2-color, var(--fg)); }
 .message h4 { color: var(--ftr10-h4-color, var(--fg)); }
 .message a { color: var(--primary); }
 .message a:hover { color: var(--accent-2); }
@@ -2324,7 +2326,7 @@ body {
 .input-composite-shell {
     position: relative;
     overflow: visible;
-    border: 1px solid #ff00007a;
+    border: 1px solid var(--accent-2);
     background: #00000066;
     border-radius: 8px;
 }
@@ -3228,10 +3230,24 @@ body {
 }
 .attach-image-btn {
     margin-right: auto;
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    background: #0c0e13;
+    color: var(--fg);
+    border: 1px solid var(--glass-stroke-strong);
+    border-radius: var(--radius-md);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+}
+.attach-image-btn:hover {
+    background: #16181f;
+    color: var(--primary);
+    border-color: var(--primary);
 }
 .attach-image-btn svg {
     width: 16px;
     height: 16px;
+    fill: currentColor;
 }
 .attach-preview-row {
     display: flex;
@@ -4133,14 +4149,21 @@ mark.search-mark-active {
 #sendBtn {
     background: var(--primary);
     color: var(--primary-fg);
-    box-shadow: var(--ftr10-inset-light-edges, none);
+    border: 1px solid color-mix(in srgb, var(--primary) 80%, #fff);
+    border-radius: var(--radius-md);
+    padding: 6px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    box-shadow: 0 1px 6px color-mix(in srgb, var(--primary) 40%, transparent), var(--ftr10-inset-light-edges, none);
 }
 #sendBtn:hover:not(:disabled) {
     background: var(--primary-hover);
+    box-shadow: 0 2px 10px color-mix(in srgb, var(--primary) 50%, transparent);
 }
 #sendBtn:disabled {
-    opacity: 0.4;
+    opacity: 0.45;
     cursor: default;
+    box-shadow: none;
 }
 #cancelBtn {
     background: transparent;
@@ -4177,6 +4200,84 @@ mark.search-mark-active {
     flex-shrink: 0;
 }
 
+/* ── Apply-button visual language (mirrors FTR10-Codex .btn-apply) ──────────
+   Translucent dark fill, accent-colored text + hairline border, soft glow,
+   uppercase letter-spaced label, press-in scale on :active. */
+.ftr10-apply-btn {
+    font-family: var(--ftr10-font-panel-top, var(--ftr10-body-font, 'Share Tech Mono', ui-monospace, monospace));
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.15s, box-shadow 0.15s, border-color 0.15s, color 0.15s, transform 0.1s;
+    position: relative;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    background: rgba(0, 8, 20, 0.62);
+    color: var(--primary);
+    box-shadow: 0 0 12px color-mix(in srgb, var(--primary) 20%, transparent);
+}
+.ftr10-apply-btn:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--primary) 22%, transparent);
+    box-shadow: 0 0 20px color-mix(in srgb, var(--primary) 40%, transparent);
+}
+.ftr10-apply-btn:active:not(:disabled) {
+    transform: scale(0.97);
+}
+.ftr10-apply-btn:disabled {
+    opacity: 0.45;
+    cursor: default;
+    box-shadow: none;
+}
+
+/* Apply the look to the requested controls. Specificity keeps their existing
+   layout rules (sizes, flex, min-width) intact — only the skin is replaced.
+   The combined ID+class selectors beat the bare #id rules so the Apply skin
+   wins over the original primary/error fills. */
+#sendBtn.ftr10-apply-btn {
+    padding: 7px 16px;
+    font-size: 0.78rem;
+    background: rgba(0, 8, 20, 0.62);
+    border-color: rgba(255, 255, 255, 0.2);
+}
+.live-command-btn.ftr10-apply-btn {
+    padding: 7px 12px;
+    min-width: 0;
+    font-size: 0.78rem;
+    background: rgba(0, 8, 20, 0.62);
+    border-color: rgba(255, 255, 255, 0.2);
+}
+#cancelBtn.ftr10-apply-btn {
+    color: var(--error);
+    border-color: color-mix(in srgb, var(--error) 60%, transparent);
+    background: rgba(0, 8, 20, 0.62);
+    box-shadow: 0 0 12px color-mix(in srgb, var(--error) 20%, transparent);
+}
+#cancelBtn.ftr10-apply-btn:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--error) 22%, transparent);
+    box-shadow: 0 0 20px color-mix(in srgb, var(--error) 40%, transparent);
+}
+#sessionPickerRefreshBtn.ftr10-apply-btn,
+#sessionPickerNewBtn.ftr10-apply-btn {
+    padding: 7px 18px;
+    font-size: 0.78rem;
+    border-radius: var(--radius-md);
+    background: rgba(0, 8, 20, 0.62);
+}
+/* Keep the "primary" New Session affordance distinct with a filled accent. */
+#sessionPickerNewBtn.ftr10-apply-btn.primary {
+    background: color-mix(in srgb, var(--primary) 22%, rgba(0, 8, 20, 0.62));
+    color: var(--primary);
+    border-color: rgba(255, 255, 255, 0.2);
+    box-shadow: 0 0 12px color-mix(in srgb, var(--primary) 30%, transparent);
+}
+#sessionPickerNewBtn.ftr10-apply-btn.primary:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--primary) 34%, transparent);
+    box-shadow: 0 0 20px color-mix(in srgb, var(--primary) 45%, transparent);
+}
+
 /* Live (during-run) command bar — buttons surface commands that can be used
    while a turn is streaming, shown to the LEFT of the send/stop button. */
 .live-command-bar {
@@ -4189,18 +4290,24 @@ mark.search-mark-active {
     display: none;
 }
 .live-command-btn {
-    background: var(--ftr10-glass-bg, rgba(255, 255, 255, 0.08));
-    color: var(--ftr10-accent-1, var(--primary));
-    border: 1px solid var(--ftr10-glass-border, rgba(255, 255, 255, 0.18));
+    background: color-mix(in srgb, var(--primary) 14%, var(--text-block));
+    color: var(--fg);
+    border: 1px solid color-mix(in srgb, var(--primary) 35%, var(--border));
     box-shadow: none;
-    padding: 5px 9px;
+    padding: 6px 11px;
     min-width: 0;
+    border-radius: var(--radius-md);
+    font-size: 12px;
+    font-weight: 600;
+    transition: background var(--transition-spring), border-color var(--transition-spring), color var(--transition-spring);
 }
 .live-command-btn:hover:not(:disabled) {
-    background: var(--ftr10-glass-bg-strong, rgba(255, 255, 255, 0.14));
+    background: color-mix(in srgb, var(--primary) 24%, var(--text-block));
+    border-color: color-mix(in srgb, var(--primary) 55%, var(--border));
+    color: var(--fg);
 }
 .live-command-btn:disabled {
-    opacity: 0.4;
+    opacity: 0.45;
     cursor: default;
 }
 
@@ -4817,23 +4924,31 @@ mark.search-mark-active {
     align-items: stretch;
     justify-content: flex-start;
     z-index: 100;
+    /* Default baseline (used only if JS transparency toggle is unavailable).
+       Real transparency is driven by .is-transparent below. */
     background: var(--bg-solid, #0e0e12);
     padding: 0;
     margin: 0;
     box-sizing: border-box;
+    transition: background var(--transition-base), backdrop-filter var(--transition-base);
 }
 .session-picker-modal[hidden] {
     display: none;
 }
-.session-picker-panel {
+/* Method-driven transparency: applied while the picker is open so the
+   in-progress session/chat behind it remains visible (blurred for legibility). */
+.session-picker-modal.is-transparent {
     background: transparent;
-    border: none;
-    border-radius: 0;
-    box-shadow: none;
-    max-width: none;
-    width: 100%;
+    -webkit-backdrop-filter: var(--glass-blur);
+    backdrop-filter: var(--glass-blur);
+}
+.session-picker-panel {
+    background: color-mix(in srgb, var(--bg-solid, #0c0e13) 40%, transparent);
+    border: 1px solid var(--glass-stroke);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--glass-shadow-md);
     max-height: none;
-    height: 100%;
+    height: auto;
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -4842,22 +4957,29 @@ mark.search-mark-active {
     padding: var(--space-lg) var(--space-lg) var(--space-sm);
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: 4px;
+    border-bottom: 1px solid var(--glass-stroke);
+    -webkit-backdrop-filter: blur(4px);
+    backdrop-filter: blur(4px);
 }
 .session-picker-title {
-    font-size: 14px;
-    font-weight: 600;
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: 0.2px;
     color: var(--fg);
 }
 .session-picker-subtitle {
-    font-size: var(--font-size-sm);
+    font-size: var(--font-size-base);
     color: var(--dim);
 }
 .session-picker-body {
     flex: 1;
     overflow-y: auto;
-    padding: var(--space-sm) var(--space-lg);
+    padding: var(--space-md) var(--space-lg);
     min-height: 80px;
+    background: color-mix(in srgb, var(--bg-solid, #0c0e13) 55%, transparent);
+    scrollbar-width: thin;
+    scrollbar-color: #ffffff42 #00000000;
 }
 .session-picker-list {
     display: flex;
@@ -4903,15 +5025,15 @@ mark.search-mark-active {
     gap: 1px;
 }
 .session-picker-card-title {
-    font-size: 12px;
+    font-size: 13px;
     color: var(--fg);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-weight: 500;
+    font-weight: 600;
 }
 .session-picker-card-meta {
-    font-size: 10px;
+    font-size: 11px;
     color: var(--dim);
     overflow: hidden;
     text-overflow: ellipsis;
@@ -4934,28 +5056,35 @@ mark.search-mark-active {
     display: flex;
     gap: var(--space-sm);
     justify-content: flex-end;
-    padding: var(--space-sm) var(--space-lg) var(--space-lg);
+    padding: var(--space-md) var(--space-lg) var(--space-lg);
+    border-top: 1px solid var(--glass-stroke);
+    -webkit-backdrop-filter: blur(4px);
+    backdrop-filter: blur(4px);
 }
 .session-picker-footer .toolbar-btn {
-    padding: 6px 16px;
-    font-size: 12px;
-    border-radius: var(--radius-sm);
-    border: 1px solid var(--border);
-    background: transparent;
+    padding: 7px 18px;
+    font-size: 13px;
+    font-weight: 500;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--glass-stroke-strong);
+    background: color-mix(in srgb, var(--fg) 6%, var(--text-block));
     color: var(--fg);
     cursor: pointer;
-    transition: all var(--transition-fast);
+    transition: all var(--transition-spring);
 }
 .session-picker-footer .toolbar-btn:hover {
-    background: color-mix(in srgb, var(--fg) 6%, var(--bg));
+    background: color-mix(in srgb, var(--fg) 12%, var(--text-block));
+    border-color: var(--primary);
 }
 .session-picker-footer .toolbar-btn.primary {
     background: var(--primary);
     color: var(--primary-fg);
     border-color: var(--primary);
+    font-weight: 600;
 }
 .session-picker-footer .toolbar-btn.primary:hover {
     background: var(--primary-hover);
+    border-color: var(--primary-hover);
 }
 
 /* Responsive Adjustments */
