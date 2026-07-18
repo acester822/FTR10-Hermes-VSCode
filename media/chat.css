@@ -2477,17 +2477,37 @@ body {
     max-width: min(280px, 92vw);
     border-radius: var(--radius-md);
 }
-/* Dynamic mode icons: ensure contrast on the editor background */
+/* Dynamic mode icons: rendered as a CSS mask so the glyph takes the element's
+   background-color — this lets it recolor on hover like the other icons. */
 .permission-mode-picker .permission-mode-btn .input-picker-icon {
-    filter: var(--picker-icon-filter, brightness(0) invert(0.85));
-}
-.permission-mode-picker.mode-yolo .permission-mode-btn .input-picker-icon {
     filter: none;
-    background: #00ff0a;
-    border-radius: 5px;
 }
-.permission-mode-picker.mode-denyAll .permission-mode-btn .input-picker-icon {
-    filter: var(--picker-icon-filter, brightness(0) invert(0.85));
+.picker-icon-mask {
+    width: 16px;
+    height: 16px;
+    background-color: var(--dim);
+    -webkit-mask-size: contain;
+    mask-size: contain;
+    -webkit-mask-position: center;
+    mask-position: center;
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+    transition: background-color 0.15s;
+}
+.permission-mode-picker .permission-mode-btn:hover .picker-icon-mask,
+.permission-mode-picker.is-open .picker-icon-mask {
+    background-color: var(--primary);
+}
+.permission-mode-picker.mode-yolo .permission-mode-btn .picker-icon-mask,
+.permission-mode-picker.mode-autoApprove .permission-mode-btn .picker-icon-mask {
+    background-color: #00ff0a;
+}
+.permission-mode-picker.mode-yolo .permission-mode-btn:hover .picker-icon-mask,
+.permission-mode-picker.mode-autoApprove .permission-mode-btn:hover .picker-icon-mask {
+    background-color: var(--primary);
+}
+.permission-mode-picker.mode-denyAll .permission-mode-btn .picker-icon-mask {
+    background-color: var(--dim);
 }
 .permission-mode-option {
     display: flex;
@@ -2684,7 +2704,9 @@ body {
     color: var(--fg);
 }
 .slash-command-menu-picker .slash-command-menu-btn .input-picker-icon {
-    filter: var(--picker-icon-filter, brightness(0) invert(0.85));
+    color: var(--dim);
+    filter: none;
+    transition: color 0.15s;
 }
 .slash-command-menu-picker .dropdown {
     top: auto;
@@ -4389,6 +4411,19 @@ mark.search-mark-active {
 #sessionPickerNewBtn.ftr10-apply-btn.primary:hover:not(:disabled) {
     background: color-mix(in srgb, var(--primary) 34%, transparent);
     box-shadow: 0 0 14px color-mix(in srgb, var(--primary) 26%, transparent);
+}
+/* Slow ready-pulse on the Send button when it is enabled, mirroring the
+   gentle breathing glow the input area uses while the agent is active. */
+#sendBtn.ftr10-apply-btn:not(:disabled) {
+    animation: send-ready-pulse 1.8s ease-in-out infinite;
+}
+@keyframes send-ready-pulse {
+    0%, 100% {
+        box-shadow: 0 0 6px color-mix(in srgb, var(--primary) 18%, transparent);
+    }
+    50% {
+        box-shadow: 0 0 16px color-mix(in srgb, var(--primary) 42%, transparent);
+    }
 }
 
 /* Live (during-run) command bar — buttons surface commands that can be used

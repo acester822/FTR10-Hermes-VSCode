@@ -5962,17 +5962,22 @@ function parseToolCallText(text) {
         }
         if (permissionModeIconEl) {
             const mediaBase = (typeof FTR10_MEDIA_URI === 'string' && FTR10_MEDIA_URI) ? FTR10_MEDIA_URI.replace(/\/$/, '') + '/' : '';
+            const maskUrl = function (name) { return 'url("' + mediaBase + name + '")'; };
             if (permissionMode === 'yolo') {
-                permissionModeIconEl.src = mediaBase + 'accelerate-svgrepo-com.svg';
+                permissionModeIconEl.style.maskImage = maskUrl('accelerate-svgrepo-com.svg');
+                permissionModeIconEl.style.webkitMaskImage = maskUrl('accelerate-svgrepo-com.svg');
                 permissionModeIconEl.style.transform = '';
             } else if (permissionMode === 'autoApprove') {
-                permissionModeIconEl.src = mediaBase + 'thumbs-up-svgrepo-com.svg';
+                permissionModeIconEl.style.maskImage = maskUrl('thumbs-up-svgrepo-com.svg');
+                permissionModeIconEl.style.webkitMaskImage = maskUrl('thumbs-up-svgrepo-com.svg');
                 permissionModeIconEl.style.transform = '';
             } else if (permissionMode === 'denyAll') {
-                permissionModeIconEl.src = mediaBase + 'thumbs-up-svgrepo-com.svg';
+                permissionModeIconEl.style.maskImage = maskUrl('thumbs-up-svgrepo-com.svg');
+                permissionModeIconEl.style.webkitMaskImage = maskUrl('thumbs-up-svgrepo-com.svg');
                 permissionModeIconEl.style.transform = 'rotate(180deg)';
             } else {
-                permissionModeIconEl.src = mediaBase + 'shield-svgrepo-com.svg';
+                permissionModeIconEl.style.maskImage = maskUrl('shield-svgrepo-com.svg');
+                permissionModeIconEl.style.webkitMaskImage = maskUrl('shield-svgrepo-com.svg');
                 permissionModeIconEl.style.transform = '';
             }
         }
