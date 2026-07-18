@@ -3230,24 +3230,25 @@ body {
 }
 .attach-image-btn {
     margin-right: auto;
-    width: 30px;
-    height: 30px;
-    padding: 0;
-    background: #0c0e13;
-    color: var(--fg);
-    border: 1px solid var(--glass-stroke-strong);
-    border-radius: var(--radius-md);
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+    width: auto;
+    height: auto;
+    padding: 3px;
+    background: none;
+    color: var(--dim);
+    border: none;
+    border-radius: 4px;
+    box-shadow: none;
 }
 .attach-image-btn:hover {
-    background: #16181f;
+    background: none;
     color: var(--primary);
-    border-color: var(--primary);
+    border-color: transparent;
 }
 .attach-image-btn svg {
-    width: 16px;
-    height: 16px;
+    width: 18px;
+    height: 18px;
     fill: currentColor;
+    display: block;
 }
 .attach-preview-row {
     display: flex;
@@ -4265,10 +4266,10 @@ mark.search-mark-active {
     font-size: 0.78rem;
     border-radius: var(--radius-md);
     background: rgba(0, 8, 20, 0.62);
+    color: var(--ftr10-accent-2);
 }
 /* Keep the "primary" New Session affordance distinct with a filled accent. */
 #sessionPickerNewBtn.ftr10-apply-btn.primary {
-    background: color-mix(in srgb, var(--primary) 22%, rgba(0, 8, 20, 0.62));
     color: var(--primary);
     border-color: rgba(255, 255, 255, 0.2);
     box-shadow: 0 0 12px color-mix(in srgb, var(--primary) 30%, transparent);
