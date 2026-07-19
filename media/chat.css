@@ -209,6 +209,17 @@ body {
 .status-bar .dot.ready { background: var(--success); }
 .status-bar .dot.prompting { background: var(--accent-2); animation: pulse 1s infinite; }
 .status-bar .dot.error { background: var(--error); }
+/* Model picker lives in the status bar: keep it inline and anchor its dropdown
+   to the button itself (status-bar is not a positioned context). */
+.status-bar .status-bar-model {
+    position: relative;
+    flex-shrink: 0;
+    max-width: 160px;
+    margin-left: 4px;
+}
+.status-bar .status-bar-model .input-model-btn {
+    padding: 1px 6px;
+}
 .retry-btn {
     background: transparent;
     border: 1px solid var(--border);
@@ -2312,12 +2323,12 @@ body {
 }
 .input-picker-row {
     position: absolute;
-    left: -8px;
+    left: 0;
     bottom: -5px;
     z-index: 8;
     display: flex;
     align-items: center;
-    gap: 2px;
+    gap: 12px;
     max-width: min(420px, 88vw);
 }
 .input-model-picker,
