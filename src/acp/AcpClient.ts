@@ -34,7 +34,6 @@ import {
     formatToolCallRawValue,
 } from './toolCallUpdate';
 import { followAlong } from './followAlong';
-import { InlineDiffManager } from './InlineDiffManager';
 import {
     VSCODE_MCP_SERVER_ID,
     VSCODE_MCP_SERVER_NAME,
@@ -205,6 +204,8 @@ export interface SlashCommand {
 }
 /** Called when the agent advertises or updates its supported slash commands. */
 export type SlashCommandsHandler = (commands: SlashCommand[]) => void;
+/** Called when a tool call arrives that may mutate a file. Used for inline diff snapshot capture. */
+export type FileToolCallHandler = (update: Record<string, unknown>) => void;
 
 interface TerminalInstance {
     process: ChildProcess;
@@ -283,6 +284,7 @@ export class AcpClient {
     private _onUsage: UsageHandler;
     private _onSegmentEnd: SegmentEndHandler;
     private _onSlashCommands: SlashCommandsHandler;
+    private _onFileToolCall: FileToolCallHandler;
     private _resolveMcpServers: McpServersResolver;
     /** Monotonic id so stale prompt rejections after cancel are ignored. */
     private _activePromptId = 0;
@@ -310,8 +312,6 @@ export class AcpClient {
     private _historyReplayBuffer: ReplayMessage[] = [];
     /** Resolves with the captured replay messages once the load completes. */
     private _historyReplayResolve: ((messages: ReplayMessage[]) => void) | null = null;
-    /** Inline diff manager for file change previews. */
-    private _inlineDiff = new InlineDiffManager();
 
     private static readonly VALID: Record<AcpStatus, AcpStatus[]> = {
         idle:        ['connecting'],
@@ -337,7 +337,8 @@ export class AcpClient {
         onModelsChanged?: ModelsChangedHandler,
         onSegmentEnd?: SegmentEndHandler,
         onSlashCommands?: SlashCommandsHandler,
-        resolveMcpServers?: McpServersResolver
+        resolveMcpServers?: McpServersResolver,
+        onFileToolCall?: FileToolCallHandler
     ) {
         this._onMessage = onMessage;
         this._onStatus = onStatus;
@@ -354,6 +355,7 @@ export class AcpClient {
         this._onModelsChanged = onModelsChanged || (() => {});
         this._onSegmentEnd = onSegmentEnd || (() => {});
         this._onSlashCommands = onSlashCommands || (() => {});
+        this._onFileToolCall = onFileToolCall || (() => {});
         this._resolveMcpServers = resolveMcpServers || (() => []);
     }
 
@@ -1336,11 +1338,8 @@ export class AcpClient {
                     break;
                 }
                 this._endAssistantSegment();
-                // Capture file snapshot before modification for inline diff generation
-                if (this._inlineDiff.isFileMutating(update)) {
-                    const fp = this._inlineDiff.getFilePath(update);
-                    if (fp) this._inlineDiff.captureSnapshot(fp);
-                }
+                // Notify the host about a file-mutating tool call so it can capture a pre-change snapshot
+                this._onFileToolCall(update);
                 this._emitToolCallUpdate(update, 'tool_call');
                 break;
 

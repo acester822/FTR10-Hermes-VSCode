@@ -5,7 +5,7 @@ import * as os from 'os';
 import * as crypto from 'crypto';
 import * as http from 'http';
 import { AcpClient, AcpStatus, ModelListState, PermissionRequest, TokenUsage, ReplayMessage } from '../acp/AcpClient';
-import { InlineDiffManager } from '../acp/InlineDiffManager';
+import { InlineDiffManager, isFileMutatingTool, extractFilePath } from '../acp/InlineDiffManager';
 import { buildModelListStateFromCatalog, isRuntimeModelSource, encodeHermesModelValueId } from '../acp/modelConfig';
 import { resolveModelCatalog } from '../acp/acpModelCatalog';
 import type { AcpModelOptionsResponse } from '../acp/acpModelCatalog';
@@ -1404,6 +1404,17 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
                     this._log(`Forwarding ${servers.length} MCP server(s) to Hermes: ${servers.map(s => s.name).join(', ')}`);
                 }
                 return servers;
+            },
+            // onFileToolCall: capture pre-change snapshot for inline diff preview
+            (update) => {
+                if (isFileMutatingTool(update)) {
+                    const fp = extractFilePath(update);
+                    if (fp) {
+                        try {
+                            this._inlineDiff.captureSnapshot(fp);
+                        } catch { /* best-effort */ }
+                    }
+                }
             }
         );
 
