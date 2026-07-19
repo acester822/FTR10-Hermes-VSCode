@@ -2,7 +2,7 @@
   "name": "FTR10-Hermes-VSCode",
   "displayName": "%extension.displayName%",
   "description": "%extension.description%",
-  "version": "0.5.6",
+  "version": "0.5.7",
   "publisher": "FTR10",
   "icon": "media/icon.png",
   "license": "MIT",

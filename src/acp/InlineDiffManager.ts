@@ -241,6 +241,33 @@ export class InlineDiffManager {
         return extractFilePath(update);
     }
 
+    /**
+     * Called when a file-mutating tool completes. Reads the current file content
+     * directly and emits the diff without relying on the filesystem watcher.
+     */
+    completeSnapshot(filePath: string): void {
+        if (!this._enabled) return;
+        const realKey = normalizePath(filePath);
+        if (!this._pendingToolFiles.has(realKey)) return;
+        let newContent: string;
+        try {
+            newContent = fs.readFileSync(realKey, 'utf-8');
+        } catch {
+            return;
+        }
+        const snapshot = this._snapshots.get(realKey);
+        if (!snapshot) return;
+        const oldContent = snapshot.content;
+        this._snapshots.set(realKey, { content: newContent, timestamp: Date.now() });
+        if (oldContent === newContent) return;
+        this._pendingToolFiles.delete(realKey);
+        const diff = computeDiff(oldContent, newContent, realKey);
+        console.log(`[inline-diff-complete] computed diff for ${realKey}, length=${diff?.length ?? 0}, handler=${!!this._onDiffPreview}`);
+        if (diff && this._onDiffPreview) {
+            this._onDiffPreview(realKey, diff);
+        }
+    }
+
     dispose(): void {
         for (const d of this._disposables) d.dispose();
         this._disposables = [];

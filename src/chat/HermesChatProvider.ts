@@ -141,6 +141,8 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
     private _view?: vscode.WebviewView;
     private _acp?: AcpClient;
     private _inlineDiff = new InlineDiffManager();
+    /** Maps toolCallId → filePath for file-mutating tool calls, so the completion handler can compute the diff. */
+    private _pendingFileTools = new Map<string, string>();
     private _output: vscode.OutputChannel;
     private _ftr10Watcher?: fs.FSWatcher;
     private _configWatcher?: fs.FSWatcher;
@@ -1418,11 +1420,25 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
                         try {
                             this._inlineDiff.captureSnapshot(fp);
                             console.log(`[inline-diff] captureSnapshot(${fp}) OK`);
+                            // Track for completion handler
+                            if (typeof toolCallId === 'string') {
+                                this._pendingFileTools.set(toolCallId, fp);
+                            }
                         } catch (e) {
                             console.error('[inline-diff] captureSnapshot error:', e);
                         }
                     }
                 }
+            },
+            // onFileToolComplete: read file and emit diff when tool finishes
+            (update) => {
+                const { toolCallId } = update;
+                if (typeof toolCallId !== 'string') return;
+                const filePath = this._pendingFileTools.get(toolCallId);
+                if (!filePath) return;
+                this._pendingFileTools.delete(toolCallId);
+                console.log(`[inline-diff-complete] tool ${toolCallId} completed, resolving ${filePath}`);
+                this._inlineDiff.completeSnapshot(filePath);
             }
         );
 

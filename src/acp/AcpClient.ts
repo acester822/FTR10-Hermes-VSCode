@@ -206,6 +206,8 @@ export interface SlashCommand {
 export type SlashCommandsHandler = (commands: SlashCommand[]) => void;
 /** Called when a tool call arrives that may mutate a file. Used for inline diff snapshot capture. */
 export type FileToolCallHandler = (update: Record<string, unknown>) => void;
+/** Called when a tool call completes that may have mutated a file. Used for inline diff emission. */
+export type CompletedToolCallHandler = (update: Record<string, unknown>) => void;
 
 interface TerminalInstance {
     process: ChildProcess;
@@ -285,6 +287,7 @@ export class AcpClient {
     private _onSegmentEnd: SegmentEndHandler;
     private _onSlashCommands: SlashCommandsHandler;
     private _onFileToolCall: FileToolCallHandler;
+    private _onFileToolComplete: CompletedToolCallHandler;
     private _resolveMcpServers: McpServersResolver;
     /** Monotonic id so stale prompt rejections after cancel are ignored. */
     private _activePromptId = 0;
@@ -338,7 +341,8 @@ export class AcpClient {
         onSegmentEnd?: SegmentEndHandler,
         onSlashCommands?: SlashCommandsHandler,
         resolveMcpServers?: McpServersResolver,
-        onFileToolCall?: FileToolCallHandler
+        onFileToolCall?: FileToolCallHandler,
+        onFileToolComplete?: CompletedToolCallHandler
     ) {
         this._onMessage = onMessage;
         this._onStatus = onStatus;
@@ -356,6 +360,7 @@ export class AcpClient {
         this._onSegmentEnd = onSegmentEnd || (() => {});
         this._onSlashCommands = onSlashCommands || (() => {});
         this._onFileToolCall = onFileToolCall || (() => {});
+        this._onFileToolComplete = onFileToolComplete || (() => {});
         this._resolveMcpServers = resolveMcpServers || (() => []);
     }
 
@@ -1348,6 +1353,10 @@ export class AcpClient {
                     break;
                 }
                 this._emitToolCallUpdate(update, 'tool_call_update');
+                // Notify the host when a tool completes — triggers inline diff emission
+                if (update.status === 'completed') {
+                    this._onFileToolComplete(update);
+                }
                 break;
 
             case 'config_option_update': {
