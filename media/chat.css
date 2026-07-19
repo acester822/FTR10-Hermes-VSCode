@@ -2458,8 +2458,8 @@ body {
 }
 .input-model-picker .input-model-btn:hover,
 .input-context-picker .input-context-btn:hover {
-    color: var(--fg);
-    background: color-mix(in srgb, var(--fg) 7%, transparent);
+    color: var(--ftr10-accent-2, var(--accent-2));
+    background: color-mix(in srgb, var(--ftr10-accent-2, var(--accent-2)) 7%, transparent);
 }
 .permission-mode-picker .permission-mode-btn {
     display: inline-flex;
@@ -2479,11 +2479,11 @@ body {
     overflow: hidden;
 }
 .permission-mode-picker .permission-mode-btn:hover {
-    color: var(--fg);
-    background: color-mix(in srgb, var(--fg) 7%, transparent);
+    color: var(--ftr10-accent-2, var(--accent-2));
+    background: color-mix(in srgb, var(--ftr10-accent-2, var(--accent-2)) 7%, transparent);
 }
 .permission-mode-picker.is-open .permission-mode-btn {
-    color: var(--fg);
+    color: var(--ftr10-accent-2, var(--accent-2));
 }
 .permission-mode-picker .dropdown {
     top: auto;
@@ -2585,11 +2585,11 @@ body {
     overflow: hidden;
 }
 .reasoning-effort-picker .reasoning-effort-btn:hover {
-    color: var(--fg);
-    background: color-mix(in srgb, var(--fg) 7%, transparent);
+    color: var(--ftr10-accent-2, var(--accent-2));
+    background: color-mix(in srgb, var(--ftr10-accent-2, var(--accent-2)) 7%, transparent);
 }
 .reasoning-effort-picker.is-open .reasoning-effort-btn {
-    color: var(--fg);
+    color: var(--ftr10-accent-2, var(--accent-2));
 }
 .reasoning-effort-picker .reasoning-effort-btn .input-picker-icon {
     font-size: 12px;
@@ -2698,23 +2698,16 @@ body {
     cursor: pointer;
     transition: color 0.15s, background 0.15s;
 }
-.slash-command-menu-picker .slash-command-menu-btn:hover {
-    color: var(--ftr10-accent-2, var(--accent-2));
-    background: color-mix(in srgb, var(--ftr10-accent-2, var(--accent-2)) 8%, transparent);
-}
+.slash-command-menu-picker .slash-command-menu-btn:hover,
 .slash-command-menu-picker.is-open .slash-command-menu-btn {
     color: var(--ftr10-accent-2, var(--accent-2));
+    background: transparent;
 }
 .slash-command-menu-picker .slash-command-menu-btn .input-picker-icon {
     color: var(--ftr10-accent-2, var(--accent-2));
     fill: var(--ftr10-accent-2, var(--accent-2));
     filter: none;
     transition: color 0.15s, fill 0.15s;
-}
-.slash-command-menu-picker .slash-command-menu-btn:hover .input-picker-icon,
-.slash-command-menu-picker.is-open .slash-command-menu-btn .input-picker-icon {
-    color: var(--ftr10-accent-2, var(--accent-2));
-    fill: var(--ftr10-accent-2, var(--accent-2));
 }
 .slash-command-menu-picker .dropdown {
     top: auto;
