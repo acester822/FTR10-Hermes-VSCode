@@ -19,7 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Test Inline Diff (2026-07-19, live)
 
-- **Inline diff live test (✅ VERIFIED 2026-07-19)**: After the `InlineDiffManager` fix (single instance in `HermesChatProvider`), this section was modified via `patch` to confirm a colored unified diff appears inline in the chat feed. Two instances were previously orphaned from each other; now snapshots, watchers, and webview emission share one manager.
+- **Inline diff live test (✅ VERIFIED 2026-07-19, round 2)**: Debug logging added to trace the tool_call → snapshot → diff pipeline. Check DevTools console for `[inline-diff]` entries.
 
 ## [0.3.2] - 2026-06-22
 
