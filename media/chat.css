@@ -166,13 +166,14 @@ body {
     display: flex;
     justify-content: flex-start;
     /* gap: 6px; */
-    padding: 2px 0 4px;
+    padding: 1px 0 2px;
     font-size: var(--font-size-sm);
     color: var(--dim);
     flex-shrink: 0;
     align-self: stretch;
     width: 100%;
     min-width: 0;
+    align-items: center;
 }
 .status-bar .status-dot {
     width: 7px;
@@ -221,9 +222,27 @@ body {
     margin-left: 0;
     margin-right: 8px;
     order: -1;
+    display: flex;
+    align-items: center;
 }
 .status-bar .status-bar-model .input-model-btn {
-    padding: 1px 6px;
+    padding: 0 4px;
+    display: inline-flex;
+    align-items: center;
+    line-height: 1;
+    border-radius: 3px;
+}
+.status-bar .status-bar-model .input-picker-icon {
+    width: 14px;
+    height: 14px;
+}
+.status-bar .status-bar-model .input-picker-icon svg {
+    width: 14px;
+    height: 14px;
+}
+.status-bar .status-bar-model .input-picker-label {
+    font-size: var(--font-size-sm);
+    line-height: 1;
 }
 .retry-btn {
     background: transparent;
