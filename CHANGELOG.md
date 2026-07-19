@@ -13,6 +13,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Diff expand/collapse**: Inline diffs are collapsible with a click on the header
 - **Open in editor**: "Open diff in editor" button opens VS Code's native side-by-side diff view
 
+### Testing
+
+- **Inline diff smoke test (2026-07-19)**: Added this section to exercise the inline diff editor — verifying file-modifying tools surface a colored unified diff in the chat feed when approval is not required. Fix applied: `InlineDiffManager` now also watches the filesystem (not just open editors) so agent edits to non-open files produce a diff. No functional change to shipped features.
+
+### Test Inline Diff (2026-07-19, live)
+
+- **Inline diff live test**: This section was added via a `patch` tool call to verify the inline diff editor surfaces a colored unified diff for the change in the chat feed. If you see a diff above showing the insertion of this section, the inline diff feature is working correctly.
+
 ## [0.3.2] - 2026-06-22
 
 ### Added
