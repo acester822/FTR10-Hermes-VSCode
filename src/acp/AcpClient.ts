@@ -1545,10 +1545,18 @@ export class AcpClient {
     ]);
 
     /**
-     * Extract the file path from a tool call's rawInput or title.
+     * Extract the file path from a tool call's locations, rawInput, or title.
      */
     private _extractFilePath(update: Record<string, unknown>): string | undefined {
-        // Try rawInput / raw_input first
+        // Try locations first — the ACP tool_call start event sends this
+        const locations = update.locations;
+        if (Array.isArray(locations) && locations.length > 0) {
+            const first = locations[0] as Record<string, unknown>;
+            if (first && typeof first.path === 'string' && first.path.trim()) {
+                return first.path.trim();
+            }
+        }
+        // Try rawInput / raw_input (may be present on tool_call_update)
         const rawInput = update.rawInput ?? update.raw_input;
         if (rawInput && typeof rawInput === 'object') {
             const args = rawInput as Record<string, unknown>;
@@ -1567,12 +1575,13 @@ export class AcpClient {
                 }
             } catch { /* not JSON */ }
         }
-        // Fall back to title (e.g. "patch: src/foo.ts")
+        // Fall back to title (e.g. "write: src/foo.ts", "patch (replace): src/foo.ts")
         const title = update.title;
         if (typeof title === 'string') {
-            const colonIdx = title.indexOf(':');
-            if (colonIdx >= 0) {
-                const candidate = title.slice(colonIdx + 1).trim();
+            // Match "write: path" or "patch (mode): path" — take everything after last ": "
+            const colonMatch = title.match(/:\s+(.+)$/);
+            if (colonMatch && colonMatch[1]) {
+                const candidate = colonMatch[1].trim();
                 if (candidate && !candidate.includes(' ')) {
                     return candidate;
                 }
@@ -1593,7 +1602,12 @@ export class AcpClient {
         const title = typeof update.title === 'string' ? update.title : '';
         const kind = typeof update.kind === 'string' ? update.kind : '';
         const text = `${title} ${kind}`.toLowerCase();
-        const isFileMutating = AcpClient.FILE_MUTATING_TOOLS.has(kind) ||
+        // Detect file-mutating tools by title prefix, kind, or known names
+        const isFileMutating =
+            title.startsWith('write:') || title.startsWith('patch') ||
+            title.startsWith('skill_manage') ||
+            kind === 'file_write' || kind === 'file_edit' || kind === 'skill_manage' ||
+            AcpClient.FILE_MUTATING_TOOLS.has(kind) ||
             text.includes('write_file') || text.includes('patch') ||
             text.includes('apply_diff') || text.includes('skill_manage');
         if (!isFileMutating) {
@@ -1601,15 +1615,18 @@ export class AcpClient {
         }
         const filePath = this._extractFilePath(update);
         if (!filePath) {
+            logToFile(`[InlineDiff] No file path found for tool ${toolCallId} title="${title}" kind="${kind}"`);
             return;
         }
         // Read the file content (may not exist yet for new files)
         try {
             const content = fs.readFileSync(filePath, 'utf-8');
             this._editSnapshots.set(toolCallId, { filePath, content });
+            logToFile(`[InlineDiff] Captured snapshot for ${filePath} (${content.length} chars)`);
         } catch {
             // File doesn't exist yet — snapshot empty string
             this._editSnapshots.set(toolCallId, { filePath, content: '' });
+            logToFile(`[InlineDiff] Captured empty snapshot for ${filePath} (new file)`);
         }
     }
 
@@ -1624,6 +1641,7 @@ export class AcpClient {
         }
         const snapshot = this._editSnapshots.get(toolCallId);
         if (!snapshot) {
+            logToFile(`[InlineDiff] No snapshot found for completed tool ${toolCallId}`);
             return;
         }
         this._editSnapshots.delete(toolCallId);
@@ -1682,10 +1700,12 @@ export class AcpClient {
 
         const diffText = diffLines.join('\n');
         if (!diffText || diffLines.length <= 3) {
+            logToFile(`[InlineDiff] No meaningful diff for ${filePath} (${diffLines.length} lines)`);
             return; // No meaningful diff
         }
 
         // Emit the diff as a special message
+        logToFile(`[InlineDiff] Emitting diff preview for ${filePath} (${diffLines.length} lines)`);
         this._onMessage('diffPreview', JSON.stringify({
             filePath,
             diff: diffText,
