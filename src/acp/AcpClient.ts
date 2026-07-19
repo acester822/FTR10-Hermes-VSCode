@@ -34,6 +34,7 @@ import {
     formatToolCallRawValue,
 } from './toolCallUpdate';
 import { followAlong } from './followAlong';
+import { InlineDiffManager } from './InlineDiffManager';
 import {
     VSCODE_MCP_SERVER_ID,
     VSCODE_MCP_SERVER_NAME,
@@ -309,8 +310,8 @@ export class AcpClient {
     private _historyReplayBuffer: ReplayMessage[] = [];
     /** Resolves with the captured replay messages once the load completes. */
     private _historyReplayResolve: ((messages: ReplayMessage[]) => void) | null = null;
-    /** Snapshots of file content before modification, keyed by filePath. */
-    private _editSnapshots = new Map<string, string>();
+    /** Inline diff manager for file change previews. */
+    private _inlineDiff = new InlineDiffManager();
 
     private static readonly VALID: Record<AcpStatus, AcpStatus[]> = {
         idle:        ['connecting'],
@@ -1336,17 +1337,16 @@ export class AcpClient {
                 }
                 this._endAssistantSegment();
                 // Capture file snapshot before modification for inline diff generation
-                this._captureEditSnapshot(update);
+                if (this._inlineDiff.isFileMutating(update)) {
+                    const fp = this._inlineDiff.getFilePath(update);
+                    if (fp) this._inlineDiff.captureSnapshot(fp);
+                }
                 this._emitToolCallUpdate(update, 'tool_call');
                 break;
 
             case 'tool_call_update':
                 if (!this._acceptStreamOutput) {
                     break;
-                }
-                // Generate inline diff when tool completes (completed/failed status)
-                if (update.status === 'completed' || update.status === 'failed') {
-                    this._generateAndEmitInlineDiff(update);
                 }
                 this._emitToolCallUpdate(update, 'tool_call_update');
                 break;
@@ -1538,14 +1538,7 @@ export class AcpClient {
     }
 
     /**
-     * Tools that can modify files and should get inline diff previews.
-     */
-    private static readonly FILE_MUTATING_TOOLS = new Set([
-        'write_file', 'patch', 'apply_diff', 'skill_manage',
-    ]);
-
-    /**
-     * Extract the file path from a tool call's locations, rawInput, or title.
+     * Extract the file path from a tool call's locations, rawInput, content text, or title.
      */
     private _extractFilePath(update: Record<string, unknown>): string | undefined {
         // Try locations first — the ACP tool_call start event sends this
@@ -1575,6 +1568,33 @@ export class AcpClient {
                 }
             } catch { /* not JSON */ }
         }
+        // Try content text — "✅ patch completed for `path/to/file`" or "✅ write_file completed for `path/to/file`"
+        const content = update.content;
+        if (typeof content === 'string') {
+            const backtickMatch = content.match(/`([^`]+)`/);
+            if (backtickMatch && backtickMatch[1]) {
+                const candidate = backtickMatch[1].trim();
+                // Only if it looks like a file path (contains / or .)
+                if (candidate.includes('/') || candidate.includes('.')) {
+                    return candidate;
+                }
+            }
+        }
+        // Try content blocks (array of content objects)
+        if (Array.isArray(content)) {
+            for (const block of content) {
+                if (block && typeof block === 'object' && typeof (block as any).text === 'string') {
+                    const text = (block as any).text as string;
+                    const backtickMatch = text.match(/`([^`]+)`/);
+                    if (backtickMatch && backtickMatch[1]) {
+                        const candidate = backtickMatch[1].trim();
+                        if (candidate.includes('/') || candidate.includes('.')) {
+                            return candidate;
+                        }
+                    }
+                }
+            }
+        }
         // Fall back to title (e.g. "write: src/foo.ts", "patch (replace): src/foo.ts")
         const title = update.title;
         if (typeof title === 'string') {
@@ -1594,129 +1614,12 @@ export class AcpClient {
      * Capture a snapshot of the file content before a file-modifying tool runs.
      * Stores it keyed by toolCallId so we can diff against it on completion.
      */
-    private _captureEditSnapshot(update: Record<string, unknown>): void {
-        const toolCallId = update.toolCallId;
-        if (typeof toolCallId !== 'string' || !toolCallId) {
-            return;
-        }
-        const title = typeof update.title === 'string' ? update.title : '';
-        const kind = typeof update.kind === 'string' ? update.kind : '';
-        const text = `${title} ${kind}`.toLowerCase();
-        // Detect file-mutating tools by title prefix, kind, or known names
-        const isFileMutating =
-            title.startsWith('write:') || title.startsWith('patch') ||
-            title.startsWith('skill_manage') ||
-            kind === 'file_write' || kind === 'file_edit' || kind === 'skill_manage' ||
-            AcpClient.FILE_MUTATING_TOOLS.has(kind) ||
-            text.includes('write_file') || text.includes('patch') ||
-            text.includes('apply_diff') || text.includes('skill_manage');
-        if (!isFileMutating) {
-            return;
-        }
-        const filePath = this._extractFilePath(update);
-        if (!filePath) {
-            logToFile(`[InlineDiff] No file path found for tool ${toolCallId} title="${title}" kind="${kind}"`);
-            return;
-        }
-        // Read the file content (may not exist yet for new files)
-        try {
-            const content = fs.readFileSync(filePath, 'utf-8');
-            this._editSnapshots.set(filePath, content);
-            logToFile(`[InlineDiff] Captured snapshot for ${filePath} (${content.length} chars) toolCallId=${toolCallId}`);
-        } catch {
-            // File doesn't exist yet — snapshot empty string
-            this._editSnapshots.set(filePath, '');
-            logToFile(`[InlineDiff] Captured empty snapshot for ${filePath} (new file) toolCallId=${toolCallId}`);
-        }
-    }
+
 
     /**
      * Generate an inline diff from the snapshot and emit it as a special
      * message so the webview can render it in the chat feed.
      */
-    private async _generateAndEmitInlineDiff(update: Record<string, unknown>): Promise<void> {
-        const toolCallId = update.toolCallId;
-        if (typeof toolCallId !== 'string' || !toolCallId) {
-            return;
-        }
-        const filePath = this._extractFilePath(update);
-        if (!filePath) {
-            logToFile(`[InlineDiff] No file path in complete event ${toolCallId} title="${update.title}" kind="${update.kind}"`);
-            return;
-        }
-        const beforeContent = this._editSnapshots.get(filePath);
-        if (beforeContent === undefined) {
-            logToFile(`[InlineDiff] No snapshot found for ${filePath} (completed tool ${toolCallId})`);
-            return;
-        }
-        this._editSnapshots.delete(filePath);
-
-        // Read the current file content (may have been deleted)
-        let afterContent = '';
-        try {
-            afterContent = fs.readFileSync(filePath, 'utf-8');
-        } catch {
-            // File was deleted or is inaccessible
-        }
-
-        // No changes — skip
-        if (beforeContent === afterContent) {
-            return;
-        }
-
-        // Generate a unified diff
-        const diffLines: string[] = [];
-        const beforeLines = beforeContent.split('\n');
-        const afterLines = afterContent.split('\n');
-
-        // Simple line-by-line diff using LCS approach
-        const lcs = computeLCS(beforeLines, afterLines);
-        let bi = 0, ai = 0, li = 0;
-        diffLines.push(`--- a/${filePath}`);
-        diffLines.push(`+++ b/${filePath}`);
-        // Find first diff position
-        while (li < lcs.length && bi < beforeLines.length && ai < afterLines.length) {
-            // Emit removals
-            while (bi < beforeLines.length && (li >= lcs.length || beforeLines[bi] !== lcs[li])) {
-                diffLines.push(`-${beforeLines[bi]}`);
-                bi++;
-            }
-            // Emit additions
-            while (ai < afterLines.length && (li >= lcs.length || afterLines[ai] !== lcs[li])) {
-                diffLines.push(`+${afterLines[ai]}`);
-                ai++;
-            }
-            // Emit common
-            if (li < lcs.length) {
-                diffLines.push(` ${lcs[li]}`);
-                bi++; ai++; li++;
-            }
-        }
-        // Remaining removals/additions
-        while (bi < beforeLines.length) {
-            diffLines.push(`-${beforeLines[bi]}`);
-            bi++;
-        }
-        while (ai < afterLines.length) {
-            diffLines.push(`+${afterLines[ai]}`);
-            ai++;
-        }
-
-        const diffText = diffLines.join('\n');
-        if (!diffText || diffLines.length <= 3) {
-            logToFile(`[InlineDiff] No meaningful diff for ${filePath} (${diffLines.length} lines)`);
-            return; // No meaningful diff
-        }
-
-        // Emit the diff as a special message
-        logToFile(`[InlineDiff] Emitting diff preview for ${filePath} (${diffLines.length} lines)`);
-        this._onMessage('diffPreview', JSON.stringify({
-            filePath,
-            diff: diffText,
-            toolCallId,
-        }));
-    }
-
     private _emitCancelledToolCalls(): void {
         for (const view of this._toolCallTracker.cancelActive()) {
             this._onMessage('tool', formatToolCallDisplay(view), view.toolCallId);
@@ -1804,38 +1707,3 @@ export class AcpClient {
     }
 }
 
-/**
- * Compute the Longest Common Subsequence of two string arrays.
- * Used to generate unified diffs by identifying unchanged lines.
- */
-function computeLCS(a: string[], b: string[]): string[] {
-    const m = a.length;
-    const n = b.length;
-    // Full DP table for backtracking
-    const dp: number[][] = Array.from({ length: m + 1 }, () => new Array<number>(n + 1).fill(0));
-
-    for (let i = 1; i <= m; i++) {
-        for (let j = 1; j <= n; j++) {
-            if (a[i - 1] === b[j - 1]) {
-                dp[i][j] = dp[i - 1][j - 1] + 1;
-            } else {
-                dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1]);
-            }
-        }
-    }
-
-    // Backtrack to find the LCS
-    const result: string[] = [];
-    let i = m, j = n;
-    while (i > 0 && j > 0) {
-        if (a[i - 1] === b[j - 1]) {
-            result.push(a[i - 1]);
-            i--; j--;
-        } else if (dp[i - 1][j] > dp[i][j - 1]) {
-            i--;
-        } else {
-            j--;
-        }
-    }
-    return result.reverse();
-}

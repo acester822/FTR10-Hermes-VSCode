@@ -5,6 +5,7 @@ import * as os from 'os';
 import * as crypto from 'crypto';
 import * as http from 'http';
 import { AcpClient, AcpStatus, ModelListState, PermissionRequest, TokenUsage, ReplayMessage } from '../acp/AcpClient';
+import { InlineDiffManager } from '../acp/InlineDiffManager';
 import { buildModelListStateFromCatalog, isRuntimeModelSource, encodeHermesModelValueId } from '../acp/modelConfig';
 import { resolveModelCatalog } from '../acp/acpModelCatalog';
 import type { AcpModelOptionsResponse } from '../acp/acpModelCatalog';
@@ -139,6 +140,7 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
     // ---- Lifecycle ----
     private _view?: vscode.WebviewView;
     private _acp?: AcpClient;
+    private _inlineDiff = new InlineDiffManager();
     private _output: vscode.OutputChannel;
     private _ftr10Watcher?: fs.FSWatcher;
     private _configWatcher?: fs.FSWatcher;
@@ -1404,6 +1406,15 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
                 return servers;
             }
         );
+
+        // Wire up inline diff previews — sends colored diffs to the webview
+        this._inlineDiff.onDiffPreview((filePath, diff) => {
+            this._postMessage({
+                type: 'addMessage',
+                role: 'diffPreview',
+                text: JSON.stringify({ filePath, diff, toolCallId: '' }),
+            });
+        });
         this._acp.onLog = (line: string) => {
             logToFile(`[Hermes Agent stderr] ${line}`);
             const level = classifyLogLevel(line);
