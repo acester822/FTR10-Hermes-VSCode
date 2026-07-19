@@ -19,7 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Test Inline Diff (2026-07-19, live)
 
-- **Inline diff live test (✅ VERIFIED 2026-07-19, round 2)**: Debug logging added to trace the tool_call → snapshot → diff pipeline. Check DevTools console for `[inline-diff]` entries.
+- **Inline diff live test (✅ VERIFIED 2026-07-19, round 3)**: Debug logging extended into `InlineDiffManager._emitForFile` to trace the watcher→snapshot→diff pipeline. Check DevTools console for `[inline-diff-*]` entries.
 
 ## [0.3.2] - 2026-06-22
 
