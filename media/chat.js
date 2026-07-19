@@ -4630,6 +4630,128 @@ function parseToolCallText(text) {
         return id;
     }
 
+    /**
+     * Add an inline diff preview to the chat feed.
+     * Parses the JSON payload and renders a colored unified diff.
+     */
+    function addDiffPreview(text) {
+        var data;
+        try {
+            data = JSON.parse(text);
+        } catch (e) {
+            return;
+        }
+        var filePath = data.filePath || 'file';
+        var diff = data.diff || '';
+        if (!diff) return;
+
+        var id = 'msg-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6);
+        var group = document.createElement('div');
+        group.className = 'message-group diff-preview';
+        group.id = id;
+
+        var inner = document.createElement('div');
+        inner.className = 'message-group-inner';
+
+        var msgEl = document.createElement('div');
+        msgEl.className = 'message diff-preview';
+
+        // Header with file path and toggle
+        var header = document.createElement('div');
+        header.className = 'diff-preview-header';
+
+        var iconEl = document.createElement('span');
+        iconEl.className = 'diff-preview-icon';
+        iconEl.textContent = '📝';
+
+        var titleEl = document.createElement('span');
+        titleEl.className = 'diff-preview-title';
+        titleEl.textContent = 'Changes to ' + filePath;
+
+        var chevron = document.createElement('span');
+        chevron.className = 'diff-preview-chevron';
+        chevron.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>';
+
+        header.appendChild(iconEl);
+        header.appendChild(titleEl);
+        header.appendChild(chevron);
+
+        // Diff content
+        var content = document.createElement('div');
+        content.className = 'diff-preview-content';
+
+        var diffLines = diff.split('\n');
+        var diffEl = document.createElement('div');
+        diffEl.className = 'diff-preview-lines';
+
+        for (var i = 0; i < diffLines.length; i++) {
+            var line = diffLines[i];
+            var lineEl = document.createElement('div');
+            lineEl.className = 'diff-line';
+
+            // Skip file headers (--- a/ and +++ b/)
+            if (line.startsWith('--- ') || line.startsWith('+++ ')) {
+                continue;
+            }
+            // Skip @@ hunk headers — show them muted
+            if (line.startsWith('@@')) {
+                lineEl.classList.add('diff-hunk');
+                lineEl.textContent = line;
+                diffEl.appendChild(lineEl);
+                continue;
+            }
+
+            if (line.startsWith('+')) {
+                lineEl.classList.add('diff-add');
+                lineEl.textContent = line.slice(1);
+            } else if (line.startsWith('-')) {
+                lineEl.classList.add('diff-remove');
+                lineEl.textContent = line.slice(1);
+            } else if (line.startsWith(' ')) {
+                lineEl.classList.add('diff-context');
+                lineEl.textContent = line.slice(1);
+            } else {
+                lineEl.classList.add('diff-context');
+                lineEl.textContent = line;
+            }
+            diffEl.appendChild(lineEl);
+        }
+
+        content.appendChild(diffEl);
+
+        // Open in editor button
+        var actions = document.createElement('div');
+        actions.className = 'diff-preview-actions';
+        var openBtn = document.createElement('button');
+        openBtn.type = 'button';
+        openBtn.className = 'diff-preview-btn';
+        openBtn.textContent = 'Open diff in editor';
+        openBtn.addEventListener('click', function() {
+            vscode.postMessage({ type: 'openDiff', filePath: filePath, diff: diff });
+        });
+        actions.appendChild(openBtn);
+
+        msgEl.appendChild(header);
+        msgEl.appendChild(content);
+        msgEl.appendChild(actions);
+        inner.appendChild(msgEl);
+        group.appendChild(inner);
+        messagesEl.appendChild(group);
+
+        // Toggle expand/collapse
+        header.addEventListener('click', function() {
+            msgEl.classList.toggle('is-expanded');
+        });
+
+        // Start collapsed, auto-expand
+        msgEl.classList.add('is-expanded');
+
+        updateQuickActionBtns();
+        if (chatSearchState.query) scheduleChatSearch();
+        maybeScrollToBottom();
+        return id;
+    }
+
     function renderMarkdown(text) {
         const html = marked.parse(text);
         if (typeof DOMPurify !== 'undefined') {
@@ -6927,6 +7049,8 @@ function parseToolCallText(text) {
                     }
                     const id = addMessage('thought', msg.text);
                     thoughtMsgId = id;
+                } else if (msg.role === 'diffPreview') {
+                    addDiffPreview(msg.text);
                 } else {
                     addMessage(msg.role, msg.text);
                 }

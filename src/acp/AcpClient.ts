@@ -166,7 +166,7 @@ export interface ReplayMessage {
 export type { ModelListState } from './modelConfig';
 export type ModelsChangedHandler = (models: ModelListState | null) => void;
 
-export type MessageHandler = (role: 'user' | 'assistant' | 'tool' | 'thought', text: string, toolCallId?: string) => void;
+export type MessageHandler = (role: 'user' | 'assistant' | 'tool' | 'thought' | 'diffPreview', text: string, toolCallId?: string) => void;
 export type StatusHandler = (status: AcpStatus, message?: string) => void;
 export interface PermissionOption {
     optionId: string;
@@ -309,6 +309,8 @@ export class AcpClient {
     private _historyReplayBuffer: ReplayMessage[] = [];
     /** Resolves with the captured replay messages once the load completes. */
     private _historyReplayResolve: ((messages: ReplayMessage[]) => void) | null = null;
+    /** Snapshots of file content before modification, keyed by toolCallId. */
+    private _editSnapshots = new Map<string, { filePath: string; content: string }>();
 
     private static readonly VALID: Record<AcpStatus, AcpStatus[]> = {
         idle:        ['connecting'],
@@ -1333,12 +1335,18 @@ export class AcpClient {
                     break;
                 }
                 this._endAssistantSegment();
+                // Capture file snapshot before modification for inline diff generation
+                this._captureEditSnapshot(update);
                 this._emitToolCallUpdate(update, 'tool_call');
                 break;
 
             case 'tool_call_update':
                 if (!this._acceptStreamOutput) {
                     break;
+                }
+                // Generate inline diff when tool completes (completed/failed status)
+                if (update.status === 'completed' || update.status === 'failed') {
+                    this._generateAndEmitInlineDiff(update);
                 }
                 this._emitToolCallUpdate(update, 'tool_call_update');
                 break;
@@ -1529,6 +1537,162 @@ export class AcpClient {
         this._onMessage('tool', formatToolCallDisplay(merged), merged.toolCallId);
     }
 
+    /**
+     * Tools that can modify files and should get inline diff previews.
+     */
+    private static readonly FILE_MUTATING_TOOLS = new Set([
+        'write_file', 'patch', 'apply_diff', 'skill_manage',
+    ]);
+
+    /**
+     * Extract the file path from a tool call's rawInput or title.
+     */
+    private _extractFilePath(update: Record<string, unknown>): string | undefined {
+        // Try rawInput / raw_input first
+        const rawInput = update.rawInput ?? update.raw_input;
+        if (rawInput && typeof rawInput === 'object') {
+            const args = rawInput as Record<string, unknown>;
+            const p = args.path || args.filePath || args.file;
+            if (typeof p === 'string' && p.trim()) {
+                return p.trim();
+            }
+        }
+        // Try parsing rawInput if it's a JSON string
+        if (typeof rawInput === 'string') {
+            try {
+                const parsed = JSON.parse(rawInput);
+                const p = parsed.path || parsed.filePath || parsed.file;
+                if (typeof p === 'string' && p.trim()) {
+                    return p.trim();
+                }
+            } catch { /* not JSON */ }
+        }
+        // Fall back to title (e.g. "patch: src/foo.ts")
+        const title = update.title;
+        if (typeof title === 'string') {
+            const colonIdx = title.indexOf(':');
+            if (colonIdx >= 0) {
+                const candidate = title.slice(colonIdx + 1).trim();
+                if (candidate && !candidate.includes(' ')) {
+                    return candidate;
+                }
+            }
+        }
+        return undefined;
+    }
+
+    /**
+     * Capture a snapshot of the file content before a file-modifying tool runs.
+     * Stores it keyed by toolCallId so we can diff against it on completion.
+     */
+    private _captureEditSnapshot(update: Record<string, unknown>): void {
+        const toolCallId = update.toolCallId;
+        if (typeof toolCallId !== 'string' || !toolCallId) {
+            return;
+        }
+        const title = typeof update.title === 'string' ? update.title : '';
+        const kind = typeof update.kind === 'string' ? update.kind : '';
+        const text = `${title} ${kind}`.toLowerCase();
+        const isFileMutating = AcpClient.FILE_MUTATING_TOOLS.has(kind) ||
+            text.includes('write_file') || text.includes('patch') ||
+            text.includes('apply_diff') || text.includes('skill_manage');
+        if (!isFileMutating) {
+            return;
+        }
+        const filePath = this._extractFilePath(update);
+        if (!filePath) {
+            return;
+        }
+        // Read the file content (may not exist yet for new files)
+        try {
+            const content = fs.readFileSync(filePath, 'utf-8');
+            this._editSnapshots.set(toolCallId, { filePath, content });
+        } catch {
+            // File doesn't exist yet — snapshot empty string
+            this._editSnapshots.set(toolCallId, { filePath, content: '' });
+        }
+    }
+
+    /**
+     * Generate an inline diff from the snapshot and emit it as a special
+     * message so the webview can render it in the chat feed.
+     */
+    private async _generateAndEmitInlineDiff(update: Record<string, unknown>): Promise<void> {
+        const toolCallId = update.toolCallId;
+        if (typeof toolCallId !== 'string' || !toolCallId) {
+            return;
+        }
+        const snapshot = this._editSnapshots.get(toolCallId);
+        if (!snapshot) {
+            return;
+        }
+        this._editSnapshots.delete(toolCallId);
+        const { filePath, content: beforeContent } = snapshot;
+
+        // Read the current file content (may have been deleted)
+        let afterContent = '';
+        try {
+            afterContent = fs.readFileSync(filePath, 'utf-8');
+        } catch {
+            // File was deleted or is inaccessible
+        }
+
+        // No changes — skip
+        if (beforeContent === afterContent) {
+            return;
+        }
+
+        // Generate a unified diff
+        const diffLines: string[] = [];
+        const beforeLines = beforeContent.split('\n');
+        const afterLines = afterContent.split('\n');
+
+        // Simple line-by-line diff using LCS approach
+        const lcs = computeLCS(beforeLines, afterLines);
+        let bi = 0, ai = 0, li = 0;
+        diffLines.push(`--- a/${filePath}`);
+        diffLines.push(`+++ b/${filePath}`);
+        // Find first diff position
+        while (li < lcs.length && bi < beforeLines.length && ai < afterLines.length) {
+            // Emit removals
+            while (bi < beforeLines.length && (li >= lcs.length || beforeLines[bi] !== lcs[li])) {
+                diffLines.push(`-${beforeLines[bi]}`);
+                bi++;
+            }
+            // Emit additions
+            while (ai < afterLines.length && (li >= lcs.length || afterLines[ai] !== lcs[li])) {
+                diffLines.push(`+${afterLines[ai]}`);
+                ai++;
+            }
+            // Emit common
+            if (li < lcs.length) {
+                diffLines.push(` ${lcs[li]}`);
+                bi++; ai++; li++;
+            }
+        }
+        // Remaining removals/additions
+        while (bi < beforeLines.length) {
+            diffLines.push(`-${beforeLines[bi]}`);
+            bi++;
+        }
+        while (ai < afterLines.length) {
+            diffLines.push(`+${afterLines[ai]}`);
+            ai++;
+        }
+
+        const diffText = diffLines.join('\n');
+        if (!diffText || diffLines.length <= 3) {
+            return; // No meaningful diff
+        }
+
+        // Emit the diff as a special message
+        this._onMessage('diffPreview', JSON.stringify({
+            filePath,
+            diff: diffText,
+            toolCallId,
+        }));
+    }
+
     private _emitCancelledToolCalls(): void {
         for (const view of this._toolCallTracker.cancelActive()) {
             this._onMessage('tool', formatToolCallDisplay(view), view.toolCallId);
@@ -1614,4 +1778,40 @@ export class AcpClient {
         const msg = err instanceof Error ? err.message : String(err);
         return /method not found|method_not_found/i.test(msg);
     }
+}
+
+/**
+ * Compute the Longest Common Subsequence of two string arrays.
+ * Used to generate unified diffs by identifying unchanged lines.
+ */
+function computeLCS(a: string[], b: string[]): string[] {
+    const m = a.length;
+    const n = b.length;
+    // Full DP table for backtracking
+    const dp: number[][] = Array.from({ length: m + 1 }, () => new Array<number>(n + 1).fill(0));
+
+    for (let i = 1; i <= m; i++) {
+        for (let j = 1; j <= n; j++) {
+            if (a[i - 1] === b[j - 1]) {
+                dp[i][j] = dp[i - 1][j - 1] + 1;
+            } else {
+                dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1]);
+            }
+        }
+    }
+
+    // Backtrack to find the LCS
+    const result: string[] = [];
+    let i = m, j = n;
+    while (i > 0 && j > 0) {
+        if (a[i - 1] === b[j - 1]) {
+            result.push(a[i - 1]);
+            i--; j--;
+        } else if (dp[i - 1][j] > dp[i][j - 1]) {
+            i--;
+        } else {
+            j--;
+        }
+    }
+    return result.reverse();
 }

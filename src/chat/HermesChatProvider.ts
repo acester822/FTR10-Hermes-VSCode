@@ -360,6 +360,9 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
                 case 'openImage':
                     void this._handleOpenImage(message.name, message.mimeType, message.data);
                     break;
+                case 'openDiff':
+                    void this._handleOpenDiff(message.filePath, message.diff);
+                    break;
                 case 'clearChat':
                     void this._handleClearChat();
                     break;
@@ -1270,7 +1273,7 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
 
         this._acp = new AcpClient(
             (role, text, toolCallId) => {
-                if (role === 'assistant' || role === 'thought' || role === 'tool') {
+                if (role === 'assistant' || role === 'thought' || role === 'tool' || role === 'diffPreview') {
                     this._clearPromptStallTimer();
                 }
                 this._postPromptScopedMessage({ type: 'addMessage', role, text, toolCallId });
@@ -1291,6 +1294,9 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
                         this._upsertToolMessage(toolCallId, text);
                     } else if (role === 'tool') {
                         this._saveMessage('tool', text);
+                    }
+                    if (role === 'diffPreview') {
+                        this._saveMessage('diffPreview', text);
                     }
                 });
             },
@@ -2782,6 +2788,107 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
         } catch {
             vscode.window.showWarningMessage(t('couldNotOpenFile', filePath));
         }
+    }
+
+    /**
+     * Open a diff in the VS Code diff editor when the user clicks
+     * "Open diff in editor" on an inline diff preview.
+     */
+    private async _handleOpenDiff(filePath: string, diff: string): Promise<void> {
+        if (!filePath || !diff) {
+            return;
+        }
+        const fileUri = vscode.Uri.file(filePath);
+
+        // Read the current file content (right side of diff)
+        let currentContent = '';
+        try {
+            const doc = await vscode.workspace.openTextDocument(fileUri);
+            currentContent = doc.getText();
+        } catch {
+            // File may not exist
+        }
+
+        // Parse the diff to reconstruct the original content
+        let originalContent = currentContent;
+        try {
+            const diffLines = diff.split('\n');
+            const originalLines: string[] = [];
+            let i = 0;
+
+            // Skip file headers
+            while (i < diffLines.length && (diffLines[i].startsWith('--- ') || diffLines[i].startsWith('+++ '))) {
+                i++;
+            }
+
+            while (i < diffLines.length) {
+                const line = diffLines[i];
+                if (line.startsWith('@@')) {
+                    // Skip hunk headers
+                    i++;
+                    continue;
+                }
+                if (line.startsWith('+')) {
+                    // Added line — not in original
+                    i++;
+                    continue;
+                }
+                if (line.startsWith('-')) {
+                    // Removed line — in original
+                    originalLines.push(line.slice(1));
+                    i++;
+                    continue;
+                }
+                if (line.startsWith(' ')) {
+                    // Context line — in both
+                    originalLines.push(line.slice(1));
+                    i++;
+                    continue;
+                }
+                i++;
+            }
+
+            if (originalLines.length > 0) {
+                originalContent = originalLines.join('\n');
+            }
+        } catch {
+            // Fall back to current content
+        }
+
+        // Create virtual documents for the diff editor
+        const originalDoc = await vscode.workspace.openTextDocument({
+            content: originalContent,
+            language: this._getLanguageId(filePath),
+        });
+        const modifiedDoc = await vscode.workspace.openTextDocument({
+            content: currentContent,
+            language: this._getLanguageId(filePath),
+        });
+
+        await vscode.commands.executeCommand(
+            'vscode.diff',
+            originalDoc.uri,
+            modifiedDoc.uri,
+            `Hermes: ${path.basename(filePath)}`,
+        );
+    }
+
+    private _getLanguageId(filePath: string): string | undefined {
+        const ext = path.extname(filePath).toLowerCase();
+        const extMap: Record<string, string> = {
+            '.ts': 'typescript', '.tsx': 'typescriptreact',
+            '.js': 'javascript', '.jsx': 'javascriptreact',
+            '.py': 'python', '.rb': 'ruby', '.go': 'go',
+            '.rs': 'rust', '.java': 'java', '.c': 'c',
+            '.cpp': 'cpp', '.h': 'c', '.hpp': 'cpp',
+            '.css': 'css', '.scss': 'scss', '.less': 'less',
+            '.html': 'html', '.htm': 'html', '.xml': 'xml',
+            '.json': 'json', '.yaml': 'yaml', '.yml': 'yaml',
+            '.md': 'markdown', '.sql': 'sql', '.sh': 'shellscript',
+            '.bash': 'shellscript', '.zsh': 'shellscript',
+            '.vue': 'vue', '.svelte': 'svelte',
+        };
+        return extMap[ext];
     }
 
     private _imageExtFor(mimeType: string, name: string): string {
