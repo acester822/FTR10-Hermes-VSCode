@@ -1428,6 +1428,7 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
 
         // Wire up inline diff previews — sends colored diffs to the webview
         this._inlineDiff.onDiffPreview((filePath, diff) => {
+            console.log(`[inline-diff-preview] received diff for ${filePath}, length=${diff.length}`);
             this._postMessage({
                 type: 'addMessage',
                 role: 'diffPreview',
