@@ -309,8 +309,8 @@ export class AcpClient {
     private _historyReplayBuffer: ReplayMessage[] = [];
     /** Resolves with the captured replay messages once the load completes. */
     private _historyReplayResolve: ((messages: ReplayMessage[]) => void) | null = null;
-    /** Snapshots of file content before modification, keyed by toolCallId. */
-    private _editSnapshots = new Map<string, { filePath: string; content: string }>();
+    /** Snapshots of file content before modification, keyed by filePath. */
+    private _editSnapshots = new Map<string, string>();
 
     private static readonly VALID: Record<AcpStatus, AcpStatus[]> = {
         idle:        ['connecting'],
@@ -1621,12 +1621,12 @@ export class AcpClient {
         // Read the file content (may not exist yet for new files)
         try {
             const content = fs.readFileSync(filePath, 'utf-8');
-            this._editSnapshots.set(toolCallId, { filePath, content });
-            logToFile(`[InlineDiff] Captured snapshot for ${filePath} (${content.length} chars)`);
+            this._editSnapshots.set(filePath, content);
+            logToFile(`[InlineDiff] Captured snapshot for ${filePath} (${content.length} chars) toolCallId=${toolCallId}`);
         } catch {
             // File doesn't exist yet — snapshot empty string
-            this._editSnapshots.set(toolCallId, { filePath, content: '' });
-            logToFile(`[InlineDiff] Captured empty snapshot for ${filePath} (new file)`);
+            this._editSnapshots.set(filePath, '');
+            logToFile(`[InlineDiff] Captured empty snapshot for ${filePath} (new file) toolCallId=${toolCallId}`);
         }
     }
 
@@ -1639,13 +1639,17 @@ export class AcpClient {
         if (typeof toolCallId !== 'string' || !toolCallId) {
             return;
         }
-        const snapshot = this._editSnapshots.get(toolCallId);
-        if (!snapshot) {
-            logToFile(`[InlineDiff] No snapshot found for completed tool ${toolCallId}`);
+        const filePath = this._extractFilePath(update);
+        if (!filePath) {
+            logToFile(`[InlineDiff] No file path in complete event ${toolCallId} title="${update.title}" kind="${update.kind}"`);
             return;
         }
-        this._editSnapshots.delete(toolCallId);
-        const { filePath, content: beforeContent } = snapshot;
+        const beforeContent = this._editSnapshots.get(filePath);
+        if (beforeContent === undefined) {
+            logToFile(`[InlineDiff] No snapshot found for ${filePath} (completed tool ${toolCallId})`);
+            return;
+        }
+        this._editSnapshots.delete(filePath);
 
         // Read the current file content (may have been deleted)
         let afterContent = '';

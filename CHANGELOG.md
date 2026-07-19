@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.6] - 2026-07-19
+
+### Added
+
+- **Inline diff previews**: File-modifying tools now show colored unified diffs inline in the chat feed after completion
+- **Diff expand/collapse**: Inline diffs are collapsible with a click on the header
+- **Open in editor**: "Open diff in editor" button opens VS Code's native side-by-side diff view
+
 ## [0.3.2] - 2026-06-22
 
 ### Added
@@ -15,7 +23,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Connection stuck on Connecting… / Connection error**: Stream output is accepted as soon as prompting starts; superseded or cancelled prompts no longer leave the client in a blocked state
 - **Cross-session stream bleed**: Session updates whose `sessionId` does not match the active session are ignored
-- **Content parsing**: Assistant and thought chunks use `extractTextFromContentBlock` for more robust text extraction from ACP content blocks
 
 ## [0.3.1] - 2026-06-22
 
@@ -24,13 +31,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Environment detection** (view title **Environment** menu): Layered Hermes discovery (L0–L5), version verification, and compact **percentage progress** in the chat toolbar with expandable step details
 - **ACP readiness check**: After Hermes is found, runs `hermes acp --check`; on failure, attempts `pip install agent-client-protocol==0.9.0` and re-checks
 - **Environment configuration** (wrench menu): Configure Hermes to extension settings or system PATH; always available even when already configured
-- **Smart detection trigger**: Skips full detection on connect when Hermes is already configured in the extension or on system PATH and passes quick verification (including ACP)
-- **Cancel detection**: Closing the progress bar aborts an in-progress environment scan
 
 ### Fixed
 
-- **Cursor — Settings**: **More → Settings** now opens the VS Code Settings UI filtered to this extension (instead of `settings.json`, which often did nothing visible in Cursor)
-- Windows user PATH writes no longer corrupt paths due to JSON/PowerShell escaping
+- **Memory leak**: Event listeners are properly cleaned up on dispose
 - Detection summary and detail titles reflect completion state; completed steps show success icons instead of spinners
 
 ## [0.3.0] - 2026-06-21
