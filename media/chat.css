@@ -2704,9 +2704,15 @@ body {
     color: var(--fg);
 }
 .slash-command-menu-picker .slash-command-menu-btn .input-picker-icon {
-    color: var(--fg);
+    color: var(--ftr10-text, var(--fg));
+    fill: var(--ftr10-text, var(--fg));
     filter: none;
-    transition: color 0.15s;
+    transition: color 0.15s, fill 0.15s;
+}
+.slash-command-menu-picker .slash-command-menu-btn:hover .input-picker-icon,
+.slash-command-menu-picker.is-open .slash-command-menu-btn .input-picker-icon {
+    color: var(--primary);
+    fill: var(--primary);
 }
 .slash-command-menu-picker .dropdown {
     top: auto;
@@ -4413,6 +4419,10 @@ mark.search-mark-active {
     box-shadow: 0 0 14px color-mix(in srgb, var(--primary) 26%, transparent);
 }
 /* Send-button breathing pulse.
+   NOTE: ancestors (.input-action / .input-composite-bar / .input-composite) all
+   use overflow:hidden, which clips an outer box-shadow glow. So the pulse is
+   driven by INSET glow + border-color + background brightness — all painted
+   inside the button's own box and therefore never clipped.
    - Armed / ready: you're typing but haven't sent yet (input is enabled).
      Uses the accent so it reads "ready to receive".
    - Active turn: the conversation is live (agent running). Uses the warm
@@ -4425,18 +4435,26 @@ mark.search-mark-active {
 }
 @keyframes send-ready-pulse {
     0%, 100% {
-        box-shadow: 0 0 6px color-mix(in srgb, var(--primary) 18%, transparent);
+        border-color: rgba(255, 255, 255, 0.2);
+        background: rgba(0, 8, 20, 0.62);
+        box-shadow: inset 0 0 6px color-mix(in srgb, var(--primary) 22%, transparent);
     }
     50% {
-        box-shadow: 0 0 16px color-mix(in srgb, var(--primary) 42%, transparent);
+        border-color: color-mix(in srgb, var(--primary) 60%, transparent);
+        background: color-mix(in srgb, var(--primary) 14%, rgba(0, 8, 20, 0.62));
+        box-shadow: inset 0 0 16px color-mix(in srgb, var(--primary) 45%, transparent);
     }
 }
 @keyframes send-active-pulse {
     0%, 100% {
-        box-shadow: 0 0 6px color-mix(in srgb, var(--accent-2) 22%, transparent);
+        border-color: rgba(255, 255, 255, 0.2);
+        background: rgba(0, 8, 20, 0.62);
+        box-shadow: inset 0 0 6px color-mix(in srgb, var(--accent-2) 26%, transparent);
     }
     50% {
-        box-shadow: 0 0 18px color-mix(in srgb, var(--accent-2) 50%, transparent);
+        border-color: color-mix(in srgb, var(--accent-2) 65%, transparent);
+        background: color-mix(in srgb, var(--accent-2) 16%, rgba(0, 8, 20, 0.62));
+        box-shadow: inset 0 0 18px color-mix(in srgb, var(--accent-2) 55%, transparent);
     }
 }
 
