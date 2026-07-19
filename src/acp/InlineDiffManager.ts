@@ -1,9 +1,17 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
+import * as path from 'path';
 
 /**
- * Watches file changes via VS Code's document system and generates
- * inline diffs for the chat feed.
+ * Watches file changes and generates inline diffs for the chat feed.
+ *
+ * Two change sources are observed:
+ *  1. vscode.workspace.onDidChangeTextDocument — fires only for documents that
+ *     are OPEN in a VS Code editor.
+ *  2. vscode.workspace.createFileSystemWatcher — fires for ANY file change on
+ *     disk in the workspace, including files the user has NOT opened in an
+ *     editor. This is what makes the inline diff actually appear when the
+ *     agent edits a file purely on disk.
  */
 
 export type DiffPreviewHandler = (filePath: string, diff: string) => void;
@@ -108,12 +116,23 @@ function computeDiff(before: string, after: string, filePath: string): string | 
     return diffLines.join('\n');
 }
 
+/** Normalize a path for map lookups: resolve symlinks/case where possible and use forward slashes. */
+function normalizePath(p: string): string {
+    try {
+        return fs.realpathSync(p);
+    } catch {
+        return path.resolve(p);
+    }
+}
+
 export class InlineDiffManager {
     private _disposables: vscode.Disposable[] = [];
     private _snapshots = new Map<string, FileSnapshot>();
     private _onDiffPreview: DiffPreviewHandler | null = null;
     private _enabled = true;
     private _pendingToolFiles = new Set<string>();
+    /** Maps realpath -> original tool-reported path, so disk events resolve to the captured snapshot key. */
+    private _pathAliases = new Map<string, string>();
 
     constructor() {
         this._disposables.push(
@@ -129,20 +148,70 @@ export class InlineDiffManager {
             vscode.workspace.onDidChangeTextDocument((e) => {
                 if (!this._enabled) return;
                 const filePath = e.document.uri.fsPath;
+                console.log(`[inline-diff-editor] onDidChangeTextDocument: ${filePath} (pending: ${[...this._pendingToolFiles].join(', ')})`);
                 const newContent = e.document.getText();
-                const snapshot = this._snapshots.get(filePath);
-                if (!snapshot) return;
-                const oldContent = snapshot.content;
-                this._snapshots.set(filePath, { content: newContent, timestamp: Date.now() });
-                if (oldContent === newContent) return;
-                if (!this._pendingToolFiles.has(filePath)) return;
-                this._pendingToolFiles.delete(filePath);
-                const diff = computeDiff(oldContent, newContent, filePath);
-                if (diff && this._onDiffPreview) {
-                    this._onDiffPreview(filePath, diff);
-                }
+                this._emitForFile(filePath, newContent);
             })
         );
+
+        // Disk watcher: catches changes to files the agent edits on disk even
+        // when they are NOT open in a VS Code editor. Without this, the inline
+        // diff never fires for the common case of an external/agent file write.
+        const watcher = vscode.workspace.createFileSystemWatcher('**/*');
+        this._disposables.push(watcher);
+        const onDiskChange = (uri: vscode.Uri) => {
+            if (!this._enabled) return;
+            console.log(`[inline-diff-disk] onDidChange: ${uri.fsPath} (pending: ${[...this._pendingToolFiles].join(', ')})`);
+            let newContent: string;
+            try {
+                newContent = fs.readFileSync(uri.fsPath, 'utf-8');
+            } catch {
+                return; // unreadable (deleted, binary, etc.) — nothing to diff
+            }
+            this._emitForFile(uri.fsPath, newContent);
+        };
+        this._disposables.push(watcher.onDidChange(onDiskChange));
+        this._disposables.push(watcher.onDidCreate(onDiskChange));
+    }
+
+    /**
+     * Resolve the change to a captured pending snapshot, diff, and emit.
+     * Shared by both the editor-document path and the disk-watcher path.
+     */
+    private _emitForFile(filePath: string, newContent: string): void {
+        const realKey = normalizePath(filePath);
+        // Look up by realpath first, then by the raw path, then by any alias.
+        const rawKey = path.resolve(filePath);
+        let snapshotKey: string | undefined =
+            this._snapshots.has(realKey) ? realKey
+            : this._snapshots.has(rawKey) ? rawKey
+            : this._pathAliases.get(realKey);
+        if (!snapshotKey) {
+            console.log(`[inline-diff-emit] NO snapshot for ${filePath} (realKey=${realKey}, rawKey=${rawKey})`);
+            return;
+        }
+
+        const snapshot = this._snapshots.get(snapshotKey);
+        if (!snapshot) {
+            console.log(`[inline-diff-emit] snapshot missing for key=${snapshotKey}`);
+            return;
+        }
+        const oldContent = snapshot.content;
+        this._snapshots.set(snapshotKey, { content: newContent, timestamp: Date.now() });
+        if (oldContent === newContent) {
+            console.log(`[inline-diff-emit] content unchanged for ${snapshotKey}`);
+            return;
+        }
+        if (!this._pendingToolFiles.has(snapshotKey)) {
+            console.log(`[inline-diff-emit] NOT in pendingToolFiles: ${snapshotKey} (pending=${[...this._pendingToolFiles].join(',')})`);
+            return;
+        }
+        this._pendingToolFiles.delete(snapshotKey);
+        const diff = computeDiff(oldContent, newContent, snapshotKey);
+        console.log(`[inline-diff-emit] diff computed, length=${diff?.length ?? 0}, handler=${!!this._onDiffPreview}`);
+        if (diff && this._onDiffPreview) {
+            this._onDiffPreview(snapshotKey, diff);
+        }
     }
 
     onDiffPreview(handler: DiffPreviewHandler): void { this._onDiffPreview = handler; }
@@ -150,12 +219,17 @@ export class InlineDiffManager {
 
     captureSnapshot(filePath: string): void {
         if (!this._enabled) return;
-        this._pendingToolFiles.add(filePath);
+        const realKey = normalizePath(filePath);
+        const rawKey = path.resolve(filePath);
+        this._pendingToolFiles.add(realKey);
+        this._pathAliases.set(realKey, filePath);
         try {
             const content = fs.readFileSync(filePath, 'utf-8');
-            this._snapshots.set(filePath, { content, timestamp: Date.now() });
+            this._snapshots.set(realKey, { content, timestamp: Date.now() });
+            this._snapshots.set(rawKey, { content, timestamp: Date.now() });
         } catch {
-            this._snapshots.set(filePath, { content: '', timestamp: Date.now() });
+            this._snapshots.set(realKey, { content: '', timestamp: Date.now() });
+            this._snapshots.set(rawKey, { content: '', timestamp: Date.now() });
         }
     }
 
@@ -171,5 +245,7 @@ export class InlineDiffManager {
         for (const d of this._disposables) d.dispose();
         this._disposables = [];
         this._snapshots.clear();
+        this._pendingToolFiles.clear();
+        this._pathAliases.clear();
     }
 }
