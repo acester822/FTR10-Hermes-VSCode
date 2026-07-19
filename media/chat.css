@@ -2415,12 +2415,36 @@ body {
     height: 20px;
     opacity: 0.92;
     object-fit: contain;
+    border-radius: 5px;
+    transition: color 0.15s, background 0.15s, box-shadow 0.15s, transform 0.15s;
 }
 .input-picker-icon img,
 .input-picker-icon svg {
     width: 20px;
     height: 20px;
     display: block;
+    color: var(--ftr10-accent-2, var(--accent-2));
+    fill: var(--ftr10-accent-2, var(--accent-2));
+}
+/* Uniform icon hover: rounded accent-tinted lift + soft glow, so every
+   picker icon (model, permission, photo, reasoning, commands) feels the same. */
+.input-model-btn:hover .input-picker-icon,
+.input-context-btn:hover .input-picker-icon,
+.permission-mode-btn:hover .input-picker-icon,
+.reasoning-effort-btn:hover .input-picker-icon,
+.slash-command-menu-btn:hover .input-picker-icon,
+.attach-image-btn:hover .input-picker-icon {
+    background-color: color-mix(in srgb, var(--ftr10-accent-2, var(--accent-2)) 14%, transparent);
+    box-shadow: 0 0 8px color-mix(in srgb, var(--ftr10-accent-2, var(--accent-2)) 30%, transparent);
+    transform: translateY(-1px);
+}
+.input-model-btn:active .input-picker-icon,
+.input-context-btn:active .input-picker-icon,
+.permission-mode-btn:active .input-picker-icon,
+.reasoning-effort-btn:active .input-picker-icon,
+.slash-command-menu-btn:active .input-picker-icon,
+.attach-image-btn:active .input-picker-icon {
+    transform: translateY(0) scale(0.94);
 }
  /*   height: 12px;
     fill: currentColor;
