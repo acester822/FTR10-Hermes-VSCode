@@ -1407,12 +1407,20 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
             },
             // onFileToolCall: capture pre-change snapshot for inline diff preview
             (update) => {
+                console.log('[inline-diff] tool_call received, keys:', Object.keys(update).join(', '));
+                const { toolCallId, title, kind } = update;
+                console.log(`[inline-diff] toolCallId=${toolCallId} title=${title} kind=${kind}`);
+                console.log(`[inline-diff] isFileMutatingTool = ${isFileMutatingTool(update)}`);
                 if (isFileMutatingTool(update)) {
                     const fp = extractFilePath(update);
+                    console.log(`[inline-diff] extractFilePath = ${fp}`);
                     if (fp) {
                         try {
                             this._inlineDiff.captureSnapshot(fp);
-                        } catch { /* best-effort */ }
+                            console.log(`[inline-diff] captureSnapshot(${fp}) OK`);
+                        } catch (e) {
+                            console.error('[inline-diff] captureSnapshot error:', e);
+                        }
                     }
                 }
             }
