@@ -5461,7 +5461,7 @@ mark.search-mark-active {
 .diff-preview {
     margin: 6px 0;
     border-radius: 6px;
-    overflow: hidden;
+    overflow: visible;
 }
 
 .diff-preview-header {
