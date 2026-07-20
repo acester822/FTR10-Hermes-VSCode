@@ -7010,6 +7010,9 @@ function parseToolCallText(text) {
 
     window.addEventListener('message', function(event) {
         const msg = event.data;
+        if (msg && msg.type === 'addMessage') {
+            console.log('[webview-diff] addMessage msg.sessionId=' + msg.sessionId + ' role=' + msg.role + ' lastActive=' + lastActiveSessionId + ' textLen=' + (msg.text ? msg.text.length : 0));
+        }
         switch (msg.type) {
             case 'slashCommands':
                 if (!isMessageForActiveSession(msg)) {
