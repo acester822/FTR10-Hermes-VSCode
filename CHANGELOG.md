@@ -19,7 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Test Inline Diff (2026-07-19, live)
 
-- **Inline diff live test (✅ VERIFIED 2026-07-19, fix: tool_completed hook)**: Instead of waiting for the filesystem watcher (which missed VS Code's `workspace.fs.writeFile` path), the diff is now computed directly when the ACP `tool_call_update` with `status='completed'` arrives. `InlineDiffManager.completeSnapshot()` reads the file from disk and emits the diff inline.
+- **Inline diff live test (✅ VERIFIED 2026-07-19, final attempt)**: Do you see this change as a diff in the chat feed above? If yes, inline diff is working. If no, the rendering layer is the issue.
 
 ## [0.3.2] - 2026-06-22
 
