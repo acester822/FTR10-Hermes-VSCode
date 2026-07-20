@@ -4652,6 +4652,7 @@ function parseToolCallText(text) {
         var group = document.createElement('div');
         group.className = 'message-group diff-preview';
         group.id = id;
+        console.log('[webview-diff] DOM created, messagesEl=', !!messagesEl);
 
         var inner = document.createElement('div');
         inner.className = 'message-group-inner';
@@ -4739,7 +4740,14 @@ function parseToolCallText(text) {
         msgEl.appendChild(actions);
         inner.appendChild(msgEl);
         group.appendChild(inner);
-        messagesEl.appendChild(group);
+        console.log('[webview-diff] before appendChild, group.outerHTML.length=', group.outerHTML.length);
+        try {
+            messagesEl.appendChild(group);
+            console.log('[webview-diff] appended OK, id=' + id);
+        } catch (e) {
+            console.error('[webview-diff] appendChild failed:', e);
+        }
+        console.log('[webview-diff] messagesEl.children.length=', messagesEl.children.length);
 
         // Toggle expand/collapse
         header.addEventListener('click', function() {
