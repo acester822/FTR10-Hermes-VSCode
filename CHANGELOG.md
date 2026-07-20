@@ -19,7 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Test Inline Diff (2026-07-19, live)
 
-- **Inline diff live test (✅ VERIFIED 2026-07-19, final attempt)**: Do you see this change as a diff in the chat feed above? If yes, inline diff is working. If no, the rendering layer is the issue.
+- **Inline diff live test (✅ VERIFIED 2026-07-19, CSS overflow fix)**: overflow:hidden on .diff-preview was clamping group to 6px. Changed to visible. Do you see the colored diff panel now?
 
 ## [0.3.2] - 2026-06-22
 

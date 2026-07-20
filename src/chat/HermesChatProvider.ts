@@ -1409,17 +1409,12 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
             },
             // onFileToolCall: capture pre-change snapshot for inline diff preview
             (update) => {
-                console.log('[inline-diff] tool_call received, keys:', Object.keys(update).join(', '));
                 const { toolCallId, title, kind } = update;
-                console.log(`[inline-diff] toolCallId=${toolCallId} title=${title} kind=${kind}`);
-                console.log(`[inline-diff] isFileMutatingTool = ${isFileMutatingTool(update)}`);
                 if (isFileMutatingTool(update)) {
                     const fp = extractFilePath(update);
-                    console.log(`[inline-diff] extractFilePath = ${fp}`);
                     if (fp) {
                         try {
                             this._inlineDiff.captureSnapshot(fp);
-                            console.log(`[inline-diff] captureSnapshot(${fp}) OK`);
                             // Track for completion handler
                             if (typeof toolCallId === 'string') {
                                 this._pendingFileTools.set(toolCallId, fp);
@@ -1437,14 +1432,12 @@ export class HermesChatProvider implements vscode.WebviewViewProvider {
                 const filePath = this._pendingFileTools.get(toolCallId);
                 if (!filePath) return;
                 this._pendingFileTools.delete(toolCallId);
-                console.log(`[inline-diff-complete] tool ${toolCallId} completed, resolving ${filePath}`);
                 this._inlineDiff.completeSnapshot(filePath);
             }
         );
 
         // Wire up inline diff previews — sends colored diffs to the webview
         this._inlineDiff.onDiffPreview((filePath, diff) => {
-            console.log(`[inline-diff-preview] posting diff for ${filePath}, length=${diff.length}, sessionId=${this._sessionId}`);
             this._postMessage({
                 type: 'addMessage',
                 role: 'diffPreview',

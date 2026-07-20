@@ -4635,24 +4635,20 @@ function parseToolCallText(text) {
      * Parses the JSON payload and renders a colored unified diff.
      */
     function addDiffPreview(text) {
-        console.log('[webview-diff] addDiffPreview called, text length:', text ? text.length : 0);
         var data;
         try {
             data = JSON.parse(text);
         } catch (e) {
-            console.error('[webview-diff] JSON.parse failed:', e);
             return;
         }
         var filePath = data.filePath || 'file';
         var diff = data.diff || '';
-        console.log('[webview-diff] parsed filePath:', filePath, 'diff length:', diff.length);
         if (!diff) return;
 
         var id = 'msg-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6);
         var group = document.createElement('div');
         group.className = 'message-group diff-preview';
         group.id = id;
-        console.log('[webview-diff] DOM created, messagesEl=', !!messagesEl);
 
         var inner = document.createElement('div');
         inner.className = 'message-group-inner';
@@ -4740,14 +4736,10 @@ function parseToolCallText(text) {
         msgEl.appendChild(actions);
         inner.appendChild(msgEl);
         group.appendChild(inner);
-        console.log('[webview-diff] before appendChild, group.outerHTML.length=', group.outerHTML.length);
         try {
             messagesEl.appendChild(group);
-            console.log('[webview-diff] appended OK, id=' + id);
         } catch (e) {
-            console.error('[webview-diff] appendChild failed:', e);
         }
-        console.log('[webview-diff] messagesEl.children.length=', messagesEl.children.length);
 
         // Toggle expand/collapse
         header.addEventListener('click', function() {
@@ -4762,7 +4754,6 @@ function parseToolCallText(text) {
         maybeScrollToBottom();
         setTimeout(function() {
             var contentEl = msgEl.querySelector('.diff-preview-content');
-            console.log('[webview-diff] post-render: group.offsetHeight=' + group.offsetHeight + ' msgEl.className=' + msgEl.className + ' content.maxHeight=' + (contentEl ? window.getComputedStyle(contentEl).maxHeight : 'N/A') + ' content.offsetHeight=' + (contentEl ? contentEl.offsetHeight : 'N/A'));
         }, 300);
         return id;
     }
@@ -7023,7 +7014,6 @@ function parseToolCallText(text) {
     window.addEventListener('message', function(event) {
         const msg = event.data;
         if (msg && msg.type === 'addMessage') {
-            console.log('[webview-diff] addMessage msg.sessionId=' + msg.sessionId + ' role=' + msg.role + ' lastActive=' + lastActiveSessionId + ' textLen=' + (msg.text ? msg.text.length : 0));
         }
         switch (msg.type) {
             case 'slashCommands':
@@ -7068,7 +7058,6 @@ function parseToolCallText(text) {
                     const id = addMessage('thought', msg.text);
                     thoughtMsgId = id;
                 } else if (msg.role === 'diffPreview') {
-                    console.log('[webview-diff] addMessage diffPreview, text length:', msg.text ? msg.text.length : 0);
                     addDiffPreview(msg.text);
                 } else {
                     addMessage(msg.role, msg.text);

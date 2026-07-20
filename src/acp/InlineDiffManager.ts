@@ -148,7 +148,6 @@ export class InlineDiffManager {
             vscode.workspace.onDidChangeTextDocument((e) => {
                 if (!this._enabled) return;
                 const filePath = e.document.uri.fsPath;
-                console.log(`[inline-diff-editor] onDidChangeTextDocument: ${filePath} (pending: ${[...this._pendingToolFiles].join(', ')})`);
                 const newContent = e.document.getText();
                 this._emitForFile(filePath, newContent);
             })
@@ -161,7 +160,6 @@ export class InlineDiffManager {
         this._disposables.push(watcher);
         const onDiskChange = (uri: vscode.Uri) => {
             if (!this._enabled) return;
-            console.log(`[inline-diff-disk] onDidChange: ${uri.fsPath} (pending: ${[...this._pendingToolFiles].join(', ')})`);
             let newContent: string;
             try {
                 newContent = fs.readFileSync(uri.fsPath, 'utf-8');
@@ -187,28 +185,23 @@ export class InlineDiffManager {
             : this._snapshots.has(rawKey) ? rawKey
             : this._pathAliases.get(realKey);
         if (!snapshotKey) {
-            console.log(`[inline-diff-emit] NO snapshot for ${filePath} (realKey=${realKey}, rawKey=${rawKey})`);
             return;
         }
 
         const snapshot = this._snapshots.get(snapshotKey);
         if (!snapshot) {
-            console.log(`[inline-diff-emit] snapshot missing for key=${snapshotKey}`);
             return;
         }
         const oldContent = snapshot.content;
         this._snapshots.set(snapshotKey, { content: newContent, timestamp: Date.now() });
         if (oldContent === newContent) {
-            console.log(`[inline-diff-emit] content unchanged for ${snapshotKey}`);
             return;
         }
         if (!this._pendingToolFiles.has(snapshotKey)) {
-            console.log(`[inline-diff-emit] NOT in pendingToolFiles: ${snapshotKey} (pending=${[...this._pendingToolFiles].join(',')})`);
             return;
         }
         this._pendingToolFiles.delete(snapshotKey);
         const diff = computeDiff(oldContent, newContent, snapshotKey);
-        console.log(`[inline-diff-emit] diff computed, length=${diff?.length ?? 0}, handler=${!!this._onDiffPreview}`);
         if (diff && this._onDiffPreview) {
             this._onDiffPreview(snapshotKey, diff);
         }
@@ -262,7 +255,6 @@ export class InlineDiffManager {
         if (oldContent === newContent) return;
         this._pendingToolFiles.delete(realKey);
         const diff = computeDiff(oldContent, newContent, realKey);
-        console.log(`[inline-diff-complete] computed diff for ${realKey}, length=${diff?.length ?? 0}, handler=${!!this._onDiffPreview}`);
         if (diff && this._onDiffPreview) {
             this._onDiffPreview(realKey, diff);
         }
