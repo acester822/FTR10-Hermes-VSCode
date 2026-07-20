@@ -4635,14 +4635,17 @@ function parseToolCallText(text) {
      * Parses the JSON payload and renders a colored unified diff.
      */
     function addDiffPreview(text) {
+        console.log('[webview-diff] addDiffPreview called, text length:', text ? text.length : 0);
         var data;
         try {
             data = JSON.parse(text);
         } catch (e) {
+            console.error('[webview-diff] JSON.parse failed:', e);
             return;
         }
         var filePath = data.filePath || 'file';
         var diff = data.diff || '';
+        console.log('[webview-diff] parsed filePath:', filePath, 'diff length:', diff.length);
         if (!diff) return;
 
         var id = 'msg-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6);
@@ -7050,6 +7053,7 @@ function parseToolCallText(text) {
                     const id = addMessage('thought', msg.text);
                     thoughtMsgId = id;
                 } else if (msg.role === 'diffPreview') {
+                    console.log('[webview-diff] addMessage diffPreview, text length:', msg.text ? msg.text.length : 0);
                     addDiffPreview(msg.text);
                 } else {
                     addMessage(msg.role, msg.text);
