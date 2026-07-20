@@ -4760,6 +4760,10 @@ function parseToolCallText(text) {
         updateQuickActionBtns();
         if (chatSearchState.query) scheduleChatSearch();
         maybeScrollToBottom();
+        setTimeout(function() {
+            var contentEl = msgEl.querySelector('.diff-preview-content');
+            console.log('[webview-diff] post-render: group.offsetHeight=' + group.offsetHeight + ' msgEl.className=' + msgEl.className + ' content.maxHeight=' + (contentEl ? window.getComputedStyle(contentEl).maxHeight : 'N/A') + ' content.offsetHeight=' + (contentEl ? contentEl.offsetHeight : 'N/A'));
+        }, 300);
         return id;
     }
 
